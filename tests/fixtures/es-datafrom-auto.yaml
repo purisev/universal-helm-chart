@@ -1,0 +1,8 @@
+externalSecrets:
+  tls-cert:
+    enabled: true
+    secretStore: vault-store
+    type: kubernetes.io/tls
+    dataFrom:
+      - remoteKey: my-app/tls
+        decodingStrategy: Auto

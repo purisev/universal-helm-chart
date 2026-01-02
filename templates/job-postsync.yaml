@@ -1,0 +1,94 @@
+{{- if .Values.postSync.enabled }}
+{{- $ctx := . }}
+{{- $psConfig := .Values.postSync }}
+{{- range $psJobName := keys ($psConfig.jobs | default dict) | sortAlpha }}
+{{- $psJob := index $psConfig.jobs $psJobName }}
+{{- if $psJob.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "uhc.fullname" $ctx }}-postsync-{{ $psJobName }}
+  annotations:
+    {{- $syncWave := $psJob.syncWave | default $psConfig.syncWave | default "0" | toString }}
+    {{- $deletePolicy := $psJob.hookDeletePolicy | default $psConfig.hookDeletePolicy | default "HookSucceeded" }}
+    {{- $baseAnnotations := dict
+      "argocd.argoproj.io/hook" "PostSync"
+      "argocd.argoproj.io/sync-wave" $syncWave
+      "argocd.argoproj.io/hook-delete-policy" $deletePolicy
+    }}
+    {{- $finalAnnotations := mergeOverwrite $baseAnnotations ($psConfig.metadataAnnotations | default dict) ($psJob.metadataAnnotations | default dict) }}
+    {{- toYaml $finalAnnotations | nindent 4 }}
+  labels:
+    {{- include "uhc.postSyncLabels" $ctx | nindent 4 }}
+spec:
+  backoffLimit: {{ $psJob.backoffLimit | default $psConfig.backoffLimit | default 1 }}
+  {{- with ($psJob.ttlSecondsAfterFinished | default $psConfig.ttlSecondsAfterFinished) }}
+  ttlSecondsAfterFinished: {{ . | int }}
+  {{- end }}
+  template:
+    metadata:
+      {{- $jobAnnotations := merge ($ctx.Values.jobPodAnnotations | default dict) ($ctx.Values.podAnnotations | default dict) }}
+      {{- with $jobAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "uhc.postSyncLabels" $ctx | nindent 8 }}
+    spec:
+      {{- with $ctx.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "uhc.serviceAccountName" $ctx }}
+      automountServiceAccountToken: {{ $ctx.Values.automountServiceAccountToken | default false }}
+      securityContext:
+        {{- toYaml $ctx.Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $ctx.Values.terminationGracePeriodSeconds | default 30 | int }}
+      restartPolicy: Never
+      containers:
+        - name: {{ $psJobName }}
+          {{- $imageSpec := $psJob.image | default dict }}
+          image: "{{ $imageSpec.repository | default $ctx.Values.image.repository }}:{{ $imageSpec.tag | default $ctx.Values.image.tag }}"
+          imagePullPolicy: {{ $imageSpec.pullPolicy | default $ctx.Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml ($ctx.Values.securityContext | default dict) | nindent 12 }}
+          {{- if $psJob.command }}
+          command:
+            - sh
+            - -c
+            - |
+{{ $psJob.command | trim | indent 14 }}
+          {{- else if $psJob.args }}
+          args:
+            {{- range $psJob.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          env:
+            {{- $combinedEnv := merge ($psConfig.env | default dict) ($psJob.env | default dict) }}
+            {{- include "uhc.envVars" (dict "ctx" $ctx "extraEnv" $combinedEnv) | nindent 12 }}
+          {{- include "uhc.envFrom" (dict "rootSecrets" $ctx.Values.envSecrets "workloadSecrets" $psJob.envSecrets) | nindent 10 }}
+          {{- with (index $ctx.Values.volumeMounts "postSync") }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with $ctx.Values.volumes }}
+      volumes:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $ctx.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $ctx.Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $ctx.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

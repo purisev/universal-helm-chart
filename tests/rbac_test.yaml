@@ -1,0 +1,123 @@
+suite: test rbac
+templates:
+  - rbac.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when rbac.enabled is false
+    set:
+      serviceAccount.create: true
+      rbac.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when serviceAccount.create is false
+    set:
+      serviceAccount.create: false
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Role and RoleBinding when both enabled
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get", "list"]
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should render Role as first document
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+    documentIndex: 0
+    asserts:
+      - isKind:
+          of: Role
+      - equal:
+          path: apiVersion
+          value: rbac.authorization.k8s.io/v1
+
+  - it: should render RoleBinding as second document
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+    documentIndex: 1
+    asserts:
+      - isKind:
+          of: RoleBinding
+
+  - it: should include rules in Role
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["secrets"]
+          verbs: ["get", "list", "watch"]
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: rules[0].resources[0]
+          value: secrets
+      - contains:
+          path: rules[0].verbs
+          content: get
+
+  - it: should bind RoleBinding to chart ServiceAccount
+    set:
+      serviceAccount.create: true
+      serviceAccount.name: my-app-sa
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: subjects[0].kind
+          value: ServiceAccount
+      - equal:
+          path: subjects[0].name
+          value: my-app-sa
+      - equal:
+          path: subjects[0].namespace
+          value: test-ns
+
+  - it: should reference the Role in RoleBinding roleRef
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: roleRef.kind
+          value: Role
+      - equal:
+          path: roleRef.apiGroup
+          value: rbac.authorization.k8s.io

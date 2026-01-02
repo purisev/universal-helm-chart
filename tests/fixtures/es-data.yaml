@@ -1,0 +1,8 @@
+externalSecrets:
+  db-creds:
+    enabled: true
+    secretStore: vault-store
+    data:
+      - remoteKey: my-app/db
+        secretKey: DB_PASSWORD
+        property: password

@@ -1,0 +1,131 @@
+suite: test networkpolicy
+templates:
+  - networkpolicy.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when no workloads have networkPolicy enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render NetworkPolicy for Deployment when enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+    asserts:
+      - isKind:
+          of: NetworkPolicy
+      - equal:
+          path: apiVersion
+          value: networking.k8s.io/v1
+      - matchRegex:
+          path: metadata.name
+          pattern: -web$
+
+  - it: should render NetworkPolicy for StatefulSet when enabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.networkPolicy.enabled: true
+    asserts:
+      - isKind:
+          of: NetworkPolicy
+      - matchRegex:
+          path: metadata.name
+          pattern: -redis$
+
+  - it: should use default policyTypes Ingress when not set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+    asserts:
+      - equal:
+          path: spec.policyTypes[0]
+          value: Ingress
+
+  - it: should render custom policyTypes
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+      deployments.web.networkPolicy.policyTypes:
+        - Ingress
+        - Egress
+    asserts:
+      - equal:
+          path: spec.policyTypes[0]
+          value: Ingress
+      - equal:
+          path: spec.policyTypes[1]
+          value: Egress
+
+  - it: should render ingress rules when set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+      deployments.web.networkPolicy.ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app: frontend
+          ports:
+            - port: 8080
+    asserts:
+      - isNotNull:
+          path: spec.ingress
+
+  - it: should render egress rules when set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+      deployments.web.networkPolicy.policyTypes:
+        - Egress
+      deployments.web.networkPolicy.egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  app: db
+    asserts:
+      - isNotNull:
+          path: spec.egress
+
+  - it: should set podSelector matching workload selector labels
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+    asserts:
+      - isNotNull:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/name"]
+      - isNotNull:
+          path: spec.podSelector.matchLabels["app.kubernetes.io/instance"]
+
+  - it: should render NetworkPolicy for both Deployment and StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.networkPolicy.enabled: true
+      statefulSets.db.enabled: true
+      statefulSets.db.networkPolicy.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2

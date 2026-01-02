@@ -1,0 +1,88 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- $deploymentSpecs := $ctx.Values.deployments -}}
+{{- range $wlName := keys $deploymentSpecs | sortAlpha }}
+{{- $wl := index $deploymentSpecs $wlName -}}
+{{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled (hasKey $wl "metrics") $wl.metrics.enabled }}
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}-metrics
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  annotations:
+    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+spec:
+  selector:
+    matchLabels:
+      {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+      app.kubernetes.io/workload: runtime
+  endpoints:
+    - port: {{ $wl.metrics.port | default "http" }}
+      path: {{ $wl.metrics.path | default "/metrics" }}
+      interval: {{ $wl.metrics.interval | default "30s" }}
+      scrapeTimeout: {{ $wl.metrics.scrapeTimeout | default "10s" }}
+    {{- if $wl.metrics.relabelConfigs }}
+      relabelConfigs:
+      {{- toYaml $wl.metrics.relabelConfigs | nindent 6 }}
+    {{- end }}
+    {{- if $wl.metrics.basicAuth }}
+      basicAuth:
+        password:
+          name: {{ $wl.metrics.basicAuth.password.name }}
+          key: {{ $wl.metrics.basicAuth.password.key }}
+        username:
+          name: {{ $wl.metrics.basicAuth.username.name }}
+          key: {{ $wl.metrics.basicAuth.username.key }}
+    {{- end }}
+    {{- if $wl.metrics.headers }}
+      vm_scrape_params:
+        headers:
+          {{- toYaml $wl.metrics.headers | nindent 10 }}
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
+{{- $wl := index $statefulSetSpecs $wlName -}}
+{{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled (hasKey $wl "metrics") $wl.metrics.enabled }}
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}-metrics
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  annotations:
+    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+spec:
+  selector:
+    matchLabels:
+      {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+      app.kubernetes.io/workload: runtime
+  endpoints:
+    - port: {{ $wl.metrics.port | default "http" }}
+      path: {{ $wl.metrics.path | default "/metrics" }}
+      interval: {{ $wl.metrics.interval | default "30s" }}
+      scrapeTimeout: {{ $wl.metrics.scrapeTimeout | default "10s" }}
+    {{- if $wl.metrics.relabelConfigs }}
+      relabelConfigs:
+      {{- toYaml $wl.metrics.relabelConfigs | nindent 6 }}
+    {{- end }}
+    {{- if $wl.metrics.basicAuth }}
+      basicAuth:
+        password:
+          name: {{ $wl.metrics.basicAuth.password.name }}
+          key: {{ $wl.metrics.basicAuth.password.key }}
+        username:
+          name: {{ $wl.metrics.basicAuth.username.name }}
+          key: {{ $wl.metrics.basicAuth.username.key }}
+    {{- end }}
+    {{- if $wl.metrics.headers }}
+      vm_scrape_params:
+        headers:
+          {{- toYaml $wl.metrics.headers | nindent 10 }}
+    {{- end }}
+{{- end }}
+{{- end }}

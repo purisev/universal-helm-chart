@@ -1,0 +1,10 @@
+externalSecrets:
+  mixed:
+    enabled: true
+    secretStore: vault-store
+    data:
+      - remoteKey: my-app/db
+        secretKey: DB_URL
+        property: url
+    dataFrom:
+      - remoteKey: my-app/config

@@ -1,0 +1,104 @@
+suite: test ingress
+templates:
+  - ingress.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when ingress disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Ingress when enabled
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: nginx
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: apiVersion
+          value: networking.k8s.io/v1
+
+  - it: should use release name for ingress name
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: nginx
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^test-release
+
+  - it: should set ingressClassName
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: traefik
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: traefik
+
+  - it: should render hosts and paths
+    values:
+      - fixtures/ingress-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: myapp.example.com
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: Prefix
+
+  - it: should render TLS when set
+    values:
+      - fixtures/ingress-full.yaml
+    asserts:
+      - isNotNull:
+          path: spec.tls
+      - equal:
+          path: spec.tls[0].secretName
+          value: myapp-tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: myapp.example.com
+
+  - it: should render annotations when set
+    values:
+      - fixtures/ingress-full.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/rewrite-target"]
+          value: /
+
+  - it: should have helm labels
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: nginx
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+
+  - it: should default path servicePort to 80
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: nginx
+      ingress.hosts[0].host: example.com
+      ingress.hosts[0].paths[0].path: /
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.port.number
+          value: 80
+
+  - it: should not render tls section when not set
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: nginx
+    asserts:
+      - isNull:
+          path: spec.tls

@@ -1,0 +1,15 @@
+image:
+  repository: nginx
+  tag: latest
+statefulSets:
+  cache:
+    enabled: true
+    keda:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 4
+      triggers:
+        - type: cpu
+          metricType: Utilization
+          metadata:
+            value: "60"

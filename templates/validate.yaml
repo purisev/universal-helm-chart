@@ -1,0 +1,6 @@
+{{- /*
+Input validation — fails fast with a clear error message before any resources are rendered.
+*/}}
+{{- if and .Values.envDev.enabled .Values.envProd.enabled }}
+{{- fail "envDev and envProd cannot both be enabled simultaneously. Enable only one environment-specific variable set." }}
+{{- end }}

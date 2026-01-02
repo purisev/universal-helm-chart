@@ -1,0 +1,202 @@
+suite: test job-postsync
+templates:
+  - job-postsync.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when postSync disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when postSync enabled but no jobs
+    set:
+      postSync.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render Job per enabled postSync job
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: apiVersion
+          value: batch/v1
+
+  - it: should have correct name with postsync prefix
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: -postsync-notify$
+
+  - it: should have ArgoCD PostSync hook annotation
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+
+  - it: should use default hookDeletePolicy HookSucceeded
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+          value: HookSucceeded
+
+  - it: should use per-job hookDeletePolicy override
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+      postSync.jobs.notify.hookDeletePolicy: BeforeHookCreation
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook-delete-policy"]
+          value: BeforeHookCreation
+
+  - it: should use root image when job has no image
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^alpine:3$
+
+  - it: should use per-job image override
+    set:
+      image.repository: nginx
+      image.tag: latest
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+      postSync.jobs.notify.image.repository: curlimages/curl
+      postSync.jobs.notify.image.tag: latest
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: ^curlimages/curl:latest$
+
+  - it: should skip disabled jobs
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: false
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render multiple Jobs when multiple jobs enabled
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo notify
+      postSync.jobs.smoke.enabled: true
+      postSync.jobs.smoke.command: echo smoke
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should set restartPolicy to Never
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - equal:
+          path: spec.template.spec.restartPolicy
+          value: Never
+
+  - it: should use per-job backoffLimit override
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+      postSync.jobs.notify.backoffLimit: 3
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 3
+
+  - it: should merge global and per-job metadata annotations
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.metadataAnnotations.team: platform
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - equal:
+          path: metadata.annotations["team"]
+          value: platform
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/hook"]
+          value: PostSync
+
+  # --- R2: ttlSecondsAfterFinished ---
+
+  - it: should render ttlSecondsAfterFinished from global postSync config
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.ttlSecondsAfterFinished: 600
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 600
+
+  - it: should allow per-job ttlSecondsAfterFinished override
+    set:
+      image.repository: alpine
+      image.tag: "3"
+      postSync.enabled: true
+      postSync.ttlSecondsAfterFinished: 600
+      postSync.jobs.notify.enabled: true
+      postSync.jobs.notify.command: echo done
+      postSync.jobs.notify.ttlSecondsAfterFinished: 120
+    asserts:
+      - equal:
+          path: spec.ttlSecondsAfterFinished
+          value: 120

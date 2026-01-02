@@ -1,0 +1,17 @@
+image:
+  repository: nginx
+  tag: latest
+deployments:
+  worker:
+    enabled: true
+    keda:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 8
+      pollingInterval: 30
+      cooldownPeriod: 60
+      triggers:
+        - type: rabbitmq
+          metadata:
+            queueName: tasks
+            hostFromEnv: RABBITMQ_URI

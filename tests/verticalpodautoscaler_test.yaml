@@ -1,0 +1,129 @@
+suite: test verticalpodautoscaler
+templates:
+  - verticalpodautoscaler.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when vpa disabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render VPA for Deployment when global vpa enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - isKind:
+          of: VerticalPodAutoscaler
+      - equal:
+          path: apiVersion
+          value: autoscaling.k8s.io/v1
+
+  - it: should have correct name
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: -web$
+
+  - it: should target Deployment kind
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - equal:
+          path: spec.targetRef.kind
+          value: Deployment
+      - equal:
+          path: spec.targetRef.apiVersion
+          value: apps/v1
+
+  - it: should default updateMode to Initial
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: Initial
+
+  - it: should use custom updateMode
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: true
+      verticalPodAutoscaler.updateMode: "Off"
+    asserts:
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: "Off"
+
+  - it: should render VPA for StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: latest
+      statefulSets.db.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - isKind:
+          of: VerticalPodAutoscaler
+      - equal:
+          path: spec.targetRef.kind
+          value: StatefulSet
+      - matchRegex:
+          path: metadata.name
+          pattern: -db$
+
+  - it: should use per-workload vpa override
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: false
+      deployments.web.verticalPodAutoscaler.enabled: true
+      deployments.web.verticalPodAutoscaler.updateMode: Recreate
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.updatePolicy.updateMode
+          value: Recreate
+
+  - it: should have argocd sync-wave annotation
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - isNotNull:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+
+  - it: should render VPA for both Deployment and StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      statefulSets.db.enabled: true
+      verticalPodAutoscaler.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2

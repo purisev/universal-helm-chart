@@ -1,0 +1,66 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- $deploymentSpecs := $ctx.Values.deployments -}}
+{{- range $wlName := keys $deploymentSpecs | sortAlpha }}
+{{- $wl := index $deploymentSpecs $wlName }}
+{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- $pdbSpec := default $ctx.Values.podDisruptionBudget $wl.podDisruptionBudget }}
+{{- if and $pdbSpec (default false $pdbSpec.enabled) }}
+{{- if and (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
+{{- fail (printf "podDisruptionBudget for workload %q: cannot set both minAvailable and maxUnavailable" $wlName) }}
+{{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  annotations:
+    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  {{- if hasKey $pdbSpec "maxUnavailable" }}
+  maxUnavailable: {{ $pdbSpec.maxUnavailable }}
+  {{- else if hasKey $pdbSpec "minAvailable" }}
+  minAvailable: {{ $pdbSpec.minAvailable }}
+  {{- else }}
+  maxUnavailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
+{{- $wl := index $statefulSetSpecs $wlName }}
+{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- $pdbSpec := default $ctx.Values.podDisruptionBudget $wl.podDisruptionBudget }}
+{{- if and $pdbSpec (default false $pdbSpec.enabled) }}
+{{- if and (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
+{{- fail (printf "podDisruptionBudget for workload %q: cannot set both minAvailable and maxUnavailable" $wlName) }}
+{{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  annotations:
+    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  {{- if hasKey $pdbSpec "maxUnavailable" }}
+  maxUnavailable: {{ $pdbSpec.maxUnavailable }}
+  {{- else if hasKey $pdbSpec "minAvailable" }}
+  minAvailable: {{ $pdbSpec.minAvailable }}
+  {{- else }}
+  maxUnavailable: 1
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}

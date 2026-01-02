@@ -1,0 +1,154 @@
+suite: test poddisruptionbudget
+templates:
+  - poddisruptionbudget.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when no workloads
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when pdb disabled on deployment
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.podDisruptionBudget.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render PDB for Deployment using global pdb
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - equal:
+          path: apiVersion
+          value: policy/v1
+      - matchRegex:
+          path: metadata.name
+          pattern: -web$
+
+  - it: should render PDB for StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: latest
+      statefulSets.db.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+    asserts:
+      - isKind:
+          of: PodDisruptionBudget
+      - matchRegex:
+          path: metadata.name
+          pattern: -db$
+
+  - it: should use minAvailable when set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 2
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 2
+      - isNull:
+          path: spec.maxUnavailable
+
+  - it: should use maxUnavailable when set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.podDisruptionBudget.enabled: true
+      deployments.web.podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+
+  - it: should default to maxUnavailable 1 when neither specified
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.podDisruptionBudget.enabled: true
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 1
+
+  - it: should use per-workload pdb over global
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: false
+      podDisruptionBudget.minAvailable: 1
+      deployments.web.podDisruptionBudget.enabled: true
+      deployments.web.podDisruptionBudget.minAvailable: 3
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.minAvailable
+          value: 3
+
+  - it: should have selector matching workload labels
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+    asserts:
+      - isNotNull:
+          path: spec.selector.matchLabels
+
+  - it: should have argocd sync-wave annotation
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+    asserts:
+      - isNotNull:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+
+  - it: should render PDB for both Deployment and StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      statefulSets.db.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.minAvailable: 1
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  # --- R6: PDB both-fields validation ---
+
+  - it: should fail when both minAvailable and maxUnavailable are set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.podDisruptionBudget.enabled: true
+      deployments.web.podDisruptionBudget.minAvailable: 1
+      deployments.web.podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "podDisruptionBudget for workload \"web\": cannot set both minAvailable and maxUnavailable"

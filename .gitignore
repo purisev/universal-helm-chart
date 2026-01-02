@@ -1,0 +1,28 @@
+# Claude Code development tooling — never commit to git
+CLAUDE.md
+.claude/
+
+# Helm packaged chart archives — use OCI registry or chart museum, not git
+*.tgz
+
+# Helm dependency downloads — reproduce with `helm dependency update`
+# Uncomment if you use chart dependencies (Chart.yaml dependencies[]):
+# charts/*.tgz
+
+# Local values overrides with secrets — never commit
+*.local.yaml
+*.secret.yaml
+secrets.yaml
+secret.yaml
+
+# OS artifacts
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor temp files
+*.swp
+*.swo
+*~
+*.orig
+.idea/

@@ -1,0 +1,941 @@
+suite: test deployment
+templates:
+  - deployment.yaml
+release:
+  name: test-release
+  namespace: test-ns
+tests:
+  - it: should render Deployment when workload enabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 2
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: metadata.name
+          pattern: -web$
+      - equal:
+          path: spec.replicas
+          value: 2
+      - matchRegex:
+          path: spec.template.spec.containers[0].image
+          pattern: nginx:alpine
+
+  - it: should not render replicas when KEDA enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 3
+      deployments.web.keda.enabled: true
+      deployments.web.keda.minReplicas: 1
+      deployments.web.keda.maxReplicas: 10
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - isKind:
+          of: Deployment
+      - isNull:
+          path: spec.replicas
+
+  - it: should not render replicas when HPA enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 3
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.minReplicas: 1
+      deployments.web.hpa.maxReplicas: 5
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - isKind:
+          of: Deployment
+      - isNull:
+          path: spec.replicas
+
+  - it: should use per-workload image override
+    set:
+      image.repository: default/app
+      image.tag: v1
+      deployments.web.enabled: true
+      deployments.web.image.repository: custom/web
+      deployments.web.image.tag: v2
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: custom/web:v2
+
+  - it: should use root strategy when workload has no strategy override
+    set:
+      image.repository: nginx
+      image.tag: latest
+      strategy.type: RollingUpdate
+      strategy.rollingUpdate.maxSurge: 2
+      strategy.rollingUpdate.maxUnavailable: 1
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 2
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 1
+
+  - it: should override root strategy with per-workload strategy
+    set:
+      image.repository: nginx
+      image.tag: latest
+      strategy.type: RollingUpdate
+      strategy.rollingUpdate.maxSurge: 1
+      strategy.rollingUpdate.maxUnavailable: 0
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.strategy.type: Recreate
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.strategy.type
+          value: Recreate
+      - isNull:
+          path: spec.strategy.rollingUpdate
+
+  - it: should use built-in fallback strategy when not set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.strategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.strategy.rollingUpdate.maxSurge
+          value: 1
+      - equal:
+          path: spec.strategy.rollingUpdate.maxUnavailable
+          value: 0
+
+  - it: should render sidecar after main container with merged secrets
+    set:
+      image:
+        repository: nginx
+        tag: latest
+      securityContext:
+        allowPrivilegeEscalation: false
+      envSecrets:
+        - name: shared-secret
+      volumeMounts:
+        web:
+          - name: app-config
+            mountPath: /etc/config
+      deployments:
+        web:
+          enabled: true
+          replicaCount: 1
+          service:
+            enabled: true
+            port: 80
+            targetPort: 8080
+          sidecars:
+            fluent-bit:
+              image:
+                repository: fluent/fluent-bit
+                tag: "3.1"
+              args:
+                - -c
+                - /fluent-bit/etc/fluent-bit.conf
+              envSecrets:
+                - name: fluent-secret
+              ports:
+                - name: metrics
+                  containerPort: 2020
+                  protocol: TCP
+              volumeMounts:
+                - name: local-only
+                  mountPath: /etc/metrics
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: web
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+      - equal:
+          path: spec.template.spec.containers[1].name
+          value: fluent-bit
+      - equal:
+          path: spec.template.spec.containers[1].image
+          value: fluent/fluent-bit:3.1
+      - equal:
+          path: spec.template.spec.containers[1].args[0]
+          value: -c
+      - equal:
+          path: spec.template.spec.containers[1].ports[0].containerPort
+          value: 2020
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[0].secretRef.name
+          value: shared-secret
+      - equal:
+          path: spec.template.spec.containers[1].envFrom[1].secretRef.name
+          value: fluent-secret
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[0].mountPath
+          value: /etc/metrics
+      - equal:
+          path: spec.template.spec.containers[1].securityContext.allowPrivilegeEscalation
+          value: false
+
+  - it: should not inherit root volumeMounts for sidecars
+    set:
+      image:
+        repository: nginx
+        tag: latest
+      volumeMounts:
+        web:
+          - name: app-config
+            mountPath: /etc/config
+      deployments:
+        web:
+          enabled: true
+          replicaCount: 1
+          service:
+            enabled: true
+            port: 80
+            targetPort: 8080
+          sidecars:
+            fluent-bit:
+              volumeMounts:
+                - name: local-only
+                  mountPath: /etc/metrics
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[0].mountPath
+          value: /etc/metrics
+      - isNull:
+          path: spec.template.spec.containers[1].volumeMounts[1]
+
+  - it: should keep single container when sidecars not configured
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: web
+      - isNull:
+          path: spec.template.spec.containers[1]
+
+  - it: should inherit all env levels by default
+    set:
+      image.repository: nginx
+      image.tag: latest
+      global.application.env.APP_NAME.value: myapp
+      global.env.APP_ENV.value: production
+      envDev.enabled: true
+      envDev.env.DEBUG.value: "true"
+      envProd.enabled: false
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.env.WEB_ONLY.value: local
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_NAME
+            value: myapp
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_ENV
+            value: production
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DEBUG
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEB_ONLY
+            value: local
+
+  - it: should respect inherit.env flags and disable selected env layers
+    set:
+      image.repository: nginx
+      image.tag: latest
+      global.application.env.APP_NAME.value: myapp
+      global.env.APP_ENV.value: production
+      envDev.enabled: true
+      envDev.env.DEBUG.value: "true"
+      envProd.enabled: false
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.env.application: false
+      deployments.web.inherit.env.global: false
+      deployments.web.inherit.env.dev: false
+      deployments.web.env.WEB_ONLY.value: local
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_NAME
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_ENV
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DEBUG
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: WEB_ONLY
+            value: local
+
+  # --- configMap auto-mount ---
+
+  - it: should not add volume or volumeMount when configMaps has no mountPath
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.template.spec.volumes
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: should auto-mount configMap as volume when mountPath is set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: cm-app-config
+      - matchRegex:
+          path: spec.template.spec.volumes[0].configMap.name
+          pattern: -app-config$
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: cm-app-config
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /etc/config
+
+  - it: should auto-mount multiple configMaps into containers
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      configMaps.nginx-config.enabled: true
+      configMaps.nginx-config.mountPath: /etc/nginx/conf.d
+      configMaps.nginx-config.data.default: conf
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: cm-app-config
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: cm-nginx-config
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: cm-app-config
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: cm-nginx-config
+
+  - it: should auto-mount configMap into sidecars as well
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.sidecars.log-shipper: {}
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[0].name
+          value: cm-app-config
+      - equal:
+          path: spec.template.spec.containers[1].volumeMounts[0].mountPath
+          value: /etc/config
+
+  - it: should set readOnly true on auto-mounted configMap by default
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].readOnly
+          value: true
+
+  - it: should set readOnly false when explicitly disabled on configMap
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.readOnly: false
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].readOnly
+          value: false
+
+  - it: should set defaultMode on configMap volume
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.scripts.enabled: true
+      configMaps.scripts.mountPath: /scripts
+      configMaps.scripts.defaultMode: 493
+      configMaps.scripts.data.run: "#!/bin/sh"
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].configMap.defaultMode
+          value: 493
+
+  - it: should not mount configMaps when inherit.configMapMount is false
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMapMount: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts
+
+  - it: should disable only specific configMap via granular inherit.configMapMount map
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      configMaps.nginx-config.enabled: true
+      configMaps.nginx-config.mountPath: /etc/nginx/conf.d
+      configMaps.nginx-config.data.default: conf
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMapMount.nginx-config: false
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: cm-app-config
+      - isNull:
+          path: spec.template.spec.containers[0].volumeMounts[1]
+
+  - it: should resolve configMapRef shorthand in envConfigMaps
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.env-config.enabled: true
+      configMaps.env-config.data.LOG_LEVEL: info
+      envConfigMaps[0].configMapRef: env-config
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          pattern: -env-config$
+
+  - it: should propagate inherit.configMapMount false to sidecars
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMapMount: false
+      deployments.web.sidecars.log-shipper: {}
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[1].volumeMounts
+
+  # --- envConfigMaps ---
+
+  - it: should inject root envConfigMaps into main container
+    set:
+      image.repository: nginx
+      image.tag: latest
+      envConfigMaps[0].name: shared-config
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: shared-config
+
+  - it: should merge root and per-workload envConfigMaps
+    set:
+      image.repository: nginx
+      image.tag: latest
+      envConfigMaps[0].name: global-config
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.envConfigMaps[0].name: web-config
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: global-config
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].configMapRef.name
+          value: web-config
+
+  - it: should disable root envConfigMaps with inherit.configMaps false
+    set:
+      image.repository: nginx
+      image.tag: latest
+      envConfigMaps[0].name: global-config
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMaps: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: should keep per-workload envConfigMaps when inherit.configMaps is false
+    set:
+      image.repository: nginx
+      image.tag: latest
+      envConfigMaps[0].name: global-config
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMaps: false
+      deployments.web.envConfigMaps[0].name: web-only-config
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: web-only-config
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom[1]
+
+  - it: should propagate inherit.configMaps false from workload to its sidecars
+    set:
+      image.repository: nginx
+      image.tag: latest
+      envConfigMaps[0].name: global-config
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMaps: false
+      deployments.web.sidecars.log-shipper: {}
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[1].envFrom
+
+  - it: should propagate inherit.env from workload to its sidecars
+    set:
+      image.repository: nginx
+      image.tag: latest
+      global.env.APP_ENV.value: production
+      envDev.enabled: true
+      envDev.env.DEBUG.value: "true"
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.env.global: false
+      deployments.web.inherit.env.dev: false
+      deployments.web.sidecars.log-shipper: {}
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: APP_ENV
+      - notContains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: DEBUG
+      - contains:
+          path: spec.template.spec.containers[1].env
+          content:
+            name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+
+  # --- C2: replicaCount default ---
+
+  - it: should default to 1 replica when replicaCount not set
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  # --- C3: command / args fixes ---
+
+  - it: should render command as exec array when a list is given
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.command:
+        - /app/server
+        - --port=8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: /app/server
+      - equal:
+          path: spec.template.spec.containers[0].command[1]
+          value: --port=8080
+
+  - it: should wrap string command in sh -c
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.command: "echo hello"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command[0]
+          value: sh
+      - equal:
+          path: spec.template.spec.containers[0].command[1]
+          value: -c
+
+  - it: should render args independently without command
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.args:
+        - --config
+        - /etc/app.yaml
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].command
+      - equal:
+          path: spec.template.spec.containers[0].args[0]
+          value: --config
+      - equal:
+          path: spec.template.spec.containers[0].args[1]
+          value: /etc/app.yaml
+
+  # --- S1: seccompProfile ---
+
+  - it: should set seccompProfile RuntimeDefault in podSecurityContext by default
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.seccompProfile.type
+          value: RuntimeDefault
+
+  # --- S2: readOnlyRootFilesystem ---
+
+  - it: should set readOnlyRootFilesystem true in container securityContext by default
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+
+  # --- S3: automountServiceAccountToken ---
+
+  - it: should set automountServiceAccountToken false by default
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: false
+
+  - it: should allow enabling automountServiceAccountToken per-workload
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.automountServiceAccountToken: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.automountServiceAccountToken
+          value: true
+
+  # --- R1: lifecycle ---
+
+  - it: should render lifecycle preStop when configured
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.lifecycle.preStop.exec.command:
+        - /bin/sh
+        - -c
+        - sleep 5
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].lifecycle.preStop.exec.command[0]
+          value: /bin/sh
+
+  # --- R4: minReadySeconds ---
+
+  - it: should not render minReadySeconds when it is 0
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.minReadySeconds
+
+  - it: should render minReadySeconds when non-zero
+    set:
+      image.repository: nginx
+      image.tag: latest
+      minReadySeconds: 10
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.minReadySeconds
+          value: 10
+
+  - it: should use per-workload minReadySeconds over root
+    set:
+      image.repository: nginx
+      image.tag: latest
+      minReadySeconds: 5
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.minReadySeconds: 20
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.minReadySeconds
+          value: 20
+
+  # --- R5: terminationGracePeriodSeconds ---
+
+  - it: should set terminationGracePeriodSeconds from root values
+    set:
+      image.repository: nginx
+      image.tag: latest
+      terminationGracePeriodSeconds: 60
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 60
+
+  - it: should set per-workload terminationGracePeriodSeconds
+    set:
+      image.repository: nginx
+      image.tag: latest
+      terminationGracePeriodSeconds: 30
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.terminationGracePeriodSeconds: 120
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 120
+
+  # --- L1: full labels on pod template ---
+
+  - it: should include helm.sh/chart label on pod template
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - isNotNull:
+          path: spec.template.metadata.labels["helm.sh/chart"]
+      - isNotNull:
+          path: spec.template.metadata.labels["app.kubernetes.io/managed-by"]

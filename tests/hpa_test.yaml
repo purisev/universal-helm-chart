@@ -1,0 +1,140 @@
+suite: test hpa
+templates:
+  - hpa.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when no deployments
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when hpa disabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: false
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when keda is enabled (keda takes priority)
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+      deployments.web.keda.enabled: true
+      deployments.web.keda.maxReplicas: 5
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render HPA when enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: apiVersion
+          value: autoscaling/v2
+
+  - it: should have correct name
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: -web$
+
+  - it: should default minReplicas to 1
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 1
+
+  - it: should set custom minReplicas and maxReplicas
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.minReplicas: 2
+      deployments.web.hpa.maxReplicas: 10
+    asserts:
+      - equal:
+          path: spec.minReplicas
+          value: 2
+      - equal:
+          path: spec.maxReplicas
+          value: 10
+
+  - it: should reference correct deployment in scaleTargetRef
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+      - matchRegex:
+          path: spec.scaleTargetRef.name
+          pattern: -web$
+
+  - it: should have argocd sync-wave annotation
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - isNotNull:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+
+  - it: should include metrics when set
+    values:
+      - fixtures/hpa-with-metrics.yaml
+    asserts:
+      - isNotNull:
+          path: spec.metrics
+      - equal:
+          path: spec.metrics[0].type
+          value: Resource
+
+  - it: should render two HPAs for two deployments
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.alpha.enabled: true
+      deployments.alpha.hpa.enabled: true
+      deployments.alpha.hpa.maxReplicas: 5
+      deployments.beta.enabled: true
+      deployments.beta.hpa.enabled: true
+      deployments.beta.hpa.maxReplicas: 5
+    asserts:
+      - hasDocuments:
+          count: 2

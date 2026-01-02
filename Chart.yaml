@@ -1,0 +1,15 @@
+apiVersion: v2
+name: universal-helm-chart
+description: A universal Helm chart for deploying Kubernetes workloads.
+type: application
+version: 1.0.0
+keywords:
+  - kubernetes
+  - universal
+  - deployment
+  - statefulset
+  - cronjob
+home: https://github.com/purisev/universal-helm-chart
+license: Apache-2.0
+maintainers:
+  - name: purisev

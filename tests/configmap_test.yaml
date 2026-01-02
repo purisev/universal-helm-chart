@@ -1,0 +1,106 @@
+suite: test configmap
+templates:
+  - configmap.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # --- chart-level configMaps map ---
+
+  - it: should not render any ConfigMap when configMaps is empty
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render ConfigMap when disabled
+    set:
+      configMaps.app-config.enabled: false
+      configMaps.app-config.data.key: value
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ConfigMap when enabled
+    set:
+      configMaps.app-config.enabled: true
+      configMaps.app-config.data.appconfig: myvalue
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: metadata.name
+          pattern: -app-config$
+      - equal:
+          path: data.appconfig
+          value: myvalue
+
+  - it: should render multiple ConfigMaps
+    set:
+      configMaps.app-config.enabled: true
+      configMaps.app-config.data.key: val1
+      configMaps.nginx-config.enabled: true
+      configMaps.nginx-config.data.key: val2
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should render ConfigMap with correct labels
+    set:
+      configMaps.app-config.enabled: true
+      configMaps.app-config.data.foo: bar
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+
+  # --- per-workload configMap (createConfigmap) ---
+
+  - it: should render per-workload ConfigMap when createConfigmap true
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.createConfigmap: true
+      deployments.web.configData.server_port: "8080"
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: metadata.name
+          pattern: -web-config$
+      - equal:
+          path: data.server_port
+          value: "8080"
+
+  - it: should have reloader annotation on per-workload ConfigMap
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.createConfigmap: true
+      deployments.web.configData.key: value
+    asserts:
+      - equal:
+          path: metadata.annotations["reloader.stakater.com/auto"]
+          value: "true"
+
+  - it: should render per-workload ConfigMap for StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: latest
+      statefulSets.db.enabled: true
+      statefulSets.db.createConfigmap: true
+      statefulSets.db.configData.pg_hba: "host all all 0.0.0.0/0 md5"
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: metadata.name
+          pattern: -db-config$
+      - equal:
+          path: data.pg_hba
+          value: "host all all 0.0.0.0/0 md5"
+      - equal:
+          path: metadata.annotations["reloader.stakater.com/auto"]
+          value: "true"

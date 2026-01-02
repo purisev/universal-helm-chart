@@ -1,0 +1,114 @@
+suite: test scaledobject
+templates:
+  - scaledobject.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when no keda enabled
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ScaledObject for Deployment when keda enabled
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: apiVersion
+          value: keda.sh/v1alpha1
+
+  - it: should have correct name for Deployment ScaledObject
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: -worker$
+
+  - it: should target Deployment kind
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: Deployment
+
+  - it: should set minReplicaCount and maxReplicaCount
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 2
+      - equal:
+          path: spec.maxReplicaCount
+          value: 8
+
+  - it: should default minReplicaCount to 1
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.keda.enabled: true
+      deployments.web.keda.maxReplicas: 5
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 1
+
+  - it: should include triggers
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - isNotNull:
+          path: spec.triggers
+      - equal:
+          path: spec.triggers[0].type
+          value: rabbitmq
+
+  - it: should include pollingInterval and cooldownPeriod when set
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.pollingInterval
+          value: 30
+      - equal:
+          path: spec.cooldownPeriod
+          value: 60
+
+  - it: should render ScaledObject for StatefulSet
+    values:
+      - fixtures/keda-statefulset.yaml
+    asserts:
+      - isKind:
+          of: ScaledObject
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: StatefulSet
+      - matchRegex:
+          path: metadata.name
+          pattern: -cache$
+
+  - it: should have argocd sync-wave annotation
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - isNotNull:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+
+  - it: should set envSourceContainerName to workload name
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.envSourceContainerName
+          value: worker

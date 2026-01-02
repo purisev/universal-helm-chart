@@ -1,0 +1,106 @@
+{{- if .Values.dbJob.enabled }}
+{{- $ctx := . }}
+{{- $dbJobSpec := $ctx.Values.dbJob }}
+{{- if not $dbJobSpec.image.repository }}{{ required "dbJob.image.repository is required when dbJob.enabled is true" nil }}{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "uhc.fullname" . }}-database
+  annotations:
+    {{- $baseAnnotations := dict
+      "argocd.argoproj.io/hook" "Sync"
+      "argocd.argoproj.io/sync-wave" (printf "%d" (int .Values.syncWaves.databaseJobsSyncWave))
+    }}
+    {{- $finalAnnotations := mergeOverwrite $baseAnnotations ($dbJobSpec.metadataAnnotations | default dict) }}
+    {{- toYaml $finalAnnotations | nindent 4 }}
+  labels:
+    {{- include "uhc.labels" . | nindent 4 }}
+spec:
+  backoffLimit: {{ default 3 $dbJobSpec.backoffLimit }}
+  {{- with $dbJobSpec.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . | int }}
+  {{- end }}
+  {{- with $dbJobSpec.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . | int }}
+  {{- end }}
+  template:
+    metadata:
+    {{- $jobAnnotations := merge ($ctx.Values.jobPodAnnotations | default dict) ($ctx.Values.podAnnotations | default dict) }}
+    {{- with $jobAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      name: {{ .Release.Name }}
+      labels:
+        {{- include "uhc.dbJobLabels" . | nindent 8 }}
+    spec:
+      {{- with $dbJobSpec.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "uhc.serviceAccountName" . }}
+      automountServiceAccountToken: {{ $ctx.Values.automountServiceAccountToken | default false }}
+      securityContext:
+        {{- toYaml $ctx.Values.podSecurityContext | nindent 8 }}
+      terminationGracePeriodSeconds: {{ $ctx.Values.terminationGracePeriodSeconds | default 30 | int }}
+      restartPolicy: Never
+      initContainers:
+        {{- range $taskName := keys $dbJobSpec.tasks | sortAlpha }}
+        {{- $task := index $dbJobSpec.tasks $taskName }}
+        {{- if $task.enabled }}
+        - name: {{ $taskName }}
+          image: "{{ $dbJobSpec.image.repository }}:{{ $dbJobSpec.image.tag }}"
+          imagePullPolicy: {{ $dbJobSpec.image.pullPolicy }}
+          securityContext:
+            {{- toYaml $ctx.Values.securityContext | nindent 12 }}
+          {{- if $task.command }}
+          command:
+            - sh
+            - -c
+            - |
+{{ $task.command | trim | indent 14 }}
+          {{- else if $task.args }}
+          args:
+            {{- range $task.args }}
+            - {{ . | quote }}
+            {{- end }}
+          {{- end }}
+          env:
+            {{- include "uhc.envVars" (dict "ctx" $ctx "extraEnv" $dbJobSpec.env) | nindent 12 }}
+          {{- include "uhc.envFrom" (dict "rootSecrets" $ctx.Values.envSecrets) | nindent 10 }}
+          {{- with (index $ctx.Values.volumeMounts "dbJob") }}
+          volumeMounts:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+        {{- end }}
+        {{- end }}
+      containers:
+        - name: job-completed
+          image: {{ $dbJobSpec.completionImage | default "alpine:3.21" }}
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "echo SUCCESS"]
+          securityContext:
+            {{- toYaml $ctx.Values.securityContext | nindent 12 }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 16Mi
+      volumes:
+        {{- with $ctx.Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

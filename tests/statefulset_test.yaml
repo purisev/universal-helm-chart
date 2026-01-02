@@ -1,0 +1,263 @@
+suite: test statefulset
+templates:
+  - statefulset.yaml
+release:
+  name: test-release
+  namespace: test-ns
+tests:
+  - it: renders StatefulSet when enabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  - it: should use root strategy for updateStrategy when statefulset has no override
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSetUpdateStrategy.type: RollingUpdate
+      statefulSetUpdateStrategy.rollingUpdate.partition: 3
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.serviceName: redis-headless
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.updateStrategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.partition
+          value: 3
+
+  - it: should override root strategy with per-statefulset strategy
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSetUpdateStrategy.type: RollingUpdate
+      statefulSetUpdateStrategy.rollingUpdate.partition: 0
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.statefulSetUpdateStrategy.type: OnDelete
+      statefulSets.redis.serviceName: redis-headless
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.updateStrategy.type
+          value: OnDelete
+      - isNull:
+          path: spec.updateStrategy.rollingUpdate
+
+  - it: should use built-in fallback updateStrategy when not set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.serviceName: redis-headless
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.updateStrategy.type
+          value: RollingUpdate
+      - equal:
+          path: spec.updateStrategy.rollingUpdate.partition
+          value: 0
+
+  - it: should inherit all env levels by default for StatefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      global.application.env.APP_NAME.value: myapp
+      global.env.APP_ENV.value: production
+      envDev.enabled: true
+      envDev.env.DEBUG.value: "true"
+      envProd.enabled: false
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.env.REDIS_ONLY.value: local
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_NAME
+            value: myapp
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_ENV
+            value: production
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DEBUG
+            value: "true"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_ONLY
+            value: local
+
+  - it: should respect inherit.env flags and disable selected env layers for StatefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      global.application.env.APP_NAME.value: myapp
+      global.env.APP_ENV.value: production
+      envDev.enabled: true
+      envDev.env.DEBUG.value: "true"
+      envProd.enabled: false
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.inherit.env.application: false
+      statefulSets.redis.inherit.env.global: false
+      statefulSets.redis.inherit.env.dev: false
+      statefulSets.redis.env.REDIS_ONLY.value: local
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_NAME
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: APP_ENV
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DEBUG
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: REDIS_ONLY
+            value: local
+
+  # --- C2: replicaCount default ---
+
+  - it: should default to 1 replica when replicaCount not set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+
+  # --- L1: full labels on pod template ---
+
+  - it: should include helm.sh/chart label on pod template
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isNotNull:
+          path: spec.template.metadata.labels["helm.sh/chart"]
+      - isNotNull:
+          path: spec.template.metadata.labels["app.kubernetes.io/managed-by"]
+
+  # --- L4: podManagementPolicy ---
+
+  - it: should render podManagementPolicy when set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.podManagementPolicy: Parallel
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - equal:
+          path: spec.podManagementPolicy
+          value: Parallel
+
+  - it: should not render podManagementPolicy when not set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isNull:
+          path: spec.podManagementPolicy
+
+  # --- R4: minReadySeconds ---
+
+  - it: should render minReadySeconds when non-zero
+    set:
+      image.repository: redis
+      image.tag: alpine
+      minReadySeconds: 15
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - equal:
+          path: spec.minReadySeconds
+          value: 15
+
+  # --- R5: terminationGracePeriodSeconds ---
+
+  - it: should set terminationGracePeriodSeconds for StatefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      terminationGracePeriodSeconds: 90
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - equal:
+          path: spec.template.spec.terminationGracePeriodSeconds
+          value: 90

@@ -1,0 +1,81 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- $deploymentSpecs := $ctx.Values.deployments -}}
+{{- range $wlName := keys $deploymentSpecs | sortAlpha }}
+{{- $wl := index $deploymentSpecs $wlName -}}
+{{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+    {{- if and (hasKey $wl "metrics") $wl.metrics.enabled }}
+    app.kubernetes.io/workload: runtime
+    {{- end }}
+  {{- with $wl.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $wl.service.type }}
+  ports:
+    {{- if $wl.service.ports }}
+    {{- range $wl.service.ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .targetPort }}
+      protocol: {{ .protocol | default "TCP" }}
+    {{- end }}
+    {{- else }}
+    - port: {{ $wl.service.port }}
+      targetPort: {{ $wl.service.targetPort }}
+      protocol: TCP
+      name: http
+    {{- end }}
+  selector:
+    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+    {{- if and (hasKey $wl "metrics") $wl.metrics.enabled }}
+    app.kubernetes.io/workload: runtime
+    {{- end }}
+{{- end }}
+{{- end }}
+{{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
+{{- $wl := index $statefulSetSpecs $wlName }}
+{{- if and (hasKey $wl "enabled") $wl.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  clusterIP: None
+  ports:
+    {{- if and $wl.service $wl.service.enabled }}
+    {{- if $wl.service.ports }}
+    {{- range $wl.service.ports }}
+    - name: {{ .name }}
+      port: {{ .port | default .targetPort }}
+      targetPort: {{ .targetPort }}
+      protocol: {{ .protocol | default "TCP" }}
+    {{- end }}
+    {{- else }}
+    - name: http
+      port: {{ $wl.service.port | default $wl.service.targetPort }}
+      targetPort: {{ $wl.service.targetPort }}
+      protocol: TCP
+    {{- end }}
+    {{- else }}
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- end }}
+{{- end }}

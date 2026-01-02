@@ -1,0 +1,88 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
+{{- $wl := index $statefulSetSpecs $wlName }}
+{{- if and (hasKey $wl "enabled") $wl.enabled }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  annotations:
+    {{- if $ctx.Values.reloader.enabled }}
+    "reloader.stakater.com/auto": "true"
+    {{- end }}
+    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  serviceName: {{ $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
+  {{- with $wl.podManagementPolicy }}
+  podManagementPolicy: {{ . }}
+  {{- end }}
+  {{- if not (and $wl.keda $wl.keda.enabled) }}
+  replicas: {{ $wl.replicaCount | default 1 }}
+  {{- end }}
+  revisionHistoryLimit: {{ default 10 $ctx.Values.revisionHistoryLimit }}
+  {{- $minReady := int ($wl.minReadySeconds | default $ctx.Values.minReadySeconds | default 0) }}
+  {{- if gt $minReady 0 }}
+  minReadySeconds: {{ $minReady }}
+  {{- end }}
+  updateStrategy:
+    {{- /*
+    Prefer per-workload statefulSetUpdateStrategy, then root statefulSetUpdateStrategy,
+    then per-workload strategy (backward compat), then Deployment-style root strategy (type only).
+    StatefulSet rolling update uses 'partition', not maxSurge/maxUnavailable.
+    */}}
+    {{- $updateStrategy := $wl.statefulSetUpdateStrategy | default $ctx.Values.statefulSetUpdateStrategy | default $wl.strategy | default (dict "type" "RollingUpdate") }}
+    type: {{ $updateStrategy.type | default "RollingUpdate" }}
+    {{- if eq ($updateStrategy.type | default "RollingUpdate") "RollingUpdate" }}
+    rollingUpdate:
+      partition: {{ default 0 $updateStrategy.rollingUpdate.partition }}
+    {{- end }}
+  selector:
+    matchLabels:
+      {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+  template:
+    metadata:
+      {{- with $ctx.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
+        {{- if and (hasKey $wl "metrics") $wl.metrics.enabled }}
+        app.kubernetes.io/workload: runtime
+        {{- end }}
+    spec:
+      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | nindent 6 }}
+      containers:
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | nindent 8 }}
+        {{- include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
+      {{- $inheritParentVolumes := ne ($wl.useRootVolumes | toString) "false" }}
+      {{- $hasAutoVols := false }}
+      {{- range $cmName, $cm := ($ctx.Values.configMaps | default dict) }}
+        {{- if and (hasKey $cm "enabled") $cm.enabled $cm.mountPath }}
+          {{- $hasAutoVols = true }}
+        {{- end }}
+      {{- end }}
+      {{- if or (and $inheritParentVolumes $ctx.Values.volumes) $wl.volumes $hasAutoVols }}
+      volumes:
+        {{- if $inheritParentVolumes }}
+        {{- with $ctx.Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        {{- with $wl.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- include "uhc.configMapAutoVolumes" $ctx | nindent 8 }}
+      {{- end }}
+      {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
+  {{- with $wl.volumeClaimTemplates }}
+  volumeClaimTemplates:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,18 @@
+# Patterns to ignore when building packages with Helm.
+# Supports shell glob matching, relative path matching, and negation (prefixed with !).
+# One pattern per line.
+
+# Development tooling
+CLAUDE.md
+
+# CI / test fixtures
+ci/
+tests/
+
+# OS artifacts
+.DS_Store
+
+# Git
+.git
+.gitignore
+.gitattributes

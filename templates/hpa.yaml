@@ -1,0 +1,36 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- $deploymentSpecs := $ctx.Values.deployments -}}
+{{- range $wlName := keys $deploymentSpecs | sortAlpha }}
+{{- $wl := index $deploymentSpecs $wlName }}
+{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if and $wl.hpa $wl.hpa.enabled }}
+{{- if not (and $wl.keda $wl.keda.enabled) }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  annotations:
+    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $releaseName }}-{{ $wlName }}
+  minReplicas: {{ $wl.hpa.minReplicas | default 1 }}
+  maxReplicas: {{ required (printf "deployments.%s.hpa.maxReplicas is required" $wlName) $wl.hpa.maxReplicas }}
+  {{- if $wl.hpa.metrics }}
+  metrics:
+    {{- toYaml $wl.hpa.metrics | nindent 4 }}
+  {{- end }}
+  {{- if $wl.hpa.behavior }}
+  behavior:
+    {{- toYaml $wl.hpa.behavior | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

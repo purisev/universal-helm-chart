@@ -1,0 +1,17 @@
+image:
+  repository: nginx
+  tag: latest
+deployments:
+  web:
+    enabled: true
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 80
