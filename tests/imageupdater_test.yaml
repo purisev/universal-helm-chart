@@ -1,0 +1,215 @@
+suite: test imageupdater
+templates:
+  - imageupdater.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # --- Basic ---
+
+  - it: should not render when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ImageUpdater when enabled
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ImageUpdater
+      - equal:
+          path: apiVersion
+          value: argocd-image-updater.argoproj.io/v1alpha1
+
+  - it: should default name to chart fullname
+    set:
+      imageUpdater.enabled: true
+      fullnameOverride: test-release
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release
+
+  - it: should use custom name when specified
+    set:
+      imageUpdater.enabled: true
+      imageUpdater.name: my-custom-updater
+    asserts:
+      - equal:
+          path: metadata.name
+          value: my-custom-updater
+
+  - it: should default namespace to release namespace
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: test-ns
+
+  - it: should use custom namespace when specified
+    set:
+      imageUpdater.enabled: true
+      imageUpdater.namespace: argocd
+    asserts:
+      - equal:
+          path: metadata.namespace
+          value: argocd
+
+  - it: should have helm labels
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+
+  - it: should render annotations when set
+    set:
+      imageUpdater.enabled: true
+      imageUpdater.annotations:
+        my-annotation: my-value
+    asserts:
+      - equal:
+          path: metadata.annotations["my-annotation"]
+          value: my-value
+
+  # --- Shorthand mode ---
+
+  - it: shorthand - should build single applicationRef with release name as default namePattern
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].namePattern
+          value: test-release
+
+  - it: shorthand - should use appNamePattern when specified
+    set:
+      imageUpdater.enabled: true
+      imageUpdater.appNamePattern: "my-app"
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].namePattern
+          value: "my-app"
+
+  - it: shorthand - should render commonUpdateSettings inside applicationRef
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.updateStrategy
+          value: alphabetical
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.forceUpdate
+          value: true
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.allowTags
+          value: "regexp:^[0-9]{8}t[0-9]{6}$"
+
+  - it: shorthand - should render writeBackConfig inside applicationRef
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].writeBackConfig.method
+          value: git
+      - equal:
+          path: spec.applicationRefs[0].writeBackConfig.gitConfig.branch
+          value: main
+
+  - it: shorthand - should render images inside applicationRef
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].images[0].alias
+          value: app
+      - equal:
+          path: spec.applicationRefs[0].images[0].imageName
+          value: myregistry/myapp
+
+  - it: shorthand - should render manifestTargets inside image
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.name
+          value: image.repository
+      - equal:
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.tag
+          value: image.tag
+
+  - it: shorthand - should omit commonUpdateSettings when not set
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - isNull:
+          path: spec.applicationRefs[0].commonUpdateSettings
+
+  - it: shorthand - should omit writeBackConfig when not set
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - isNull:
+          path: spec.applicationRefs[0].writeBackConfig
+
+  - it: shorthand - should omit images when not set
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - isNull:
+          path: spec.applicationRefs[0].images
+
+  # --- Manual mode ---
+
+  - it: manual - should render applicationRefs as-is
+    values:
+      - fixtures/imageupdater-manual.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].namePattern
+          value: "my-app"
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.updateStrategy
+          value: semver
+      - equal:
+          path: spec.applicationRefs[0].images[0].alias
+          value: app
+
+  - it: manual - should render manifestTargets inside applicationRef image
+    values:
+      - fixtures/imageupdater-manual.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.name
+          value: image.repository
+      - equal:
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.tag
+          value: image.tag
+
+  - it: manual - should render multiple applicationRefs
+    values:
+      - fixtures/imageupdater-manual.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[1].namePattern
+          value: "my-app-*"
+      - equal:
+          path: spec.applicationRefs[1].labelSelectors.matchLabels.environment
+          value: production
+
+  - it: manual - should render useAnnotations
+    set:
+      imageUpdater.enabled: true
+      imageUpdater.applicationRefs:
+        - namePattern: "*"
+          useAnnotations: true
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].useAnnotations
+          value: true

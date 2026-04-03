@@ -2,6 +2,117 @@
 global:
   env: {}
 
+# Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
+# Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
+# Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
+#
+# Full spec reference:
+#   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
+#
+# TWO MODES:
+#
+#   Shorthand mode (applicationRefs is empty — the default):
+#     A single applicationRef is built automatically.
+#     namePattern defaults to .Release.Name (override with appNamePattern).
+#     commonUpdateSettings, writeBackConfig and images are placed inside that
+#     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
+#     Use this when one release = one ArgoCD Application with a shared image.
+#
+#   Manual mode (applicationRefs is provided):
+#     applicationRefs is rendered as-is.
+#     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
+#     top level are ignored — all config must live inside each applicationRef entry.
+#     Use this when you need multiple application targets or fine-grained control.
+imageUpdater:
+  enabled: false
+
+  # CR metadata
+  # name: override the ImageUpdater resource name (default: chart fullname)
+  name: ""
+  # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
+  # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
+  # to scope which ArgoCD Applications it looks at.
+  namespace: ""
+  annotations: {}
+
+  # --- Shorthand mode fields (ignored when applicationRefs is set) ---
+
+  # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
+  # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
+  appNamePattern: ""
+
+  # commonUpdateSettings: update strategy applied to all images in this applicationRef.
+  #   updateStrategy: alphabetical | semver | latest | digest | name
+  #   forceUpdate: false
+  #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
+  #   ignoreTags: ["latest", "dev"]
+  #   pullSecret: "pullsecret:<namespace>/<secret-name>"
+  #   platforms: []
+  commonUpdateSettings: {}
+
+  # writeBackConfig: how Image Updater writes the new image tag back.
+  #   method: argocd   — imperative via Argo CD API (default)
+  #   method: git      — declarative, commits the new tag to a Git repository
+  #   gitConfig:         required when method: git
+  #     repository: git@github.com:myorg/config.git
+  #     branch: main
+  #     writeBackTarget: "helmvalues:/values.yaml"
+  writeBackConfig: {}
+
+  # images: list of container images to track for the auto-generated applicationRef.
+  # Each image can override update settings and declare Helm value targets.
+  #   - alias: short identifier used as the write-back key
+  #     imageName: full image reference without tag (registry/repo)
+  #     commonUpdateSettings:    # optional per-image override
+  #       updateStrategy: semver
+  #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+  #       ignoreTags: ["latest"]
+  #     manifestTargets:         # optional: where to write the new tag in the manifest
+  #       helm:
+  #         name: image.repository   # Helm value key for the repository
+  #         tag: image.tag           # Helm value key for the tag
+  #
+  # Example (shorthand mode):
+  # images:
+  #   - alias: app
+  #     imageName: myregistry/myapp
+  #     manifestTargets:
+  #       helm:
+  #         name: image.repository
+  #         tag: image.tag
+  images: []
+
+  # --- Manual mode (takes precedence over all shorthand fields above) ---
+  #
+  # applicationRefs: full list of applicationRef entries rendered as-is.
+  # Each entry supports: namePattern, labelSelectors, useAnnotations,
+  # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
+  #
+  # Example:
+  # applicationRefs:
+  #   - namePattern: "my-app"
+  #     commonUpdateSettings:
+  #       updateStrategy: semver
+  #     writeBackConfig:
+  #       method: git
+  #       gitConfig:
+  #         repository: git@github.com:myorg/config.git
+  #         branch: main
+  #         writeBackTarget: "helmvalues:/values.yaml"
+  #     images:
+  #       - alias: app
+  #         imageName: myregistry/myapp
+  #         manifestTargets:
+  #           helm:
+  #             name: image.repository
+  #             tag: image.tag
+  #   - namePattern: "*"
+  #     labelSelectors:
+  #       matchLabels:
+  #         image-updater: my-updater
+  #     useAnnotations: true
+  applicationRefs: []
+
 # Environment-specific variable sets; only one should be enabled at a time.
 envDev:
   enabled: false
