@@ -1,0 +1,24 @@
+httpRoute:
+  enabled: true
+  annotations:
+    some-annotation: some-value
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - "app.example.com"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: my-release-api
+          port: 8080
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      serviceName: my-release-web
+      servicePort: 80
