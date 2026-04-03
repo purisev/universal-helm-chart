@@ -1,0 +1,27 @@
+{{- if .Values.imageUpdater.enabled }}
+---
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: {{ .Values.imageUpdater.name | default (include "uhc.fullname" .) }}
+  namespace: {{ .Values.imageUpdater.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "uhc.labels" . | nindent 4 }}
+  {{- with .Values.imageUpdater.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.imageUpdater.commonUpdateSettings }}
+  commonUpdateSettings:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.imageUpdater.writeBackConfig }}
+  writeBackConfig:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.imageUpdater.applicationRefs }}
+  applicationRefs:
+    {{- toYaml .Values.imageUpdater.applicationRefs | nindent 4 }}
+  {{- end }}
+{{- end }}

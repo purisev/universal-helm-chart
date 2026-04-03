@@ -2,6 +2,88 @@
 global:
   env: {}
 
+# Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
+# Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
+# Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
+#
+# Full spec reference:
+#   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
+imageUpdater:
+  enabled: false
+  # name: override the ImageUpdater resource name (default: chart fullname)
+  name: ""
+  # namespace: target namespace for the ImageUpdater CR (default: release namespace).
+  # Usually should be the Argo CD namespace (e.g. argocd).
+  namespace: ""
+  annotations: {}
+
+  # Global update settings applied to all applicationRefs unless overridden per-app or per-image.
+  # commonUpdateSettings:
+  #   updateStrategy: semver       # semver | latest | digest | name
+  #   forceUpdate: false
+  #   allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+  #   ignoreTags: ["latest", "dev"]
+  #   pullSecret: ""
+  #   platforms: []
+  commonUpdateSettings: {}
+
+  # Write-back method: how Image Updater applies the new image tag.
+  #   method: argocd   — imperative via Argo CD API (default)
+  #   method: git      — declarative, commits to Git repo
+  # writeBackConfig:
+  #   method: argocd
+  #   # Git write-back requires additional config:
+  #   gitConfig:
+  #     repository: git@github.com:myorg/config.git
+  #     branch: main
+  #     writeBackTarget: "helmvalues:/values.yaml"
+  writeBackConfig: {}
+
+  # List of applicationRefs — defines which Argo CD Applications to monitor and how.
+  # Each entry can have:
+  #   namePattern: glob pattern matching Application names (e.g. "my-app-*", "my-app")
+  #   labelSelectors: matchLabels / matchExpressions selectors on Application labels
+  #   useAnnotations: true — read legacy argocd-image-updater.argoproj.io/* annotations
+  #                          from the Application instead of this CR config
+  #   commonUpdateSettings: override global settings for this application ref
+  #   writeBackConfig: override global write-back for this application ref
+  #   images: list of images to watch for this application ref
+  #     - alias: short name used in write-back
+  #       imageName: full image reference (registry/repo:tag)
+  #       commonUpdateSettings: override settings for this image only
+  #
+  # Example:
+  # applicationRefs:
+  #   - namePattern: "my-app"
+  #     images:
+  #       - alias: app
+  #         imageName: myregistry/myapp:v1.0.0
+  #         commonUpdateSettings:
+  #           updateStrategy: semver
+  #           allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+  #           ignoreTags: ["latest"]
+  #   - namePattern: "my-app-*"
+  #     labelSelectors:
+  #       matchLabels:
+  #         environment: production
+  #     commonUpdateSettings:
+  #       updateStrategy: latest
+  #     writeBackConfig:
+  #       method: git
+  #       gitConfig:
+  #         repository: git@github.com:myorg/config.git
+  #         branch: main
+  #         writeBackTarget: "helmvalues:/values.yaml"
+  #     images:
+  #       - alias: app
+  #         imageName: myregistry/myapp:stable
+  #   - namePattern: "*"
+  #     labelSelectors:
+  #       matchLabels:
+  #         image-updater: my-updater
+  #     useAnnotations: true
+  applicationRefs: []
+
 # Environment-specific variable sets; only one should be enabled at a time.
 envDev:
   enabled: false

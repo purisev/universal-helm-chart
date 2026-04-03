@@ -1,0 +1,17 @@
+imageUpdater:
+  enabled: true
+  namespace: argocd
+  writeBackConfig:
+    method: git
+    gitConfig:
+      repository: "git@github.com:myorg/config.git"
+      branch: main
+      writeBackTarget: "helmvalues:/values.yaml"
+  applicationRefs:
+    - namePattern: "my-app-*"
+      labelSelectors:
+        matchLabels:
+          environment: production
+      images:
+        - alias: app
+          imageName: "myregistry/myapp:stable"
