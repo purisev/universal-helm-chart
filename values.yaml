@@ -382,6 +382,107 @@ ingresses: {}
 #           - app.example.com
 #         secretName: app-tls
 
+# Kubernetes Gateway API — HTTPRoute (gateway.networking.k8s.io/v1).
+# Requires the Gateway API CRDs and a compatible Gateway controller installed in the cluster
+# (e.g. Cilium, Envoy Gateway, Istio, Traefik, Kong).
+# The Gateway itself must be created separately (outside this chart).
+#
+# Singleton HTTPRoute: one resource named <fullname>.
+httpRoute:
+  enabled: false
+  annotations: {}
+
+  # parentRefs: references to the Gateway(s) this route attaches to.
+  # name and namespace are required; sectionName targets a specific listener.
+  # parentRefs:
+  #   - name: my-gateway
+  #     namespace: gateway-system
+  #     sectionName: https   # optional: target a specific listener by name
+  parentRefs: []
+
+  # hostnames: list of hostnames this route serves.
+  # Must match a listener's hostname (or be a subdomain of it).
+  hostnames: []
+
+  # rules: list of routing rules.
+  # Each rule matches requests and forwards them to a backend service.
+  #
+  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
+  #   rules:
+  #     - serviceName: my-release-web   # default: chart fullname
+  #       servicePort: 8080             # default: 80
+  #       matches:
+  #         - path:
+  #             type: PathPrefix
+  #             value: /
+  #
+  # Full form — use backendRefs for multiple backends or weights:
+  #   rules:
+  #     - matches:
+  #         - path:
+  #             type: PathPrefix
+  #             value: /api
+  #       backendRefs:
+  #         - name: my-release-api
+  #           port: 8080
+  #           weight: 100
+  #
+  # filters: optional request/response transformations per rule:
+  #   filters:
+  #     - type: RequestRedirect
+  #       requestRedirect:
+  #         scheme: https
+  rules: []
+
+# Multi-HTTPRoute map: each key becomes a separate HTTPRoute named <fullname>-<key>.
+# Mirrors the ingresses map — useful when workloads in one release need separate routes
+# (e.g. different parentRefs, hostnames, or listener sections per route).
+httpRoutes: {}
+# Example:
+# httpRoutes:
+#   internal:
+#     enabled: true
+#     parentRefs:
+#       - name: internal-gateway
+#         namespace: gateway-system
+#     hostnames:
+#       - "app.internal.example.com"
+#     rules:
+#       - serviceName: my-release-web
+#         servicePort: 80
+#         matches:
+#           - path:
+#               type: PathPrefix
+#               value: /
+#   external:
+#     enabled: true
+#     parentRefs:
+#       - name: external-gateway
+#         namespace: gateway-system
+#         sectionName: https
+#     hostnames:
+#       - "app.example.com"
+#     rules:
+#       - matches:
+#           - path:
+#               type: PathPrefix
+#               value: /api
+#         backendRefs:
+#           - name: my-release-api
+#             port: 8080
+#       - matches:
+#           - path:
+#               type: PathPrefix
+#               value: /
+#         filters:
+#           - type: RequestRedirect
+#             requestRedirect:
+#               scheme: https
+#               statusCode: 301
+#         backendRefs:
+#           - name: my-release-web
+#             port: 80
+
 nodeSelector: {}
 
 tolerations: []
