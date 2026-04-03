@@ -227,8 +227,10 @@ postSync:
 
 ingress:
   enabled: false
-  # ingressClassName matches the actual Kubernetes Ingress field name.
-  ingressClassName: nginx
+  # ingressClassName: if set, maps to spec.ingressClassName on the Ingress resource.
+  # Leave empty ("") to omit the field and let the cluster use its default IngressClass.
+  # Example values: nginx, traefik, alb, haproxy, kong
+  ingressClassName: ""
   annotations: {}
   hosts: []
   tls: []

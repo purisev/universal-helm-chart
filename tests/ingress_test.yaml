@@ -14,7 +14,6 @@ tests:
   - it: should render Ingress when enabled
     set:
       ingress.enabled: true
-      ingress.ingressClassName: nginx
     asserts:
       - isKind:
           of: Ingress
@@ -25,13 +24,12 @@ tests:
   - it: should use release name for ingress name
     set:
       ingress.enabled: true
-      ingress.ingressClassName: nginx
     asserts:
       - matchRegex:
           path: metadata.name
           pattern: ^test-release
 
-  - it: should set ingressClassName
+  - it: should set ingressClassName when specified
     set:
       ingress.enabled: true
       ingress.ingressClassName: traefik
@@ -39,6 +37,32 @@ tests:
       - equal:
           path: spec.ingressClassName
           value: traefik
+
+  - it: should set ingressClassName to nginx when specified
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: nginx
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: nginx
+
+  - it: should set ingressClassName to alb when specified
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: alb
+    asserts:
+      - equal:
+          path: spec.ingressClassName
+          value: alb
+
+  - it: should omit ingressClassName when not set
+    set:
+      ingress.enabled: true
+      ingress.ingressClassName: ""
+    asserts:
+      - isNull:
+          path: spec.ingressClassName
 
   - it: should render hosts and paths
     values:
@@ -78,7 +102,6 @@ tests:
   - it: should have helm labels
     set:
       ingress.enabled: true
-      ingress.ingressClassName: nginx
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/managed-by"]
@@ -87,7 +110,6 @@ tests:
   - it: should default path servicePort to 80
     set:
       ingress.enabled: true
-      ingress.ingressClassName: nginx
       ingress.hosts[0].host: example.com
       ingress.hosts[0].paths[0].path: /
     asserts:
@@ -98,7 +120,6 @@ tests:
   - it: should not render tls section when not set
     set:
       ingress.enabled: true
-      ingress.ingressClassName: nginx
     asserts:
       - isNull:
           path: spec.tls
