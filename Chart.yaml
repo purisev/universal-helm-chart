@@ -2,7 +2,7 @@ apiVersion: v2
 name: universal-helm-chart
 description: A universal Helm chart for deploying Kubernetes workloads.
 type: application
-version: 1.0.0
+version: 1.1.0
 keywords:
   - kubernetes
   - universal
