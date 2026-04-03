@@ -6,6 +6,8 @@ release:
   namespace: test-ns
 
 tests:
+  # --- Basic ---
+
   - it: should not render when disabled
     asserts:
       - hasDocuments:
@@ -76,98 +78,132 @@ tests:
           path: metadata.annotations["my-annotation"]
           value: my-value
 
-  - it: should render commonUpdateSettings when set
-    set:
-      imageUpdater.enabled: true
-      imageUpdater.commonUpdateSettings.updateStrategy: semver
-      imageUpdater.commonUpdateSettings.forceUpdate: false
-      imageUpdater.commonUpdateSettings.ignoreTags[0]: latest
-    asserts:
-      - equal:
-          path: spec.commonUpdateSettings.updateStrategy
-          value: semver
-      - equal:
-          path: spec.commonUpdateSettings.forceUpdate
-          value: false
-      - equal:
-          path: spec.commonUpdateSettings.ignoreTags[0]
-          value: latest
+  # --- Shorthand mode ---
 
-  - it: should omit commonUpdateSettings when empty
+  - it: shorthand - should build single applicationRef with release name as default namePattern
     set:
       imageUpdater.enabled: true
     asserts:
-      - isNull:
-          path: spec.commonUpdateSettings
+      - equal:
+          path: spec.applicationRefs[0].namePattern
+          value: test-release
 
-  - it: should render writeBackConfig when set
+  - it: shorthand - should use appNamePattern when specified
     set:
       imageUpdater.enabled: true
-      imageUpdater.writeBackConfig.method: argocd
-    asserts:
-      - equal:
-          path: spec.writeBackConfig.method
-          value: argocd
-
-  - it: should render git writeBackConfig
-    set:
-      imageUpdater.enabled: true
-      imageUpdater.writeBackConfig.method: git
-      imageUpdater.writeBackConfig.gitConfig.repository: git@github.com:myorg/config.git
-      imageUpdater.writeBackConfig.gitConfig.branch: main
-      imageUpdater.writeBackConfig.gitConfig.writeBackTarget: "helmvalues:/values.yaml"
-    asserts:
-      - equal:
-          path: spec.writeBackConfig.method
-          value: git
-      - equal:
-          path: spec.writeBackConfig.gitConfig.branch
-          value: main
-
-  - it: should omit writeBackConfig when empty
-    set:
-      imageUpdater.enabled: true
-    asserts:
-      - isNull:
-          path: spec.writeBackConfig
-
-  - it: should render applicationRefs with namePattern and images
-    values:
-      - fixtures/imageupdater-semver.yaml
+      imageUpdater.appNamePattern: "my-app"
     asserts:
       - equal:
           path: spec.applicationRefs[0].namePattern
           value: "my-app"
+
+  - it: shorthand - should render commonUpdateSettings inside applicationRef
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.updateStrategy
+          value: alphabetical
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.forceUpdate
+          value: true
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.allowTags
+          value: "regexp:^[0-9]{8}t[0-9]{6}$"
+
+  - it: shorthand - should render writeBackConfig inside applicationRef
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].writeBackConfig.method
+          value: git
+      - equal:
+          path: spec.applicationRefs[0].writeBackConfig.gitConfig.branch
+          value: main
+
+  - it: shorthand - should render images inside applicationRef
+    values:
+      - fixtures/imageupdater-shorthand.yaml
+    asserts:
       - equal:
           path: spec.applicationRefs[0].images[0].alias
           value: app
       - equal:
           path: spec.applicationRefs[0].images[0].imageName
-          value: "myregistry/myapp:v1.0.0"
+          value: myregistry/myapp
 
-  - it: should render applicationRefs with image-level commonUpdateSettings
+  - it: shorthand - should render manifestTargets inside image
     values:
-      - fixtures/imageupdater-semver.yaml
+      - fixtures/imageupdater-shorthand.yaml
     asserts:
       - equal:
-          path: spec.applicationRefs[0].images[0].commonUpdateSettings.updateStrategy
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.name
+          value: image.repository
+      - equal:
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.tag
+          value: image.tag
+
+  - it: shorthand - should omit commonUpdateSettings when not set
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - isNull:
+          path: spec.applicationRefs[0].commonUpdateSettings
+
+  - it: shorthand - should omit writeBackConfig when not set
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - isNull:
+          path: spec.applicationRefs[0].writeBackConfig
+
+  - it: shorthand - should omit images when not set
+    set:
+      imageUpdater.enabled: true
+    asserts:
+      - isNull:
+          path: spec.applicationRefs[0].images
+
+  # --- Manual mode ---
+
+  - it: manual - should render applicationRefs as-is
+    values:
+      - fixtures/imageupdater-manual.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[0].namePattern
+          value: "my-app"
+      - equal:
+          path: spec.applicationRefs[0].commonUpdateSettings.updateStrategy
           value: semver
+      - equal:
+          path: spec.applicationRefs[0].images[0].alias
+          value: app
 
-  - it: should render applicationRefs with labelSelectors and git writeback
+  - it: manual - should render manifestTargets inside applicationRef image
     values:
-      - fixtures/imageupdater-git.yaml
+      - fixtures/imageupdater-manual.yaml
     asserts:
       - equal:
-          path: spec.applicationRefs[0].labelSelectors.matchLabels.environment
-          value: production
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.name
+          value: image.repository
       - equal:
-          path: spec.writeBackConfig.method
-          value: git
-      - equal:
-          path: spec.writeBackConfig.gitConfig.branch
-          value: main
+          path: spec.applicationRefs[0].images[0].manifestTargets.helm.tag
+          value: image.tag
 
-  - it: should render applicationRefs with useAnnotations
+  - it: manual - should render multiple applicationRefs
+    values:
+      - fixtures/imageupdater-manual.yaml
+    asserts:
+      - equal:
+          path: spec.applicationRefs[1].namePattern
+          value: "my-app-*"
+      - equal:
+          path: spec.applicationRefs[1].labelSelectors.matchLabels.environment
+          value: production
+
+  - it: manual - should render useAnnotations
     set:
       imageUpdater.enabled: true
       imageUpdater.applicationRefs:
@@ -177,11 +213,3 @@ tests:
       - equal:
           path: spec.applicationRefs[0].useAnnotations
           value: true
-
-  - it: should omit applicationRefs when empty list
-    set:
-      imageUpdater.enabled: true
-      imageUpdater.applicationRefs: []
-    asserts:
-      - isNull:
-          path: spec.applicationRefs

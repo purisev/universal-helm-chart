@@ -12,16 +12,34 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
-  {{- with .Values.imageUpdater.commonUpdateSettings }}
-  commonUpdateSettings:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
-  {{- with .Values.imageUpdater.writeBackConfig }}
-  writeBackConfig:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
   {{- if .Values.imageUpdater.applicationRefs }}
+  {{- /*
+    Manual mode: applicationRefs provided explicitly.
+    All settings (commonUpdateSettings, writeBackConfig, images) must be
+    defined inside each applicationRef entry.
+  */}}
   applicationRefs:
     {{- toYaml .Values.imageUpdater.applicationRefs | nindent 4 }}
+  {{- else }}
+  {{- /*
+    Shorthand mode: build a single applicationRef automatically.
+    namePattern defaults to .Release.Name when appNamePattern is not set.
+    commonUpdateSettings, writeBackConfig and images are placed inside the
+    applicationRef — matching the structure Argo CD Image Updater >= 1.x expects.
+  */}}
+  applicationRefs:
+    - namePattern: {{ .Values.imageUpdater.appNamePattern | default .Release.Name | quote }}
+      {{- with .Values.imageUpdater.commonUpdateSettings }}
+      commonUpdateSettings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imageUpdater.writeBackConfig }}
+      writeBackConfig:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.imageUpdater.images }}
+      images:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   {{- end }}
 {{- end }}

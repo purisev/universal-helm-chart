@@ -8,66 +8,91 @@ global:
 #
 # Full spec reference:
 #   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
+#
+# TWO MODES:
+#
+#   Shorthand mode (applicationRefs is empty — the default):
+#     A single applicationRef is built automatically.
+#     namePattern defaults to .Release.Name (override with appNamePattern).
+#     commonUpdateSettings, writeBackConfig and images are placed inside that
+#     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
+#     Use this when one release = one ArgoCD Application with a shared image.
+#
+#   Manual mode (applicationRefs is provided):
+#     applicationRefs is rendered as-is.
+#     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
+#     top level are ignored — all config must live inside each applicationRef entry.
+#     Use this when you need multiple application targets or fine-grained control.
 imageUpdater:
   enabled: false
+
+  # CR metadata
   # name: override the ImageUpdater resource name (default: chart fullname)
   name: ""
-  # namespace: target namespace for the ImageUpdater CR (default: release namespace).
-  # Usually should be the Argo CD namespace (e.g. argocd).
+  # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
+  # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
+  # to scope which ArgoCD Applications it looks at.
   namespace: ""
   annotations: {}
 
-  # Global update settings applied to all applicationRefs unless overridden per-app or per-image.
-  # commonUpdateSettings:
-  #   updateStrategy: semver       # semver | latest | digest | name
+  # --- Shorthand mode fields (ignored when applicationRefs is set) ---
+
+  # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
+  # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
+  appNamePattern: ""
+
+  # commonUpdateSettings: update strategy applied to all images in this applicationRef.
+  #   updateStrategy: alphabetical | semver | latest | digest | name
   #   forceUpdate: false
-  #   allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+  #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
   #   ignoreTags: ["latest", "dev"]
-  #   pullSecret: ""
+  #   pullSecret: "pullsecret:<namespace>/<secret-name>"
   #   platforms: []
   commonUpdateSettings: {}
 
-  # Write-back method: how Image Updater applies the new image tag.
+  # writeBackConfig: how Image Updater writes the new image tag back.
   #   method: argocd   — imperative via Argo CD API (default)
-  #   method: git      — declarative, commits to Git repo
-  # writeBackConfig:
-  #   method: argocd
-  #   # Git write-back requires additional config:
-  #   gitConfig:
+  #   method: git      — declarative, commits the new tag to a Git repository
+  #   gitConfig:         required when method: git
   #     repository: git@github.com:myorg/config.git
   #     branch: main
   #     writeBackTarget: "helmvalues:/values.yaml"
   writeBackConfig: {}
 
-  # List of applicationRefs — defines which Argo CD Applications to monitor and how.
-  # Each entry can have:
-  #   namePattern: glob pattern matching Application names (e.g. "my-app-*", "my-app")
-  #   labelSelectors: matchLabels / matchExpressions selectors on Application labels
-  #   useAnnotations: true — read legacy argocd-image-updater.argoproj.io/* annotations
-  #                          from the Application instead of this CR config
-  #   commonUpdateSettings: override global settings for this application ref
-  #   writeBackConfig: override global write-back for this application ref
-  #   images: list of images to watch for this application ref
-  #     - alias: short name used in write-back
-  #       imageName: full image reference (registry/repo:tag)
-  #       commonUpdateSettings: override settings for this image only
+  # images: list of container images to track for the auto-generated applicationRef.
+  # Each image can override update settings and declare Helm value targets.
+  #   - alias: short identifier used as the write-back key
+  #     imageName: full image reference without tag (registry/repo)
+  #     commonUpdateSettings:    # optional per-image override
+  #       updateStrategy: semver
+  #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+  #       ignoreTags: ["latest"]
+  #     manifestTargets:         # optional: where to write the new tag in the manifest
+  #       helm:
+  #         name: image.repository   # Helm value key for the repository
+  #         tag: image.tag           # Helm value key for the tag
+  #
+  # Example (shorthand mode):
+  # images:
+  #   - alias: app
+  #     imageName: myregistry/myapp
+  #     manifestTargets:
+  #       helm:
+  #         name: image.repository
+  #         tag: image.tag
+  images: []
+
+  # --- Manual mode (takes precedence over all shorthand fields above) ---
+  #
+  # applicationRefs: full list of applicationRef entries rendered as-is.
+  # Each entry supports: namePattern, labelSelectors, useAnnotations,
+  # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
   #
   # Example:
   # applicationRefs:
   #   - namePattern: "my-app"
-  #     images:
-  #       - alias: app
-  #         imageName: myregistry/myapp:v1.0.0
-  #         commonUpdateSettings:
-  #           updateStrategy: semver
-  #           allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
-  #           ignoreTags: ["latest"]
-  #   - namePattern: "my-app-*"
-  #     labelSelectors:
-  #       matchLabels:
-  #         environment: production
   #     commonUpdateSettings:
-  #       updateStrategy: latest
+  #       updateStrategy: semver
   #     writeBackConfig:
   #       method: git
   #       gitConfig:
@@ -76,7 +101,11 @@ imageUpdater:
   #         writeBackTarget: "helmvalues:/values.yaml"
   #     images:
   #       - alias: app
-  #         imageName: myregistry/myapp:stable
+  #         imageName: myregistry/myapp
+  #         manifestTargets:
+  #           helm:
+  #             name: image.repository
+  #             tag: image.tag
   #   - namePattern: "*"
   #     labelSelectors:
   #       matchLabels:
