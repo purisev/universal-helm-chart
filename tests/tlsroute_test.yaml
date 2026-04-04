@@ -1,0 +1,175 @@
+suite: test tlsroute
+templates:
+  - tlsroute.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # --- Basic ---
+
+  - it: should not render when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render TLSRoute when enabled
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: TLSRoute
+      - equal:
+          path: apiVersion
+          value: gateway.networking.k8s.io/v1
+
+  - it: should use release name for tlsroute name
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^test-release
+
+  - it: should have helm labels
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+
+  - it: should render annotations when set
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["some-annotation"]
+          value: some-value
+
+  # --- parentRefs ---
+
+  - it: should render parentRefs when set
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: my-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: gateway-system
+      - equal:
+          path: spec.parentRefs[0].sectionName
+          value: tls-passthrough
+
+  - it: should omit parentRefs when not set
+    set:
+      tlsRoute.enabled: true
+      tlsRoute.hostnames[0]: secure.example.com
+      tlsRoute.rules[0].serviceName: my-svc
+    asserts:
+      - isNull:
+          path: spec.parentRefs
+
+  # --- hostnames ---
+
+  - it: should render hostnames
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: "secure.example.com"
+
+  # --- rules: explicit backendRefs ---
+
+  - it: should render rules with explicit backendRefs
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: my-release-web
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8443
+
+  # --- rules: shorthand serviceName/servicePort ---
+
+  - it: should use serviceName shorthand in backendRefs
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[1].backendRefs[0].name
+          value: my-release-api
+      - equal:
+          path: spec.rules[1].backendRefs[0].port
+          value: 9443
+
+  - it: should default serviceName to fullname when not specified
+    set:
+      tlsRoute.enabled: true
+      tlsRoute.hostnames[0]: secure.example.com
+      tlsRoute.rules:
+        - {}
+    asserts:
+      - matchRegex:
+          path: spec.rules[0].backendRefs[0].name
+          pattern: ^test-release
+
+  - it: should default servicePort to 443 when not specified
+    set:
+      tlsRoute.enabled: true
+      tlsRoute.hostnames[0]: secure.example.com
+      tlsRoute.rules:
+        - {}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 443
+
+  # --- Multi-TLSRoute map ---
+
+  - it: should not render tlsRoutes entries when disabled
+    set:
+      tlsRoutes.ext.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render multiple TLSRoutes from tlsRoutes map
+    set:
+      tlsRoutes.ext.enabled: true
+      tlsRoutes.ext.hostnames[0]: secure.example.com
+      tlsRoutes.ext.rules[0].serviceName: my-release-web
+      tlsRoutes.int.enabled: true
+      tlsRoutes.int.hostnames[0]: internal.example.com
+      tlsRoutes.int.rules[0].serviceName: my-release-api
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should name multi-route as fullname-key
+    set:
+      fullnameOverride: test-release
+      tlsRoutes.ext.enabled: true
+      tlsRoutes.ext.hostnames[0]: secure.example.com
+      tlsRoutes.ext.rules[0].serviceName: my-svc
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^test-release-ext
+
+  - it: should render hostnames in multi-route
+    set:
+      tlsRoutes.ext.enabled: true
+      tlsRoutes.ext.hostnames[0]: secure.example.com
+      tlsRoutes.ext.rules[0].serviceName: my-svc
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: secure.example.com

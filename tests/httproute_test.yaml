@@ -162,6 +162,101 @@ tests:
           path: spec.rules[0].filters[0].requestRedirect.scheme
           value: https
 
+  # --- Per-workload rules ---
+
+  - it: should render singleton HTTPRoute when deployment has httpRoute enabled
+    values:
+      - fixtures/httproute-workload.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: HTTPRoute
+
+  - it: should inherit parentRefs and hostnames from root httpRoute
+    values:
+      - fixtures/httproute-workload.yaml
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].name
+          value: my-gateway
+      - equal:
+          path: spec.hostnames[0]
+          value: app.example.com
+
+  - it: should merge workload rules in priority order
+    values:
+      - fixtures/httproute-workload.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /api
+      - equal:
+          path: spec.rules[1].matches[0].path.value
+          value: /
+
+  - it: should auto-set serviceName from workload name
+    values:
+      - fixtures/httproute-workload.yaml
+    asserts:
+      - matchRegex:
+          path: spec.rules[0].backendRefs[0].name
+          pattern: -api$
+      - matchRegex:
+          path: spec.rules[1].backendRefs[0].name
+          pattern: -web$
+
+  - it: should auto-set servicePort from workload service.port
+    values:
+      - fixtures/httproute-workload.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8080
+      - equal:
+          path: spec.rules[1].backendRefs[0].port
+          value: 80
+
+  - it: should sort workloads alphabetically when no priority set
+    set:
+      httpRoute.parentRefs[0].name: my-gateway
+      deployments.zoo.service.port: 80
+      deployments.zoo.httpRoute.enabled: true
+      deployments.zoo.httpRoute.rules[0].matches[0].path.type: PathPrefix
+      deployments.zoo.httpRoute.rules[0].matches[0].path.value: /zoo
+      deployments.alpha.service.port: 80
+      deployments.alpha.httpRoute.enabled: true
+      deployments.alpha.httpRoute.rules[0].matches[0].path.type: PathPrefix
+      deployments.alpha.httpRoute.rules[0].matches[0].path.value: /alpha
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].path.value
+          value: /alpha
+      - equal:
+          path: spec.rules[1].matches[0].path.value
+          value: /zoo
+
+  - it: should merge statefulSet httpRoute rules into singleton
+    set:
+      httpRoute.parentRefs[0].name: my-gateway
+      statefulSets.db.service.port: 5432
+      statefulSets.db.httpRoute.enabled: true
+      statefulSets.db.httpRoute.rules[0].matches[0].path.type: PathPrefix
+      statefulSets.db.httpRoute.rules[0].matches[0].path.value: /db
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 5432
+
+  - it: should not render singleton when all workload httpRoutes disabled
+    set:
+      deployments.web.httpRoute.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
   # --- Multi-HTTPRoute map ---
 
   - it: should not render httpRoutes entries when disabled

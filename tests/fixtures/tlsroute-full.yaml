@@ -1,0 +1,16 @@
+tlsRoute:
+  enabled: true
+  annotations:
+    some-annotation: some-value
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: tls-passthrough
+  hostnames:
+    - "secure.example.com"
+  rules:
+    - backendRefs:
+        - name: my-release-web
+          port: 8443
+    - serviceName: my-release-api
+      servicePort: 9443

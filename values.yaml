@@ -483,6 +483,120 @@ httpRoutes: {}
 #           - name: my-release-web
 #             port: 80
 
+# Kubernetes Gateway API — GRPCRoute (gateway.networking.k8s.io/v1).
+# Requires a Gateway with a gRPC-capable listener and controller (e.g. Envoy Gateway, Istio, Cilium).
+# matches use gRPC service/method names instead of HTTP paths.
+# Default servicePort shorthand is 50051 (standard gRPC port).
+#
+# Singleton GRPCRoute: one resource named <fullname>.
+grpcRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  hostnames: []
+  # rules: list of routing rules. Each rule matches gRPC methods and forwards to a backend.
+  #
+  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
+  #   rules:
+  #     - serviceName: my-release-grpc   # default: chart fullname
+  #       servicePort: 50051             # default: 50051
+  #       matches:
+  #         - method:
+  #             type: Exact
+  #             service: com.example.UserService
+  #             method: Login              # optional: omit to match all methods in the service
+  #
+  # Full form — use backendRefs for multiple backends:
+  #   rules:
+  #     - matches:
+  #         - method:
+  #             type: Exact
+  #             service: com.example.UserService
+  #       backendRefs:
+  #         - name: my-release-grpc
+  #           port: 50051
+  #           weight: 100
+  #
+  # filters: same as HTTPRoute (RequestHeaderModifier, ResponseHeaderModifier, etc.)
+  rules: []
+
+# Multi-GRPCRoute map: each key becomes a separate GRPCRoute named <fullname>-<key>.
+grpcRoutes: {}
+# Example:
+# grpcRoutes:
+#   user-svc:
+#     enabled: true
+#     parentRefs:
+#       - name: my-gateway
+#         namespace: gateway-system
+#     hostnames:
+#       - "grpc.example.com"
+#     rules:
+#       - matches:
+#           - method:
+#               type: Exact
+#               service: com.example.UserService
+#         serviceName: my-release-user
+#         servicePort: 50051
+#   order-svc:
+#     enabled: true
+#     parentRefs:
+#       - name: my-gateway
+#         namespace: gateway-system
+#     rules:
+#       - matches:
+#           - method:
+#               type: Exact
+#               service: com.example.OrderService
+#         backendRefs:
+#           - name: my-release-order
+#             port: 50051
+
+# Kubernetes Gateway API — TLSRoute (gateway.networking.k8s.io/v1).
+# Operates at L4 — matches on SNI hostnames only, no HTTP-level routing.
+# Requires a Gateway listener with tls.mode: Passthrough or Terminate.
+# hostnames is required and must be FQDN (no IP addresses).
+# Default servicePort shorthand is 443.
+#
+# Singleton TLSRoute: one resource named <fullname>.
+tlsRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  # hostnames: required — list of FQDN hostnames matched via SNI during TLS handshake.
+  hostnames: []
+  # rules: list of routing rules. Each rule forwards matching TLS connections to backends.
+  # No matches or filters — routing is determined entirely by hostnames (SNI).
+  #
+  # Shorthand form:
+  #   rules:
+  #     - serviceName: my-release-tls   # default: chart fullname
+  #       servicePort: 8443             # default: 443
+  #
+  # Full form:
+  #   rules:
+  #     - backendRefs:
+  #         - name: my-release-tls
+  #           port: 8443
+  #           weight: 100
+  rules: []
+
+# Multi-TLSRoute map: each key becomes a separate TLSRoute named <fullname>-<key>.
+tlsRoutes: {}
+# Example:
+# tlsRoutes:
+#   external:
+#     enabled: true
+#     parentRefs:
+#       - name: my-gateway
+#         namespace: gateway-system
+#         sectionName: tls-passthrough
+#     hostnames:
+#       - "secure.example.com"
+#     rules:
+#       - serviceName: my-release-web
+#         servicePort: 8443
+
 # Kubernetes Gateway API — ReferenceGrant (gateway.networking.k8s.io/v1beta1).
 # Required when an HTTPRoute in a different namespace needs to reference a Service
 # in this release's namespace (cross-namespace backend reference).
@@ -629,6 +743,33 @@ deployments: {}
 #     # Per-workload host aliases (merged with root hostAliases by default).
 #     # Set inheritRootHostAliases: false to use only local aliases.
 #     hostAliases: []
+#     # Gateway API routes — per-workload shorthand.
+#     # Rules from all enabled workloads are merged into the singleton HTTPRoute/GRPCRoute/TLSRoute.
+#     # parentRefs and hostnames are inherited from the root httpRoute/grpcRoute/tlsRoute block.
+#     # servicePort defaults to service.port; serviceName defaults to <fullname>-<workloadName>.
+#     # priority: lower number = earlier in the merged rules list; omit for alphabetical ordering.
+#     httpRoute:
+#       enabled: true
+#       priority: 10              # optional — controls rule order within the merged HTTPRoute
+#       rules:
+#         - matches:
+#             - path:
+#                 type: PathPrefix
+#                 value: /api
+#           # backendRefs: explicit override (optional)
+#     grpcRoute:
+#       enabled: true
+#       priority: 10
+#       rules:
+#         - matches:
+#             - method:
+#                 type: Exact
+#                 service: com.example.MyService
+#     tlsRoute:
+#       enabled: true
+#       priority: 10
+#       rules:
+#         - {}                    # no matches for TLSRoute — routing is SNI-based via root hostnames
 
 # Map of StatefulSet workloads. Each key becomes a separate StatefulSet + headless Service.
 statefulSets: {}

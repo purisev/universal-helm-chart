@@ -1,0 +1,24 @@
+grpcRoute:
+  enabled: true
+  annotations:
+    some-annotation: some-value
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+      sectionName: grpc
+  hostnames:
+    - "grpc.example.com"
+  rules:
+    - matches:
+        - method:
+            type: Exact
+            service: com.example.UserService
+      backendRefs:
+        - name: my-release-user
+          port: 50051
+    - matches:
+        - method:
+            type: Exact
+            service: com.example.OrderService
+      serviceName: my-release-order
+      servicePort: 50051

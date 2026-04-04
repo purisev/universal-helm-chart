@@ -530,6 +530,66 @@
         }
       }
     },
+    "grpcRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "parentRefs": { "type": "array" },
+        "hostnames": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rules": { "type": "array" }
+      }
+    },
+    "grpcRoutes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "annotations": { "type": "object" },
+          "parentRefs": { "type": "array" },
+          "hostnames": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rules": { "type": "array" }
+        }
+      }
+    },
+    "tlsRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "parentRefs": { "type": "array" },
+        "hostnames": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rules": { "type": "array" }
+      }
+    },
+    "tlsRoutes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "annotations": { "type": "object" },
+          "parentRefs": { "type": "array" },
+          "hostnames": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rules": { "type": "array" }
+        }
+      }
+    },
     "referenceGrant": {
       "type": "object",
       "additionalProperties": false,
