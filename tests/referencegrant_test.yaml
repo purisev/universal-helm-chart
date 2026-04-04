@@ -1,0 +1,150 @@
+suite: test referencegrant
+templates:
+  - referencegrant.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # --- Basic ---
+
+  - it: should not render when disabled
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render ReferenceGrant when enabled
+    values:
+      - fixtures/referencegrant-full.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ReferenceGrant
+      - equal:
+          path: apiVersion
+          value: gateway.networking.k8s.io/v1beta1
+
+  - it: should use release name for referencegrant name
+    values:
+      - fixtures/referencegrant-full.yaml
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^test-release
+
+  - it: should have helm labels
+    values:
+      - fixtures/referencegrant-full.yaml
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+
+  - it: should render annotations when set
+    values:
+      - fixtures/referencegrant-full.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["some-annotation"]
+          value: some-value
+
+  # --- spec.from ---
+
+  - it: should render from with group kind namespace
+    values:
+      - fixtures/referencegrant-full.yaml
+    asserts:
+      - equal:
+          path: spec.from[0].group
+          value: gateway.networking.k8s.io
+      - equal:
+          path: spec.from[0].kind
+          value: HTTPRoute
+      - equal:
+          path: spec.from[0].namespace
+          value: gateway-system
+
+  # --- spec.to ---
+
+  - it: should render to with group and kind
+    values:
+      - fixtures/referencegrant-full.yaml
+    asserts:
+      - equal:
+          path: spec.to[0].group
+          value: ""
+      - equal:
+          path: spec.to[0].kind
+          value: Service
+
+  - it: should render to with optional name
+    values:
+      - fixtures/referencegrant-named-service.yaml
+    asserts:
+      - equal:
+          path: spec.to[0].name
+          value: test-release-web
+
+  # --- Multi-ReferenceGrant map ---
+
+  - it: should not render referenceGrants entries when disabled
+    set:
+      referenceGrants.from-gw.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render multiple ReferenceGrants from referenceGrants map
+    set:
+      referenceGrants.from-gw.enabled: true
+      referenceGrants.from-gw.from[0].group: gateway.networking.k8s.io
+      referenceGrants.from-gw.from[0].kind: HTTPRoute
+      referenceGrants.from-gw.from[0].namespace: gateway-system
+      referenceGrants.from-gw.to[0].group: ""
+      referenceGrants.from-gw.to[0].kind: Service
+      referenceGrants.from-other.enabled: true
+      referenceGrants.from-other.from[0].group: gateway.networking.k8s.io
+      referenceGrants.from-other.from[0].kind: HTTPRoute
+      referenceGrants.from-other.from[0].namespace: other-app-ns
+      referenceGrants.from-other.to[0].group: ""
+      referenceGrants.from-other.to[0].kind: Service
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should name multi-grant as fullname-key
+    set:
+      fullnameOverride: test-release
+      referenceGrants.from-gw.enabled: true
+      referenceGrants.from-gw.from[0].group: gateway.networking.k8s.io
+      referenceGrants.from-gw.from[0].kind: HTTPRoute
+      referenceGrants.from-gw.from[0].namespace: gateway-system
+      referenceGrants.from-gw.to[0].group: ""
+      referenceGrants.from-gw.to[0].kind: Service
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: ^test-release-from-gw
+
+  - it: should render from in multi-grant
+    values:
+      - fixtures/referencegrant-multi.yaml
+    asserts:
+      - equal:
+          path: spec.from[0].group
+          value: gateway.networking.k8s.io
+      - equal:
+          path: spec.from[0].kind
+          value: HTTPRoute
+      - equal:
+          path: spec.from[0].namespace
+          value: gateway-system
+
+  - it: should render annotations in multi-grant
+    values:
+      - fixtures/referencegrant-multi.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["team"]
+          value: platform

@@ -1,0 +1,51 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- /*
+Singleton ReferenceGrant (backward-compatible with httpRoute pattern).
+Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1beta1).
+Grants permission for HTTPRoutes in other namespaces to reference Services
+in this release's namespace — required for cross-namespace Gateway routing.
+*/}}
+{{- if .Values.referenceGrant.enabled -}}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: {{ $releaseName }}
+  labels:
+    {{- include "uhc.labels" . | nindent 4 }}
+  {{- with .Values.referenceGrant.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  from:
+    {{- toYaml .Values.referenceGrant.from | nindent 4 }}
+  to:
+    {{- toYaml .Values.referenceGrant.to | nindent 4 }}
+{{- end }}
+{{- /*
+Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
+Useful when multiple source namespaces or different resource types need separate grants.
+*/}}
+{{- range $grantName := keys ($ctx.Values.referenceGrants | default dict) | sortAlpha }}
+{{- $grant := index $ctx.Values.referenceGrants $grantName }}
+{{- if and (hasKey $grant "enabled") $grant.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: {{ $releaseName }}-{{ $grantName }}
+  labels:
+    {{- include "uhc.labels" $ctx | nindent 4 }}
+  {{- with $grant.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  from:
+    {{- toYaml $grant.from | nindent 4 }}
+  to:
+    {{- toYaml $grant.to | nindent 4 }}
+{{- end }}
+{{- end }}

@@ -483,6 +483,62 @@ httpRoutes: {}
 #           - name: my-release-web
 #             port: 80
 
+# Kubernetes Gateway API — ReferenceGrant (gateway.networking.k8s.io/v1beta1).
+# Required when an HTTPRoute in a different namespace needs to reference a Service
+# in this release's namespace (cross-namespace backend reference).
+# The ReferenceGrant is always created in the same namespace as the target Service
+# (i.e. the release namespace).
+#
+# Singleton ReferenceGrant: one resource named <fullname>.
+referenceGrant:
+  enabled: false
+  annotations: {}
+
+  # from: list of sources allowed to reference resources in this namespace.
+  # group and kind identify the referencing resource type; namespace is required.
+  # from:
+  #   - group: gateway.networking.k8s.io
+  #     kind: HTTPRoute
+  #     namespace: gateway-system   # namespace where the HTTPRoute lives
+  from: []
+
+  # to: list of target resource types in THIS namespace that may be referenced.
+  # group: "" means core API group (Services). name is optional — omit to allow
+  # all resources of that kind; set to restrict to a specific resource by name.
+  # to:
+  #   - group: ""
+  #     kind: Service
+  #     # name: my-release-web   # optional: restrict to a single Service
+  to: []
+
+# Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
+# Useful when HTTPRoutes from multiple namespaces need access, or when different
+# source kinds (HTTPRoute, GRPCRoute) require separate grants.
+referenceGrants: {}
+# Example:
+# referenceGrants:
+#   from-gateway-ns:
+#     enabled: true
+#     from:
+#       - group: gateway.networking.k8s.io
+#         kind: HTTPRoute
+#         namespace: gateway-system
+#     to:
+#       - group: ""
+#         kind: Service
+#   from-other-app:
+#     enabled: true
+#     annotations:
+#       team: platform
+#     from:
+#       - group: gateway.networking.k8s.io
+#         kind: HTTPRoute
+#         namespace: other-app-ns
+#     to:
+#       - group: ""
+#         kind: Service
+#         name: my-release-api   # restrict to a specific Service
+
 nodeSelector: {}
 
 tolerations: []

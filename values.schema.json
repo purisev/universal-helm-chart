@@ -530,6 +530,76 @@
         }
       }
     },
+    "referenceGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "from": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "group": { "type": "string" },
+              "kind": { "type": "string" },
+              "namespace": { "type": "string" }
+            }
+          }
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "group": { "type": "string" },
+              "kind": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "referenceGrants": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "annotations": {
+            "type": "object"
+          },
+          "from": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": { "type": "string" },
+                "kind": { "type": "string" },
+                "namespace": { "type": "string" }
+              }
+            }
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": { "type": "string" },
+                "kind": { "type": "string" },
+                "name": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
     "imageUpdater": {
       "type": "object",
       "additionalProperties": false,
