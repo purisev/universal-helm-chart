@@ -11,9 +11,6 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-    {{- if and (hasKey $wl "metrics") $wl.metrics.enabled }}
-    app.kubernetes.io/workload: runtime
-    {{- end }}
   {{- with $wl.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -36,9 +33,6 @@ spec:
     {{- end }}
   selector:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-    {{- if and (hasKey $wl "metrics") $wl.metrics.enabled }}
-    app.kubernetes.io/workload: runtime
-    {{- end }}
 {{- end }}
 {{- end }}
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}

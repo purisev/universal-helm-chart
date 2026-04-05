@@ -52,9 +52,6 @@ spec:
       {{- end }}
       labels:
         {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
-        {{- if and (hasKey $wl "metrics") $wl.metrics.enabled }}
-        app.kubernetes.io/workload: runtime
-        {{- end }}
     spec:
       {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | nindent 6 }}
       containers:

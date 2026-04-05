@@ -17,7 +17,6 @@ spec:
   selector:
     matchLabels:
       {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
-      app.kubernetes.io/workload: runtime
   endpoints:
     - port: {{ $wl.metrics.port | default "http" }}
       path: {{ $wl.metrics.path | default "/metrics" }}
@@ -60,7 +59,6 @@ spec:
   selector:
     matchLabels:
       {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
-      app.kubernetes.io/workload: runtime
   endpoints:
     - port: {{ $wl.metrics.port | default "http" }}
       path: {{ $wl.metrics.path | default "/metrics" }}

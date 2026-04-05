@@ -139,17 +139,3 @@ tests:
       - hasDocuments:
           count: 2
 
-  - it: should add metrics label when metrics enabled on deployment
-    set:
-      image.repository: nginx
-      image.tag: latest
-      deployments.web.enabled: true
-      deployments.web.service.enabled: true
-      deployments.web.service.type: ClusterIP
-      deployments.web.service.port: 80
-      deployments.web.service.targetPort: 80
-      deployments.web.metrics.enabled: true
-    asserts:
-      - equal:
-          path: metadata.labels["app.kubernetes.io/workload"]
-          value: runtime
