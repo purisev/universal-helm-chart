@@ -218,16 +218,8 @@ tests:
           value: 80
 
   - it: should sort workloads alphabetically when no priority set
-    set:
-      httpRoute.parentRefs[0].name: my-gateway
-      deployments.zoo.service.port: 80
-      deployments.zoo.httpRoute.enabled: true
-      deployments.zoo.httpRoute.rules[0].matches[0].path.type: PathPrefix
-      deployments.zoo.httpRoute.rules[0].matches[0].path.value: /zoo
-      deployments.alpha.service.port: 80
-      deployments.alpha.httpRoute.enabled: true
-      deployments.alpha.httpRoute.rules[0].matches[0].path.type: PathPrefix
-      deployments.alpha.httpRoute.rules[0].matches[0].path.value: /alpha
+    values:
+      - fixtures/httproute-sort.yaml
     asserts:
       - equal:
           path: spec.rules[0].matches[0].path.value
