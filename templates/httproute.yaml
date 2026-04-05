@@ -1,0 +1,158 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- /*
+Singleton HTTPRoute.
+Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1).
+Renders when httpRoute.enabled: true OR when any deployment/statefulSet has httpRoute.enabled: true.
+Per-workload rules are merged in priority order (lower number first), then alphabetically.
+serviceName defaults to <fullname>-<workloadName>; servicePort defaults to workload service.port.
+parentRefs and hostnames come from root httpRoute and are shared by all merged rules.
+*/}}
+{{- $wlState := dict "has" false }}
+{{- range $wlName, $wl := .Values.deployments }}
+  {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+    {{- $_ := set $wlState "has" true }}
+  {{- end }}
+{{- end }}
+{{- range $wlName, $wl := .Values.statefulSets }}
+  {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+    {{- $_ := set $wlState "has" true }}
+  {{- end }}
+{{- end }}
+{{- if or .Values.httpRoute.enabled (get $wlState "has") -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $releaseName }}
+  labels:
+    {{- include "uhc.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.httpRoute.parentRefs }}
+  parentRefs:
+    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+  {{- end }}
+  {{- if .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- range .Values.httpRoute.hostnames }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  rules:
+  {{- /* Root-level rules (backward-compatible, rendered first) */}}
+  {{- range .Values.httpRoute.rules }}
+    - {{- if .matches }}
+      matches:
+        {{- toYaml .matches | nindent 8 }}
+      {{- end }}
+      {{- if .filters }}
+      filters:
+        {{- toYaml .filters | nindent 8 }}
+      {{- end }}
+      backendRefs:
+      {{- if .backendRefs }}
+        {{- toYaml .backendRefs | nindent 8 }}
+      {{- else }}
+        - name: {{ .serviceName | default $releaseName }}
+          port: {{ .servicePort | default 80 }}
+      {{- end }}
+  {{- end }}
+  {{- /* Per-workload rules: sorted by priority (asc) then alphabetically by workload name */}}
+  {{- $sortKeys := list }}
+  {{- range $wlName, $wl := $ctx.Values.deployments }}
+    {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+      {{- $priority := int ($wl.httpRoute.priority | default 999999999) }}
+      {{- $sortKeys = append $sortKeys (printf "%09d|d|%s" $priority $wlName) }}
+    {{- end }}
+  {{- end }}
+  {{- range $wlName, $wl := $ctx.Values.statefulSets }}
+    {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+      {{- $priority := int ($wl.httpRoute.priority | default 999999999) }}
+      {{- $sortKeys = append $sortKeys (printf "%09d|s|%s" $priority $wlName) }}
+    {{- end }}
+  {{- end }}
+  {{- range $sortKey := $sortKeys | sortAlpha }}
+    {{- $parts := splitList "|" $sortKey }}
+    {{- $wlType := index $parts 1 }}
+    {{- $wlName := index $parts 2 }}
+    {{- $wl := dict }}
+    {{- if eq $wlType "d" }}
+      {{- $wl = index $ctx.Values.deployments $wlName }}
+    {{- else }}
+      {{- $wl = index $ctx.Values.statefulSets $wlName }}
+    {{- end }}
+    {{- $svcName := printf "%s-%s" $releaseName $wlName }}
+    {{- $svcPort := int (($wl.service | default dict).port | default 80) }}
+    {{- range $wl.httpRoute.rules }}
+    - {{- if .matches }}
+      matches:
+        {{- toYaml .matches | nindent 8 }}
+      {{- end }}
+      {{- if .filters }}
+      filters:
+        {{- toYaml .filters | nindent 8 }}
+      {{- end }}
+      backendRefs:
+      {{- if .backendRefs }}
+        {{- toYaml .backendRefs | nindent 8 }}
+      {{- else }}
+        - name: {{ $svcName }}
+          port: {{ $svcPort }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- /*
+Multi-HTTPRoute map: each key becomes a separate HTTPRoute named <fullname>-<key>.
+Mirrors the ingresses map pattern — useful when different workloads in one release
+need separate routes (e.g. different parentRefs or hostnames per route).
+*/}}
+{{- range $routeName := keys ($ctx.Values.httpRoutes | default dict) | sortAlpha }}
+{{- $route := index $ctx.Values.httpRoutes $routeName }}
+{{- if and (hasKey $route "enabled") $route.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $releaseName }}-{{ $routeName }}
+  labels:
+    {{- include "uhc.labels" $ctx | nindent 4 }}
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $route.parentRefs }}
+  parentRefs:
+    {{- toYaml $route.parentRefs | nindent 4 }}
+  {{- end }}
+  {{- if $route.hostnames }}
+  hostnames:
+    {{- range $route.hostnames }}
+    - {{ . | quote }}
+    {{- end }}
+  {{- end }}
+  rules:
+  {{- range $route.rules }}
+    - {{- if .matches }}
+      matches:
+        {{- toYaml .matches | nindent 8 }}
+      {{- end }}
+      {{- if .filters }}
+      filters:
+        {{- toYaml .filters | nindent 8 }}
+      {{- end }}
+      backendRefs:
+      {{- if .backendRefs }}
+        {{- toYaml .backendRefs | nindent 8 }}
+      {{- else }}
+        - name: {{ .serviceName | default $releaseName }}
+          port: {{ .servicePort | default 80 }}
+      {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

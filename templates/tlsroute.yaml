@@ -1,0 +1,129 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- /*
+Singleton TLSRoute.
+Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1).
+Renders when tlsRoute.enabled: true OR when any deployment/statefulSet has tlsRoute.enabled: true.
+Per-workload rules are merged in priority order (lower number first), then alphabetically.
+serviceName defaults to <fullname>-<workloadName>; servicePort defaults to workload service.port or 443.
+hostnames is required — must be set at root tlsRoute level.
+*/}}
+{{- $wlState := dict "has" false }}
+{{- range $wlName, $wl := .Values.deployments }}
+  {{- if and (hasKey $wl "tlsRoute") $wl.tlsRoute.enabled }}
+    {{- $_ := set $wlState "has" true }}
+  {{- end }}
+{{- end }}
+{{- range $wlName, $wl := .Values.statefulSets }}
+  {{- if and (hasKey $wl "tlsRoute") $wl.tlsRoute.enabled }}
+    {{- $_ := set $wlState "has" true }}
+  {{- end }}
+{{- end }}
+{{- if or .Values.tlsRoute.enabled (get $wlState "has") -}}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: TLSRoute
+metadata:
+  name: {{ $releaseName }}
+  labels:
+    {{- include "uhc.labels" . | nindent 4 }}
+  {{- with .Values.tlsRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.tlsRoute.parentRefs }}
+  parentRefs:
+    {{- toYaml .Values.tlsRoute.parentRefs | nindent 4 }}
+  {{- end }}
+  hostnames:
+    {{- range .Values.tlsRoute.hostnames }}
+    - {{ . | quote }}
+    {{- end }}
+  rules:
+  {{- /* Root-level rules (backward-compatible, rendered first) */}}
+  {{- range .Values.tlsRoute.rules }}
+    - backendRefs:
+      {{- if .backendRefs }}
+        {{- toYaml .backendRefs | nindent 8 }}
+      {{- else }}
+        - name: {{ .serviceName | default $releaseName }}
+          port: {{ .servicePort | default 443 }}
+      {{- end }}
+  {{- end }}
+  {{- /* Per-workload rules: sorted by priority (asc) then alphabetically by workload name */}}
+  {{- $sortKeys := list }}
+  {{- range $wlName, $wl := $ctx.Values.deployments }}
+    {{- if and (hasKey $wl "tlsRoute") $wl.tlsRoute.enabled }}
+      {{- $priority := int ($wl.tlsRoute.priority | default 999999999) }}
+      {{- $sortKeys = append $sortKeys (printf "%09d|d|%s" $priority $wlName) }}
+    {{- end }}
+  {{- end }}
+  {{- range $wlName, $wl := $ctx.Values.statefulSets }}
+    {{- if and (hasKey $wl "tlsRoute") $wl.tlsRoute.enabled }}
+      {{- $priority := int ($wl.tlsRoute.priority | default 999999999) }}
+      {{- $sortKeys = append $sortKeys (printf "%09d|s|%s" $priority $wlName) }}
+    {{- end }}
+  {{- end }}
+  {{- range $sortKey := $sortKeys | sortAlpha }}
+    {{- $parts := splitList "|" $sortKey }}
+    {{- $wlType := index $parts 1 }}
+    {{- $wlName := index $parts 2 }}
+    {{- $wl := dict }}
+    {{- if eq $wlType "d" }}
+      {{- $wl = index $ctx.Values.deployments $wlName }}
+    {{- else }}
+      {{- $wl = index $ctx.Values.statefulSets $wlName }}
+    {{- end }}
+    {{- $svcName := printf "%s-%s" $releaseName $wlName }}
+    {{- $svcPort := int (($wl.service | default dict).port | default 443) }}
+    {{- range $wl.tlsRoute.rules }}
+    - backendRefs:
+      {{- if .backendRefs }}
+        {{- toYaml .backendRefs | nindent 8 }}
+      {{- else }}
+        - name: {{ $svcName }}
+          port: {{ $svcPort }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- /*
+Multi-TLSRoute map: each key becomes a separate TLSRoute named <fullname>-<key>.
+Useful when multiple hostnames or listeners require separate TLS routes.
+*/}}
+{{- range $routeName := keys ($ctx.Values.tlsRoutes | default dict) | sortAlpha }}
+{{- $route := index $ctx.Values.tlsRoutes $routeName }}
+{{- if and (hasKey $route "enabled") $route.enabled }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: TLSRoute
+metadata:
+  name: {{ $releaseName }}-{{ $routeName }}
+  labels:
+    {{- include "uhc.labels" $ctx | nindent 4 }}
+  {{- with $route.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if $route.parentRefs }}
+  parentRefs:
+    {{- toYaml $route.parentRefs | nindent 4 }}
+  {{- end }}
+  hostnames:
+    {{- range $route.hostnames }}
+    - {{ . | quote }}
+    {{- end }}
+  rules:
+  {{- range $route.rules }}
+    - backendRefs:
+      {{- if .backendRefs }}
+        {{- toYaml .backendRefs | nindent 8 }}
+      {{- else }}
+        - name: {{ .serviceName | default $releaseName }}
+          port: {{ .servicePort | default 443 }}
+      {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -7,79 +7,165 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "repository": { "type": "string" },
-        "tag": { "type": "string" },
+        "repository": {
+          "type": "string"
+        },
+        "tag": {
+          "type": "string"
+        },
         "pullPolicy": {
           "type": "string",
-          "enum": ["Always", "IfNotPresent", "Never"]
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
         }
       }
     },
-    "revisionHistoryLimit": { "type": "integer", "minimum": 0 },
-    "progressDeadlineSeconds": { "type": "integer", "minimum": 1 },
-    "minReadySeconds": { "type": "integer", "minimum": 0 },
-    "terminationGracePeriodSeconds": { "type": "integer", "minimum": 0 },
-    "automountServiceAccountToken": { "type": "boolean" },
-    "podSecurityContext": { "type": "object" },
-    "securityContext": { "type": "object" },
-    "podAnnotations": { "type": "object" },
-    "jobPodAnnotations": { "type": "object" },
-    "nameOverride": { "type": "string" },
-    "fullnameOverride": { "type": "string" },
-    "priorityClassName": { "type": "string" },
-    "nodeSelector": { "type": "object" },
-    "tolerations": { "type": "array" },
-    "affinity": { "type": "object" },
-    "hostAliases": { "type": "array" },
-    "imagePullSecrets": { "type": "array" },
-    "volumes": { "type": "array" },
-    "volumeMounts": { "type": "object" },
-    "envSecrets": { "type": "array" },
-    "envConfigMaps": { "type": "array" },
-    "deployments": { "type": "object" },
-    "statefulSets": { "type": "object" },
-    "cronJobs": { "type": "object" },
-    "configMaps": { "type": "object" },
-    "secretStores": { "type": "object" },
-    "externalSecrets": { "type": "object" },
+    "revisionHistoryLimit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "progressDeadlineSeconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minReadySeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "automountServiceAccountToken": {
+      "type": "boolean"
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "securityContext": {
+      "type": "object"
+    },
+    "podAnnotations": {
+      "type": "object"
+    },
+    "jobPodAnnotations": {
+      "type": "object"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "hostAliases": {
+      "type": "array"
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "volumes": {
+      "type": "array"
+    },
+    "volumeMounts": {
+      "type": "object"
+    },
+    "envSecrets": {
+      "type": "array"
+    },
+    "envConfigMaps": {
+      "type": "array"
+    },
+    "deployments": {
+      "type": "object"
+    },
+    "statefulSets": {
+      "type": "object"
+    },
+    "cronJobs": {
+      "type": "object"
+    },
+    "configMaps": {
+      "type": "object"
+    },
+    "secretStores": {
+      "type": "object"
+    },
+    "externalSecrets": {
+      "type": "object"
+    },
     "serviceAccount": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "create": { "type": "boolean" },
-        "name": { "type": "string" },
-        "annotations": { "type": "object" }
+        "create": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object"
+        }
       }
     },
     "rbac": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "rules": { "type": "array" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "rules": {
+          "type": "array"
+        }
       }
     },
     "reloader": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        }
       }
     },
     "envDev": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "env": { "type": "object" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "env": {
+          "type": "object"
+        }
       }
     },
     "envProd": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "env": { "type": "object" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "env": {
+          "type": "object"
+        }
       }
     },
     "strategy": {
@@ -87,13 +173,26 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["RollingUpdate", "Recreate"]
+          "enum": [
+            "RollingUpdate",
+            "Recreate"
+          ]
         },
         "rollingUpdate": {
           "type": "object",
           "properties": {
-            "maxSurge": { "type": ["integer", "string"] },
-            "maxUnavailable": { "type": ["integer", "string"] }
+            "maxSurge": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            },
+            "maxUnavailable": {
+              "type": [
+                "integer",
+                "string"
+              ]
+            }
           }
         }
       }
@@ -103,13 +202,19 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["RollingUpdate", "OnDelete"]
+          "enum": [
+            "RollingUpdate",
+            "OnDelete"
+          ]
         },
         "rollingUpdate": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "partition": { "type": "integer", "minimum": 0 }
+            "partition": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         }
       }
@@ -118,11 +223,21 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "ingressClassName": { "type": "string" },
-        "annotations": { "type": "object" },
-        "hosts": { "type": "array" },
-        "tls": { "type": "array" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "ingressClassName": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "hosts": {
+          "type": "array"
+        },
+        "tls": {
+          "type": "array"
+        }
       }
     },
     "ingresses": {
@@ -130,11 +245,21 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "enabled": { "type": "boolean" },
-          "ingressClassName": { "type": "string" },
-          "annotations": { "type": "object" },
-          "hosts": { "type": "array" },
-          "tls": { "type": "array" }
+          "enabled": {
+            "type": "boolean"
+          },
+          "ingressClassName": {
+            "type": "string"
+          },
+          "annotations": {
+            "type": "object"
+          },
+          "hosts": {
+            "type": "array"
+          },
+          "tls": {
+            "type": "array"
+          }
         }
       }
     },
@@ -142,93 +267,430 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "minAvailable": { "type": ["integer", "string"] },
-        "maxUnavailable": { "type": ["integer", "string"] }
+        "enabled": {
+          "type": "boolean"
+        },
+        "minAvailable": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "maxUnavailable": {
+          "type": [
+            "integer",
+            "string"
+          ]
+        }
       }
     },
     "verticalPodAutoscaler": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
+        "enabled": {
+          "type": "boolean"
+        },
         "updateMode": {
           "type": "string",
-          "enum": ["Off", "Initial", "Recreate", "InPlaceOrRecreate"]
+          "enum": [
+            "Off",
+            "Initial",
+            "Recreate",
+            "InPlaceOrRecreate"
+          ]
         },
-        "resourcePolicy": { "type": "object" }
+        "resourcePolicy": {
+          "type": "object"
+        }
       }
     },
     "initJob": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "backoffLimit": { "type": "integer", "minimum": 0 },
-        "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0 },
-        "activeDeadlineSeconds": { "type": ["integer", "null"], "minimum": 1 },
-        "tasks": { "type": "object" },
-        "env": { "type": "object" },
-        "metadataAnnotations": { "type": "object" },
-        "completionImage": { "type": "string" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ttlSecondsAfterFinished": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "activeDeadlineSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "tasks": {
+          "type": "object"
+        },
+        "env": {
+          "type": "object"
+        },
+        "metadataAnnotations": {
+          "type": "object"
+        },
+        "completionImage": {
+          "type": "string"
+        }
       }
     },
     "dbJob": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "backoffLimit": { "type": "integer", "minimum": 0 },
-        "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0 },
-        "activeDeadlineSeconds": { "type": ["integer", "null"], "minimum": 1 },
+        "enabled": {
+          "type": "boolean"
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ttlSecondsAfterFinished": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "activeDeadlineSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
         "image": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "repository": { "type": "string" },
-            "tag": { "type": "string" },
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string"
+            },
             "pullPolicy": {
               "type": "string",
-              "enum": ["Always", "IfNotPresent", "Never"]
+              "enum": [
+                "Always",
+                "IfNotPresent",
+                "Never"
+              ]
             }
           }
         },
-        "imagePullSecrets": { "type": "array" },
-        "tasks": { "type": "object" },
-        "env": { "type": "object" },
-        "metadataAnnotations": { "type": "object" },
-        "completionImage": { "type": "string" }
+        "imagePullSecrets": {
+          "type": "array"
+        },
+        "tasks": {
+          "type": "object"
+        },
+        "env": {
+          "type": "object"
+        },
+        "metadataAnnotations": {
+          "type": "object"
+        },
+        "completionImage": {
+          "type": "string"
+        }
       }
     },
     "postSync": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "syncWave": { "type": ["string", "integer"] },
-        "backoffLimit": { "type": "integer", "minimum": 0 },
-        "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0 },
-        "hookDeletePolicy": { "type": "string" },
-        "jobs": { "type": "object" },
-        "env": { "type": "object" },
-        "metadataAnnotations": { "type": "object" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "syncWave": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ttlSecondsAfterFinished": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "hookDeletePolicy": {
+          "type": "string"
+        },
+        "jobs": {
+          "type": "object"
+        },
+        "env": {
+          "type": "object"
+        },
+        "metadataAnnotations": {
+          "type": "object"
+        }
       }
     },
     "syncWaves": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "jobsSyncWave": { "type": ["string", "integer"] },
-        "databaseJobsSyncWave": { "type": ["string", "integer"] },
-        "deploymentSyncWave": { "type": ["string", "integer"] }
+        "jobsSyncWave": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "databaseJobsSyncWave": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "deploymentSyncWave": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        }
       }
     },
     "topologySpreadConstraints": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "constraints": {
+          "type": "array"
+        }
+      }
+    },
+    "httpRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "parentRefs": {
+          "type": "array"
+        },
+        "hostnames": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "rules": {
+          "type": "array"
+        }
+      }
+    },
+    "httpRoutes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "annotations": {
+            "type": "object"
+          },
+          "parentRefs": {
+            "type": "array"
+          },
+          "hostnames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rules": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "grpcRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
         "enabled": { "type": "boolean" },
-        "constraints": { "type": "array" }
+        "annotations": { "type": "object" },
+        "parentRefs": { "type": "array" },
+        "hostnames": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rules": { "type": "array" }
+      }
+    },
+    "grpcRoutes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "annotations": { "type": "object" },
+          "parentRefs": { "type": "array" },
+          "hostnames": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rules": { "type": "array" }
+        }
+      }
+    },
+    "tlsRoute": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "annotations": { "type": "object" },
+        "parentRefs": { "type": "array" },
+        "hostnames": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "rules": { "type": "array" }
+      }
+    },
+    "tlsRoutes": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "annotations": { "type": "object" },
+          "parentRefs": { "type": "array" },
+          "hostnames": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "rules": { "type": "array" }
+        }
+      }
+    },
+    "referenceGrant": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "from": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "group": { "type": "string" },
+              "kind": { "type": "string" },
+              "namespace": { "type": "string" }
+            }
+          }
+        },
+        "to": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "group": { "type": "string" },
+              "kind": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "referenceGrants": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "annotations": {
+            "type": "object"
+          },
+          "from": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": { "type": "string" },
+                "kind": { "type": "string" },
+                "namespace": { "type": "string" }
+              }
+            }
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "group": { "type": "string" },
+                "kind": { "type": "string" },
+                "name": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "imageUpdater": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "appNamePattern": {
+          "type": "string"
+        },
+        "commonUpdateSettings": {
+          "type": "object"
+        },
+        "writeBackConfig": {
+          "type": "object"
+        },
+        "images": {
+          "type": "array"
+        },
+        "applicationRefs": {
+          "type": "array"
+        }
       }
     }
   }

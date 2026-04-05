@@ -2,6 +2,117 @@
 global:
   env: {}
 
+# Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
+# Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
+# Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
+#
+# Full spec reference:
+#   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
+#
+# TWO MODES:
+#
+#   Shorthand mode (applicationRefs is empty — the default):
+#     A single applicationRef is built automatically.
+#     namePattern defaults to .Release.Name (override with appNamePattern).
+#     commonUpdateSettings, writeBackConfig and images are placed inside that
+#     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
+#     Use this when one release = one ArgoCD Application with a shared image.
+#
+#   Manual mode (applicationRefs is provided):
+#     applicationRefs is rendered as-is.
+#     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
+#     top level are ignored — all config must live inside each applicationRef entry.
+#     Use this when you need multiple application targets or fine-grained control.
+imageUpdater:
+  enabled: false
+
+  # CR metadata
+  # name: override the ImageUpdater resource name (default: chart fullname)
+  name: ""
+  # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
+  # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
+  # to scope which ArgoCD Applications it looks at.
+  namespace: ""
+  annotations: {}
+
+  # --- Shorthand mode fields (ignored when applicationRefs is set) ---
+
+  # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
+  # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
+  appNamePattern: ""
+
+  # commonUpdateSettings: update strategy applied to all images in this applicationRef.
+  #   updateStrategy: alphabetical | semver | latest | digest | name
+  #   forceUpdate: false
+  #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
+  #   ignoreTags: ["latest", "dev"]
+  #   pullSecret: "pullsecret:<namespace>/<secret-name>"
+  #   platforms: []
+  commonUpdateSettings: {}
+
+  # writeBackConfig: how Image Updater writes the new image tag back.
+  #   method: argocd   — imperative via Argo CD API (default)
+  #   method: git      — declarative, commits the new tag to a Git repository
+  #   gitConfig:         required when method: git
+  #     repository: git@github.com:myorg/config.git
+  #     branch: main
+  #     writeBackTarget: "helmvalues:/values.yaml"
+  writeBackConfig: {}
+
+  # images: list of container images to track for the auto-generated applicationRef.
+  # Each image can override update settings and declare Helm value targets.
+  #   - alias: short identifier used as the write-back key
+  #     imageName: full image reference without tag (registry/repo)
+  #     commonUpdateSettings:    # optional per-image override
+  #       updateStrategy: semver
+  #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+  #       ignoreTags: ["latest"]
+  #     manifestTargets:         # optional: where to write the new tag in the manifest
+  #       helm:
+  #         name: image.repository   # Helm value key for the repository
+  #         tag: image.tag           # Helm value key for the tag
+  #
+  # Example (shorthand mode):
+  # images:
+  #   - alias: app
+  #     imageName: myregistry/myapp
+  #     manifestTargets:
+  #       helm:
+  #         name: image.repository
+  #         tag: image.tag
+  images: []
+
+  # --- Manual mode (takes precedence over all shorthand fields above) ---
+  #
+  # applicationRefs: full list of applicationRef entries rendered as-is.
+  # Each entry supports: namePattern, labelSelectors, useAnnotations,
+  # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
+  #
+  # Example:
+  # applicationRefs:
+  #   - namePattern: "my-app"
+  #     commonUpdateSettings:
+  #       updateStrategy: semver
+  #     writeBackConfig:
+  #       method: git
+  #       gitConfig:
+  #         repository: git@github.com:myorg/config.git
+  #         branch: main
+  #         writeBackTarget: "helmvalues:/values.yaml"
+  #     images:
+  #       - alias: app
+  #         imageName: myregistry/myapp
+  #         manifestTargets:
+  #           helm:
+  #             name: image.repository
+  #             tag: image.tag
+  #   - namePattern: "*"
+  #     labelSelectors:
+  #       matchLabels:
+  #         image-updater: my-updater
+  #     useAnnotations: true
+  applicationRefs: []
+
 # Environment-specific variable sets; only one should be enabled at a time.
 envDev:
   enabled: false
@@ -271,6 +382,277 @@ ingresses: {}
 #           - app.example.com
 #         secretName: app-tls
 
+# Kubernetes Gateway API — HTTPRoute (gateway.networking.k8s.io/v1).
+# Requires the Gateway API CRDs and a compatible Gateway controller installed in the cluster
+# (e.g. Cilium, Envoy Gateway, Istio, Traefik, Kong).
+# The Gateway itself must be created separately (outside this chart).
+#
+# Singleton HTTPRoute: one resource named <fullname>.
+httpRoute:
+  enabled: false
+  annotations: {}
+
+  # parentRefs: references to the Gateway(s) this route attaches to.
+  # name and namespace are required; sectionName targets a specific listener.
+  # parentRefs:
+  #   - name: my-gateway
+  #     namespace: gateway-system
+  #     sectionName: https   # optional: target a specific listener by name
+  parentRefs: []
+
+  # hostnames: list of hostnames this route serves.
+  # Must match a listener's hostname (or be a subdomain of it).
+  hostnames: []
+
+  # rules: list of routing rules.
+  # Each rule matches requests and forwards them to a backend service.
+  #
+  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
+  #   rules:
+  #     - serviceName: my-release-web   # default: chart fullname
+  #       servicePort: 8080             # default: 80
+  #       matches:
+  #         - path:
+  #             type: PathPrefix
+  #             value: /
+  #
+  # Full form — use backendRefs for multiple backends or weights:
+  #   rules:
+  #     - matches:
+  #         - path:
+  #             type: PathPrefix
+  #             value: /api
+  #       backendRefs:
+  #         - name: my-release-api
+  #           port: 8080
+  #           weight: 100
+  #
+  # filters: optional request/response transformations per rule:
+  #   filters:
+  #     - type: RequestRedirect
+  #       requestRedirect:
+  #         scheme: https
+  rules: []
+
+# Multi-HTTPRoute map: each key becomes a separate HTTPRoute named <fullname>-<key>.
+# Mirrors the ingresses map — useful when workloads in one release need separate routes
+# (e.g. different parentRefs, hostnames, or listener sections per route).
+httpRoutes: {}
+# Example:
+# httpRoutes:
+#   internal:
+#     enabled: true
+#     parentRefs:
+#       - name: internal-gateway
+#         namespace: gateway-system
+#     hostnames:
+#       - "app.internal.example.com"
+#     rules:
+#       - serviceName: my-release-web
+#         servicePort: 80
+#         matches:
+#           - path:
+#               type: PathPrefix
+#               value: /
+#   external:
+#     enabled: true
+#     parentRefs:
+#       - name: external-gateway
+#         namespace: gateway-system
+#         sectionName: https
+#     hostnames:
+#       - "app.example.com"
+#     rules:
+#       - matches:
+#           - path:
+#               type: PathPrefix
+#               value: /api
+#         backendRefs:
+#           - name: my-release-api
+#             port: 8080
+#       - matches:
+#           - path:
+#               type: PathPrefix
+#               value: /
+#         filters:
+#           - type: RequestRedirect
+#             requestRedirect:
+#               scheme: https
+#               statusCode: 301
+#         backendRefs:
+#           - name: my-release-web
+#             port: 80
+
+# Kubernetes Gateway API — GRPCRoute (gateway.networking.k8s.io/v1).
+# Requires a Gateway with a gRPC-capable listener and controller (e.g. Envoy Gateway, Istio, Cilium).
+# matches use gRPC service/method names instead of HTTP paths.
+# Default servicePort shorthand is 50051 (standard gRPC port).
+#
+# Singleton GRPCRoute: one resource named <fullname>.
+grpcRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  hostnames: []
+  # rules: list of routing rules. Each rule matches gRPC methods and forwards to a backend.
+  #
+  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
+  #   rules:
+  #     - serviceName: my-release-grpc   # default: chart fullname
+  #       servicePort: 50051             # default: 50051
+  #       matches:
+  #         - method:
+  #             type: Exact
+  #             service: com.example.UserService
+  #             method: Login              # optional: omit to match all methods in the service
+  #
+  # Full form — use backendRefs for multiple backends:
+  #   rules:
+  #     - matches:
+  #         - method:
+  #             type: Exact
+  #             service: com.example.UserService
+  #       backendRefs:
+  #         - name: my-release-grpc
+  #           port: 50051
+  #           weight: 100
+  #
+  # filters: same as HTTPRoute (RequestHeaderModifier, ResponseHeaderModifier, etc.)
+  rules: []
+
+# Multi-GRPCRoute map: each key becomes a separate GRPCRoute named <fullname>-<key>.
+grpcRoutes: {}
+# Example:
+# grpcRoutes:
+#   user-svc:
+#     enabled: true
+#     parentRefs:
+#       - name: my-gateway
+#         namespace: gateway-system
+#     hostnames:
+#       - "grpc.example.com"
+#     rules:
+#       - matches:
+#           - method:
+#               type: Exact
+#               service: com.example.UserService
+#         serviceName: my-release-user
+#         servicePort: 50051
+#   order-svc:
+#     enabled: true
+#     parentRefs:
+#       - name: my-gateway
+#         namespace: gateway-system
+#     rules:
+#       - matches:
+#           - method:
+#               type: Exact
+#               service: com.example.OrderService
+#         backendRefs:
+#           - name: my-release-order
+#             port: 50051
+
+# Kubernetes Gateway API — TLSRoute (gateway.networking.k8s.io/v1).
+# Operates at L4 — matches on SNI hostnames only, no HTTP-level routing.
+# Requires a Gateway listener with tls.mode: Passthrough or Terminate.
+# hostnames is required and must be FQDN (no IP addresses).
+# Default servicePort shorthand is 443.
+#
+# Singleton TLSRoute: one resource named <fullname>.
+tlsRoute:
+  enabled: false
+  annotations: {}
+  parentRefs: []
+  # hostnames: required — list of FQDN hostnames matched via SNI during TLS handshake.
+  hostnames: []
+  # rules: list of routing rules. Each rule forwards matching TLS connections to backends.
+  # No matches or filters — routing is determined entirely by hostnames (SNI).
+  #
+  # Shorthand form:
+  #   rules:
+  #     - serviceName: my-release-tls   # default: chart fullname
+  #       servicePort: 8443             # default: 443
+  #
+  # Full form:
+  #   rules:
+  #     - backendRefs:
+  #         - name: my-release-tls
+  #           port: 8443
+  #           weight: 100
+  rules: []
+
+# Multi-TLSRoute map: each key becomes a separate TLSRoute named <fullname>-<key>.
+tlsRoutes: {}
+# Example:
+# tlsRoutes:
+#   external:
+#     enabled: true
+#     parentRefs:
+#       - name: my-gateway
+#         namespace: gateway-system
+#         sectionName: tls-passthrough
+#     hostnames:
+#       - "secure.example.com"
+#     rules:
+#       - serviceName: my-release-web
+#         servicePort: 8443
+
+# Kubernetes Gateway API — ReferenceGrant (gateway.networking.k8s.io/v1beta1).
+# Required when an HTTPRoute in a different namespace needs to reference a Service
+# in this release's namespace (cross-namespace backend reference).
+# The ReferenceGrant is always created in the same namespace as the target Service
+# (i.e. the release namespace).
+#
+# Singleton ReferenceGrant: one resource named <fullname>.
+referenceGrant:
+  enabled: false
+  annotations: {}
+
+  # from: list of sources allowed to reference resources in this namespace.
+  # group and kind identify the referencing resource type; namespace is required.
+  # from:
+  #   - group: gateway.networking.k8s.io
+  #     kind: HTTPRoute
+  #     namespace: gateway-system   # namespace where the HTTPRoute lives
+  from: []
+
+  # to: list of target resource types in THIS namespace that may be referenced.
+  # group: "" means core API group (Services). name is optional — omit to allow
+  # all resources of that kind; set to restrict to a specific resource by name.
+  # to:
+  #   - group: ""
+  #     kind: Service
+  #     # name: my-release-web   # optional: restrict to a single Service
+  to: []
+
+# Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
+# Useful when HTTPRoutes from multiple namespaces need access, or when different
+# source kinds (HTTPRoute, GRPCRoute) require separate grants.
+referenceGrants: {}
+# Example:
+# referenceGrants:
+#   from-gateway-ns:
+#     enabled: true
+#     from:
+#       - group: gateway.networking.k8s.io
+#         kind: HTTPRoute
+#         namespace: gateway-system
+#     to:
+#       - group: ""
+#         kind: Service
+#   from-other-app:
+#     enabled: true
+#     annotations:
+#       team: platform
+#     from:
+#       - group: gateway.networking.k8s.io
+#         kind: HTTPRoute
+#         namespace: other-app-ns
+#     to:
+#       - group: ""
+#         kind: Service
+#         name: my-release-api   # restrict to a specific Service
+
 nodeSelector: {}
 
 tolerations: []
@@ -361,6 +743,33 @@ deployments: {}
 #     # Per-workload host aliases (merged with root hostAliases by default).
 #     # Set inheritRootHostAliases: false to use only local aliases.
 #     hostAliases: []
+#     # Gateway API routes — per-workload shorthand.
+#     # Rules from all enabled workloads are merged into the singleton HTTPRoute/GRPCRoute/TLSRoute.
+#     # parentRefs and hostnames are inherited from the root httpRoute/grpcRoute/tlsRoute block.
+#     # servicePort defaults to service.port; serviceName defaults to <fullname>-<workloadName>.
+#     # priority: lower number = earlier in the merged rules list; omit for alphabetical ordering.
+#     httpRoute:
+#       enabled: true
+#       priority: 10              # optional — controls rule order within the merged HTTPRoute
+#       rules:
+#         - matches:
+#             - path:
+#                 type: PathPrefix
+#                 value: /api
+#           # backendRefs: explicit override (optional)
+#     grpcRoute:
+#       enabled: true
+#       priority: 10
+#       rules:
+#         - matches:
+#             - method:
+#                 type: Exact
+#                 service: com.example.MyService
+#     tlsRoute:
+#       enabled: true
+#       priority: 10
+#       rules:
+#         - {}                    # no matches for TLSRoute — routing is SNI-based via root hostnames
 
 # Map of StatefulSet workloads. Each key becomes a separate StatefulSet + headless Service.
 statefulSets: {}

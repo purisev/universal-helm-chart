@@ -1,0 +1,11 @@
+referenceGrant:
+  enabled: true
+  annotations:
+    some-annotation: some-value
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: gateway-system
+  to:
+    - group: ""
+      kind: Service

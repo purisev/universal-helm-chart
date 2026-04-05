@@ -1,0 +1,10 @@
+referenceGrant:
+  enabled: true
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: gateway-system
+  to:
+    - group: ""
+      kind: Service
+      name: test-release-web

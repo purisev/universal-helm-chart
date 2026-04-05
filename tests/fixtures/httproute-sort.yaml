@@ -1,0 +1,25 @@
+httpRoute:
+  parentRefs:
+    - name: my-gateway
+
+deployments:
+  zoo:
+    service:
+      port: 80
+    httpRoute:
+      enabled: true
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /zoo
+  alpha:
+    service:
+      port: 80
+    httpRoute:
+      enabled: true
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /alpha
