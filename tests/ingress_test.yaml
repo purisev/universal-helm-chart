@@ -108,10 +108,8 @@ tests:
           value: Helm
 
   - it: should default path servicePort to 80
-    set:
-      ingress.enabled: true
-      ingress.hosts[0].host: example.com
-      ingress.hosts[0].paths[0].path: /
+    values:
+      - fixtures/ingress-default-port.yaml
     asserts:
       - equal:
           path: spec.rules[0].http.paths[0].backend.service.port.number
