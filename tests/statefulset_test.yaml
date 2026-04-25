@@ -89,11 +89,8 @@ tests:
     set:
       image.repository: redis
       image.tag: alpine
-      global.application.env.APP_NAME.value: myapp
       global.env.APP_ENV.value: production
-      envDev.enabled: true
-      envDev.env.DEBUG.value: "true"
-      envProd.enabled: false
+      env.DEBUG.value: "true"
       statefulSets.redis.enabled: true
       statefulSets.redis.replicaCount: 1
       statefulSets.redis.service.enabled: true
@@ -108,11 +105,6 @@ tests:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: APP_NAME
-            value: myapp
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -133,25 +125,17 @@ tests:
     set:
       image.repository: redis
       image.tag: alpine
-      global.application.env.APP_NAME.value: myapp
       global.env.APP_ENV.value: production
-      envDev.enabled: true
-      envDev.env.DEBUG.value: "true"
-      envProd.enabled: false
+      env.DEBUG.value: "true"
       statefulSets.redis.enabled: true
       statefulSets.redis.replicaCount: 1
       statefulSets.redis.service.enabled: true
       statefulSets.redis.service.port: 6379
       statefulSets.redis.service.targetPort: 6379
-      statefulSets.redis.inherit.env.application: false
       statefulSets.redis.inherit.env.global: false
-      statefulSets.redis.inherit.env.dev: false
+      statefulSets.redis.inherit.env.root: false
       statefulSets.redis.env.REDIS_ONLY.value: local
     asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: APP_NAME
       - notContains:
           path: spec.template.spec.containers[0].env
           content:

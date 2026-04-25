@@ -1,6 +1,19 @@
 # Global environment variables injected into every container.
+# When this chart is used as a subchart, Helm automatically merges any `global:`
+# block from the parent chart's values into every subchart instance — so this is
+# the layer to use for env vars shared across many subchart instances (DRY).
 global:
   env: {}
+
+# Per-chart-instance environment variables injected into every container.
+# Use this layer for vars specific to one release (one app) — typically set in
+# the small per-app values block of an umbrella chart.
+# Merge order in each container:
+#   NAMESPACE (fieldRef) → global.env → env → <workload>.env
+# Per-workload inheritance is controlled via deployments.<name>.inherit.env:
+#   global: false → exclude global.env
+#   root:   false → exclude this env block
+env: {}
 
 # Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
 # Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
@@ -112,15 +125,6 @@ imageUpdater:
   #         image-updater: my-updater
   #     useAnnotations: true
   applicationRefs: []
-
-# Environment-specific variable sets; only one should be enabled at a time.
-envDev:
-  enabled: false
-  env: {}
-
-envProd:
-  enabled: false
-  env: {}
 
 # Default image used by all workloads unless overridden per-workload.
 image:
@@ -777,10 +781,8 @@ deployments: {}
 #     # Set false to exclude that layer from this workload (and its sidecars).
 #     inherit:
 #       env:
-#         application: true
-#         global: true
-#         dev: true
-#         prod: true
+#         global: true            # set false to exclude global.env from this workload
+#         root: true              # set false to exclude root env from this workload
 #       configMaps: true          # set false to exclude root envConfigMaps from this workload
 #       configMapMount: true      # set false to skip all auto-mounts, or use map for granular control:
 #       configMapMount:

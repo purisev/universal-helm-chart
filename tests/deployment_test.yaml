@@ -266,11 +266,8 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      global.application.env.APP_NAME.value: myapp
       global.env.APP_ENV.value: production
-      envDev.enabled: true
-      envDev.env.DEBUG.value: "true"
-      envProd.enabled: false
+      env.DEBUG.value: "true"
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -285,11 +282,6 @@ tests:
             valueFrom:
               fieldRef:
                 fieldPath: metadata.namespace
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: APP_NAME
-            value: myapp
       - contains:
           path: spec.template.spec.containers[0].env
           content:
@@ -310,25 +302,17 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      global.application.env.APP_NAME.value: myapp
       global.env.APP_ENV.value: production
-      envDev.enabled: true
-      envDev.env.DEBUG.value: "true"
-      envProd.enabled: false
+      env.DEBUG.value: "true"
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
       deployments.web.service.targetPort: 8080
-      deployments.web.inherit.env.application: false
       deployments.web.inherit.env.global: false
-      deployments.web.inherit.env.dev: false
+      deployments.web.inherit.env.root: false
       deployments.web.env.WEB_ONLY.value: local
     asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: APP_NAME
       - notContains:
           path: spec.template.spec.containers[0].env
           content:
@@ -657,15 +641,14 @@ tests:
       image.repository: nginx
       image.tag: latest
       global.env.APP_ENV.value: production
-      envDev.enabled: true
-      envDev.env.DEBUG.value: "true"
+      env.DEBUG.value: "true"
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
       deployments.web.service.targetPort: 8080
       deployments.web.inherit.env.global: false
-      deployments.web.inherit.env.dev: false
+      deployments.web.inherit.env.root: false
       deployments.web.sidecars.log-shipper: {}
     asserts:
       - notContains:
