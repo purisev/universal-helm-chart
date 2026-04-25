@@ -8,8 +8,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}-config
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
@@ -32,8 +35,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}-config
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
@@ -56,8 +62,11 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $releaseName }}-{{ $cmName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}

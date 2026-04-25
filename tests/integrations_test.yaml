@@ -104,7 +104,7 @@ tests:
 
   # --- labels.standard.* toggles ---
 
-  - it: labels.standard.enabled false drops all standard labels from metadata
+  - it: labels.standard.enabled false drops only non-selector standard labels on workloads (selector-required name+instance always emitted)
     template: deployment.yaml
     set:
       image.repository: nginx
@@ -115,10 +115,12 @@ tests:
       deployments.web.service.targetPort: 80
       labels.standard.enabled: false
     asserts:
-      - isNull:
+      - equal:
           path: metadata.labels["app.kubernetes.io/name"]
-      - isNull:
+          value: web
+      - equal:
           path: metadata.labels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
       - isNull:
           path: metadata.labels["app.kubernetes.io/managed-by"]
       - isNull:
@@ -126,6 +128,39 @@ tests:
       - equal:
           path: spec.selector.matchLabels["app.kubernetes.io/name"]
           value: web
+
+  - it: labels.standard.enabled false on workload still produces matching pod template + selector (regression)
+    template: deployment.yaml
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      labels.standard.enabled: false
+    asserts:
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/name"]
+          value: web
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: web
+
+  - it: labels.standard.name false on Ingress (singleton) drops the label, but workload Service keeps it
+    template: ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.hosts[0].host: app.example.com
+      ingress.hosts[0].paths[0].path: /
+      ingress.hosts[0].paths[0].pathType: Prefix
+      labels.standard.name: false
+    asserts:
+      - isNull:
+          path: metadata.labels["app.kubernetes.io/name"]
 
   - it: labels.standard.managedBy false drops only managed-by
     template: deployment.yaml

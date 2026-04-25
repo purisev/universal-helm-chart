@@ -27,16 +27,25 @@ commonLabels: {}
 commonAnnotations: {}
 
 # Toggles for the chart's standard label set (the app.kubernetes.io/* labels emitted
-# into metadata.labels). Selector helpers (matchLabels) ignore these toggles —
-# selectors always retain name+instance to keep them immutable across upgrades.
-# Set labels.standard.enabled: false to short-circuit all five sub-flags at once
-# (useful in clusters with strict label-policy admission).
+# into metadata.labels of singleton resources — ServiceAccount, RBAC, Ingress, *Routes,
+# ReferenceGrant, NetworkPolicy, ImageUpdater, ConfigMap).
+#
+# IMPORTANT: For workload resources (Deployment, StatefulSet, Service, Job, CronJob,
+# HPA, VPA, PDB, ScaledObject, ServiceMonitor, PodMonitor, ESO resources) the
+# app.kubernetes.io/{name,instance} labels are ALWAYS emitted regardless of the
+# .name / .instance / .enabled flags below — they have to match spec.selector.matchLabels
+# (immutable on workload resources). The remaining flags (partOf, version, managedBy)
+# do apply to workload resources too.
+#
+# Set labels.standard.enabled: false to short-circuit all sub-flags at once on
+# singletons (useful in clusters with strict label-policy admission). Selector and
+# pod template label invariants on workloads are preserved.
 labels:
   standard:
     enabled: true
     partOf: true     # app.kubernetes.io/part-of
-    name: true       # app.kubernetes.io/name (selector copy is unaffected)
-    instance: true   # app.kubernetes.io/instance (selector copy is unaffected)
+    name: true       # app.kubernetes.io/name (singletons only — workloads always emit)
+    instance: true   # app.kubernetes.io/instance (singletons only — workloads always emit)
     version: true    # app.kubernetes.io/version
     managedBy: true  # app.kubernetes.io/managed-by
 

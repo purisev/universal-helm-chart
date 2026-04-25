@@ -25,8 +25,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ $releaseName }}
+  {{- $lbls := include "uhc.labels" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "httpRoute" "extra" (.Values.httpRoute.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
@@ -119,8 +122,11 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ $releaseName }}-{{ $routeName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "httpRoute" "extra" ($route.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}

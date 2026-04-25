@@ -51,8 +51,12 @@ Params: $ctx (the dot)
 
 {{/*
 Full labels for a named workload (Deployment, StatefulSet, Service, PDB, VPA, ScaledObject,
-HPA, ServiceMonitor, ConfigMap, Job, ESO resources). Same standard.* toggles and commonLabels
-merge as uhc.labels, but instance is workload-scoped (fullName-workloadName).
+HPA, ServiceMonitor, ConfigMap, Job, ESO resources). Always emits the minimal
+{name, instance} pair so spec.selector.matchLabels keeps matching the pod template — the
+labels.standard.{name,instance,enabled} flags do NOT affect this helper (changing them
+would silently break Deployment/StatefulSet/Job by orphaning the selector). Toggles for
+partOf, version, managedBy still apply, and commonLabels are merged with standard-wins
+precedence.
 Params: dict "ctx" $ctx "workloadName" $wlName
 */}}
 {{- define "uhc.workloadLabels" -}}
@@ -61,17 +65,15 @@ Params: dict "ctx" $ctx "workloadName" $wlName
 {{- $fullName := include "uhc.fullname" $ctx -}}
 {{- $std := $ctx.Values.labels.standard | default dict -}}
 {{- $stdLabels := dict -}}
+{{- $_ := set $stdLabels "app.kubernetes.io/name" $wlName -}}
+{{- $_ := set $stdLabels "app.kubernetes.io/instance" (printf "%s-%s" $fullName $wlName) -}}
 {{- if $std.enabled -}}
   {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" $fullName -}}{{- end -}}
-  {{- if $std.name -}}{{- $_ := set $stdLabels "app.kubernetes.io/name" $wlName -}}{{- end -}}
-  {{- if $std.instance -}}{{- $_ := set $stdLabels "app.kubernetes.io/instance" (printf "%s-%s" $fullName $wlName) -}}{{- end -}}
   {{- if and $std.version $ctx.Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" ($ctx.Chart.AppVersion | toString) -}}{{- end -}}
   {{- if $std.managedBy -}}{{- $_ := set $stdLabels "app.kubernetes.io/managed-by" $ctx.Release.Service -}}{{- end -}}
 {{- end -}}
 {{- $merged := merge $stdLabels ($ctx.Values.commonLabels | default dict) -}}
-{{- if $merged -}}
 {{- toYaml $merged -}}
-{{- end -}}
 {{- end }}
 
 {{/*
