@@ -430,6 +430,9 @@ envSecrets: []
 #   - if the name matches a key in `.Values.configMaps` → chart-owned: rendered as
 #     {name: <fullname>-<name>} (uses the chart-managed CM resource);
 #   - otherwise → external CM: rendered as {name: <name>} as-is.
+# On collision (an external CM and a chart-owned configMaps.<name> with the same name)
+# the chart-owned one wins and the external CM is shadowed. Two CMs with the same logical
+# name in one release is itself a smell — pick distinct names if you need both.
 # Disable per-workload inheritance with inherit.configMaps: false.
 # Example:
 #   configMaps:
@@ -1101,6 +1104,9 @@ deployments: {}
 #     replicaCount: 2
 #     # service.ports: map keyed by port name. Map key → spec.ports[].name (k8s Service)
 #     # AND becomes the matching containerPort name in the pod template.
+#     # Render order: "http" first (if present), "metrics" last (if present), all
+#     # other names alphabetically between. Auto-injected metrics port from
+#     # metrics.exposeService is always appended last.
 #     # Omit to use the singleton service.port/targetPort fallback below.
 #     service:
 #       enabled: true
@@ -1116,7 +1122,8 @@ deployments: {}
 #           port: 9090
 #           targetPort: 9090
 #     # Direct container ports (used by sidecars or workloads without a Service).
-#     # Map key → spec.containers[].ports[].name (k8s Pod).
+#     # Map key → spec.containers[].ports[].name (k8s Pod). Same render order as
+#     # service.ports: "http" first, "metrics" last, others alphabetically between.
 #     ports: {}
 #     # Per-workload env inheritance control. Each flag defaults to true.
 #     # Set false to exclude that layer from this workload (and its sidecars).

@@ -246,6 +246,23 @@ sidecars). Reads inherit.configMapMount.
 {{- end }}
 
 {{/*
+Ordered port-name list for service.ports / container ports rendering.
+Convention: "http" (if present) is rendered first, "metrics" (if present) last,
+all other ports alphabetically between. Returns a JSON-encoded list of names;
+caller decodes with `fromJsonArray`.
+Param: a map (e.g. $wl.service.ports). Output: JSON array of strings.
+*/}}
+{{- define "uhc.orderedPortNames" -}}
+{{- $names := keys (. | default dict) -}}
+{{- $first := list -}}
+{{- if has "http" $names -}}{{- $first = list "http" -}}{{- end -}}
+{{- $last := list -}}
+{{- if has "metrics" $names -}}{{- $last = list "metrics" -}}{{- end -}}
+{{- $middle := without (without $names "http") "metrics" | sortAlpha -}}
+{{- concat $first $middle $last | toJson -}}
+{{- end }}
+
+{{/*
 Fail-fast guard: aborts rendering if any legacy job-related top-level value is present.
 The dbJob/initJob/postSync/cronJobs blocks were removed in favour of jobGroups; charts
 that still carry them would silently render zero Jobs. We catch that here with a clear
@@ -442,7 +459,7 @@ Output at zero indent; caller controls nindent.
   {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
   {{- if and .renderDirectPorts $wl.ports }}
   ports:
-    {{- range $pName := keys $wl.ports | sortAlpha }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.ports | fromJsonArray }}
     {{- $p := index $wl.ports $pName }}
     - name: {{ $pName }}
       {{- toYaml $p | nindent 6 }}
@@ -457,7 +474,7 @@ Output at zero indent; caller controls nindent.
   ports:
     {{- if and $wl.service $wl.service.enabled }}
     {{- if $wl.service.ports }}
-    {{- range $pName := keys $wl.service.ports | sortAlpha }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
     {{- $p := index $wl.service.ports $pName }}
     - name: {{ $pName }}
       containerPort: {{ $p.targetPort }}
@@ -1016,9 +1033,19 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{- $_ := set $merged "envSecrets" (concat ($group.envSecrets | default list) ($job.envSecrets | default list)) -}}
 {{- $_ := set $merged "envConfigMaps" (concat ($group.envConfigMaps | default list) ($job.envConfigMaps | default list)) -}}
 {{- $_ := set $merged "tolerations" (concat ($group.tolerations | default list) ($job.tolerations | default list)) -}}
-{{/* Maps: job overrides group on collisions */}}
-{{- $_ := set $merged "volumes" (merge (deepCopy ($job.volumes | default dict)) ($group.volumes | default dict)) -}}
-{{- $_ := set $merged "volumeMounts" (merge (deepCopy ($job.volumeMounts | default dict)) ($group.volumeMounts | default dict)) -}}
+{{/* Maps: union by name; on key collision the whole job entry replaces the group entry
+     (we do NOT recurse into the inner spec — k8s volume/volumeMount kinds are mutually
+     exclusive: a name can be either an emptyDir or a configMap, not both). */}}
+{{- $vMerged := deepCopy ($group.volumes | default dict) -}}
+{{- range $k, $v := ($job.volumes | default dict) -}}
+  {{- $_ := set $vMerged $k $v -}}
+{{- end -}}
+{{- $_ := set $merged "volumes" $vMerged -}}
+{{- $vmMerged := deepCopy ($group.volumeMounts | default dict) -}}
+{{- range $k, $v := ($job.volumeMounts | default dict) -}}
+  {{- $_ := set $vmMerged $k $v -}}
+{{- end -}}
+{{- $_ := set $merged "volumeMounts" $vmMerged -}}
 {{/* Scalars: job-override-else-group */}}
 {{- range $k := list "backoffLimit" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
 {{- $jv := index $job $k -}}

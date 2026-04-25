@@ -26,7 +26,7 @@ spec:
   type: {{ $wl.service.type }}
   ports:
     {{- if $wl.service.ports }}
-    {{- range $pName := keys $wl.service.ports | sortAlpha }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
     {{- $p := index $wl.service.ports $pName }}
     - name: {{ $pName }}
       port: {{ $p.port }}
@@ -101,7 +101,7 @@ spec:
   ports:
     {{- if and $wl.service $wl.service.enabled }}
     {{- if $wl.service.ports }}
-    {{- range $pName := keys $wl.service.ports | sortAlpha }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
     {{- $p := index $wl.service.ports $pName }}
     - name: {{ $pName }}
       port: {{ $p.port | default $p.targetPort }}

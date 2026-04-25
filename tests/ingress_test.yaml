@@ -195,3 +195,24 @@ tests:
           path: metadata.name
           pattern: -internal$
         documentIndex: 1
+
+  - it: should preserve declared path order inside a host (not alphabetical)
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /b
+              pathType: Prefix
+            - path: /a
+              pathType: Prefix
+    asserts:
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 2
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /b
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: /a
