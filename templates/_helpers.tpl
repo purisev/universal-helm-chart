@@ -171,15 +171,13 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-Environment variables: NAMESPACE fieldRef → global.application.env → global.env → envDev → envProd → extraEnv.
+Environment variables: NAMESPACE fieldRef → global.env → root env → extraEnv.
 Params:
 - dict "ctx" $ctx
 - dict "extraEnv" $wl.env
 - optional dict "inherit" $wl.inherit.env with keys:
-  - application: false → exclude global.application.env
-  - global: false      → exclude global.env
-  - dev: false         → exclude envDev.env
-  - prod: false        → exclude envProd.env
+  - global: false → exclude global.env
+  - root:   false → exclude root env
   All keys default to true (inherit everything).
 Output at zero indent; caller controls nindent.
 */}}
@@ -187,46 +185,26 @@ Output at zero indent; caller controls nindent.
 {{- $ctx := .ctx }}
 {{- $extraEnv := .extraEnv | default dict }}
 {{- $inherit := .inherit | default dict }}
-{{- $wantApplication := true }}
-{{- if hasKey $inherit "application" }}
-  {{- $wantApplication = ne (index $inherit "application") false }}
-{{- end }}
 {{- $wantGlobal := true }}
 {{- if hasKey $inherit "global" }}
   {{- $wantGlobal = ne (index $inherit "global") false }}
 {{- end }}
-{{- $wantDev := true }}
-{{- if hasKey $inherit "dev" }}
-  {{- $wantDev = ne (index $inherit "dev") false }}
-{{- end }}
-{{- $wantProd := true }}
-{{- if hasKey $inherit "prod" }}
-  {{- $wantProd = ne (index $inherit "prod") false }}
+{{- $wantRoot := true }}
+{{- if hasKey $inherit "root" }}
+  {{- $wantRoot = ne (index $inherit "root") false }}
 {{- end }}
 - name: NAMESPACE
   valueFrom:
     fieldRef:
       fieldPath: metadata.namespace
-{{- if and $wantApplication $ctx.Values.global.application }}
-{{- range $envName, $value := $ctx.Values.global.application.env }}
+{{- if and $wantGlobal $ctx.Values.global }}
+{{- range $envName, $value := ($ctx.Values.global.env | default dict) }}
 - name: {{ $envName }}
   {{- toYaml $value | nindent 2 }}
 {{- end }}
 {{- end }}
-{{- if $wantGlobal }}
-{{- range $envName, $value := $ctx.Values.global.env }}
-- name: {{ $envName }}
-  {{- toYaml $value | nindent 2 }}
-{{- end }}
-{{- end }}
-{{- if and $wantDev $ctx.Values.envDev.enabled }}
-{{- range $envName, $value := $ctx.Values.envDev.env }}
-- name: {{ $envName }}
-  {{- toYaml $value | nindent 2 }}
-{{- end }}
-{{- end }}
-{{- if and $wantProd $ctx.Values.envProd.enabled }}
-{{- range $envName, $value := $ctx.Values.envProd.env }}
+{{- if $wantRoot }}
+{{- range $envName, $value := ($ctx.Values.env | default dict) }}
 - name: {{ $envName }}
   {{- toYaml $value | nindent 2 }}
 {{- end }}

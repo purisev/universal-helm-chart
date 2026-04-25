@@ -144,29 +144,8 @@
         }
       }
     },
-    "envDev": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "env": {
-          "type": "object"
-        }
-      }
-    },
-    "envProd": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "env": {
-          "type": "object"
-        }
-      }
+    "env": {
+      "type": "object"
     },
     "strategy": {
       "type": "object",
