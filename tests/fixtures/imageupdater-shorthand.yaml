@@ -16,7 +16,7 @@ integrations:
           branch: main
           writeBackTarget: "helmvalues:/values/app-image.yml"
       images:
-        - alias: app
+        app:
           imageName: myregistry/myapp
           manifestTargets:
             helm:

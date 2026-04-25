@@ -79,19 +79,37 @@
       "type": "array"
     },
     "imagePullSecrets": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "volumes": {
-      "type": "array"
+      "type": "object",
+      "additionalProperties": {
+        "type": "object"
+      }
     },
     "volumeMounts": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object"
+        }
+      }
     },
     "envSecrets": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "envConfigMaps": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "deployments": {
       "type": "object"
@@ -197,10 +215,16 @@
           "type": "object"
         },
         "hosts": {
-          "type": "array"
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
         },
         "tls": {
-          "type": "array"
+          "type": "object",
+          "additionalProperties": {
+            "type": "object"
+          }
         }
       }
     },
@@ -219,10 +243,16 @@
             "type": "object"
           },
           "hosts": {
-            "type": "array"
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            }
           },
           "tls": {
-            "type": "array"
+            "type": "object",
+            "additionalProperties": {
+              "type": "object"
+            }
           }
         }
       }
@@ -598,7 +628,10 @@
                 "appNamePattern": { "type": "string" },
                 "commonUpdateSettings": { "type": "object" },
                 "writeBackConfig": { "type": "object" },
-                "images": { "type": "array" },
+                "images": {
+                  "type": "object",
+                  "additionalProperties": { "type": "object" }
+                },
                 "applicationRefs": { "type": "array" }
               }
             }

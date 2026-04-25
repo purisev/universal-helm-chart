@@ -213,3 +213,25 @@ tests:
       - equal:
           path: spec.applicationRefs[0].useAnnotations
           value: true
+
+  - it: shorthand - should render images from a map keyed by alias in sorted order
+    set:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.images:
+        zeta:
+          imageName: registry/zeta
+        alpha:
+          imageName: registry/alpha
+    asserts:
+      - lengthEqual:
+          path: spec.applicationRefs[0].images
+          count: 2
+      - equal:
+          path: spec.applicationRefs[0].images[0].alias
+          value: alpha
+      - equal:
+          path: spec.applicationRefs[0].images[0].imageName
+          value: registry/alpha
+      - equal:
+          path: spec.applicationRefs[0].images[1].alias
+          value: zeta

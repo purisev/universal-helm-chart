@@ -153,28 +153,28 @@ integrations:
       #     writeBackTarget: "helmvalues:/values.yaml"
       writeBackConfig: {}
 
-      # images: list of container images to track for the auto-generated applicationRef.
-      # Each image can override update settings and declare Helm value targets.
-      #   - alias: short identifier used as the write-back key
-      #     imageName: full image reference without tag (registry/repo)
-      #     commonUpdateSettings:    # optional per-image override
-      #       updateStrategy: semver
-      #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
-      #       ignoreTags: ["latest"]
-      #     manifestTargets:         # optional: where to write the new tag in the manifest
-      #       helm:
-      #         name: image.repository   # Helm value key for the repository
-      #         tag: image.tag           # Helm value key for the tag
+      # images: map of container images to track for the auto-generated applicationRef.
+      # Map key → applicationRefs[].images[].alias (Argo CD ImageUpdater CRD).
+      # Each entry can override update settings and declare Helm value targets.
+      #   imageName: full image reference without tag (registry/repo)
+      #   commonUpdateSettings:    # optional per-image override
+      #     updateStrategy: semver
+      #     allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      #     ignoreTags: ["latest"]
+      #   manifestTargets:         # optional: where to write the new tag in the manifest
+      #     helm:
+      #       name: image.repository   # Helm value key for the repository
+      #       tag: image.tag            # Helm value key for the tag
       #
       # Example (shorthand mode):
       # images:
-      #   - alias: app
+      #   app:                          # ← becomes images[].alias
       #     imageName: myregistry/myapp
       #     manifestTargets:
       #       helm:
       #         name: image.repository
       #         tag: image.tag
-      images: []
+      images: {}
 
       # --- Manual mode (takes precedence over all shorthand fields above) ---
       #
@@ -236,6 +236,8 @@ integrations:
     enabled: true
 
     # SecretStores — access configuration for external secret backends (Vault, AWS, GCP).
+    # Map key → metadata.name suffix (External Secrets SecretStore/ClusterSecretStore):
+    # "<release-fullname>-<key>".
     # JWT auth uses serviceAccount.name by default; override per store via serviceAccountRef.
     # API version (v1 / v1beta1) is auto-detected via .Capabilities at install time.
     secretStores: {}
@@ -282,8 +284,13 @@ integrations:
     #             serviceAccountRef: ""  # default: serviceAccount.name
 
     # ExternalSecrets — sync secrets from external backends into K8s Secrets.
+    # Outer map key → metadata.name suffix (External Secrets ExternalSecret):
+    # "<release-fullname>-<key>" (override via .targetName).
     # Requires ExternalSecrets Operator. API version is auto-detected via .Capabilities.
-    # data[] fetches individual keys; dataFrom[] extracts the entire secret.
+    # data: map keyed by secretKey (the field name in the resulting k8s Secret).
+    #   Map key → spec.data[].secretKey (External Secrets Operator).
+    # dataFrom: list (no natural unique key — the same remoteKey can appear multiple
+    #   times with different overrides; bulk-extracts the entire remote secret).
     # conversionStrategy/decodingStrategy/metadataPolicy default to Default/None/None.
     externalSecrets: {}
     # Example:
@@ -296,8 +303,8 @@ integrations:
     #     targetName: db-creds          # K8s Secret name (default: map key)
     #     type: Opaque                  # Opaque | kubernetes.io/tls | kubernetes.io/dockerconfigjson
     #     data:
-    #       - remoteKey: my-app/db
-    #         secretKey: DB_PASSWORD
+    #       DB_PASSWORD:                # ← becomes data[].secretKey AND the field name in the k8s Secret
+    #         remoteKey: my-app/db
     #         property: password
     #         conversionStrategy: Default   # Default | Unicode
     #         decodingStrategy: None        # None | Auto | Base64 | Base64URL
@@ -339,8 +346,8 @@ integrations:
       type: service       # service | pod — per-workload metrics.type overrides
       port: http          # CRD mode: NAME of the port in Service (type:service) or Pod
                           # (type:pod) — Prometheus/VM CRDs require a string name, not a
-                          # number. If the container port has no name, give it one in the
-                          # workload spec (e.g. service.ports[].name=metrics) before setting
+                          # number. The name comes from the key under service.ports
+                          # (or ports for pod-targets); add an entry there before setting
                           # this. A numeric value here makes kubectl apply reject the CRD.
                           #
                           # Annotation mode: set per-workload metrics.port to a NUMBER
@@ -356,7 +363,7 @@ integrations:
       # (avoids ALLOWED_HOSTS / middleware issues for in-cluster scraping).
       # Port name is fixed as "metrics" (k8s convention). Per-workload metrics.exposeService
       # overrides any of these. Ignored when metrics.type is "pod" (PodMonitor doesn't
-      # need a Service) and skipped if service.ports[] already has a "metrics" entry.
+      # need a Service) and skipped if service.ports has a "metrics" entry.
       exposeService:
         enabled: false
         port: 9090       # ServicePort
@@ -378,6 +385,13 @@ image:
   pullPolicy: IfNotPresent
   tag: ""
 
+# List of registry pull secrets. Each entry is the k8s Secret name; the chart wraps
+# it as {name: <s>} for spec.imagePullSecrets[]. Referenced Secrets must already exist
+# in the namespace.
+# Example:
+#   imagePullSecrets:
+#     - regcred-prod
+#     - regcred-mirror
 imagePullSecrets: []
 
 # 10 revisions — matches Kubernetes default; gives safer rollback history.
@@ -403,11 +417,26 @@ statefulSetUpdateStrategy:
     partition: 0
 
 # Secrets mounted as environment variables in all containers via envFrom[].secretRef.
+# List of k8s Secret names (must already exist in the namespace). The chart wraps each
+# entry as {secretRef: {name: <s>}} for envFrom.
+# Example:
+#   envSecrets:
+#     - db-creds
+#     - api-keys
 envSecrets: []
 
 # ConfigMaps mounted as environment variables in all containers via envFrom[].configMapRef.
-# Disable per-workload with inherit.configMaps: false; add workload-local refs via envConfigMaps.
-# Shorthand: {configMapRef: key} resolves to {name: <fullname>-key} (references configMaps entries).
+# List of names. Resolution per entry:
+#   - if the name matches a key in `.Values.configMaps` → chart-owned: rendered as
+#     {name: <fullname>-<name>} (uses the chart-managed CM resource);
+#   - otherwise → external CM: rendered as {name: <name>} as-is.
+# Disable per-workload inheritance with inherit.configMaps: false.
+# Example:
+#   configMaps:
+#     app-config: { enabled: true, data: { ... } }
+#   envConfigMaps:
+#     - app-config        # chart-owned → <fullname>-app-config
+#     - external-cm       # external → external-cm
 envConfigMaps: []
 
 nameOverride: ""
@@ -479,18 +508,42 @@ terminationGracePeriodSeconds: 30
 # 0 means immediately (Kubernetes default). Override per-workload.
 minReadySeconds: 0
 
-volumes: []
+# Pod-level volumes shared across all containers in deployments/statefulSets
+# (and propagated into Jobs/CronJobs via jobGroups).
+# Map key → spec.template.spec.volumes[].name (k8s Pod). Drop the `name:` field
+# from the value — the chart injects it from the map key.
+# Example:
+#   volumes:
+#     cache:                              # ← becomes volumes[].name
+#       emptyDir: {}
+#     config:                             # ← becomes volumes[].name
+#       configMap:
+#         name: my-external-cm
+volumes: {}
 
+# Per-workload container volumeMounts. Outer key = workload name (deployments/
+# statefulSets entry), inner key = mount name (must match a key in `volumes`
+# above or in the workload's local `volumes`).
+# Inner map key → spec.containers[].volumeMounts[].name (k8s Container).
+# Example:
+#   volumeMounts:
+#     web:                                # outer key = workload name
+#       cache:                            # ← becomes volumeMounts[].name
+#         mountPath: /var/cache
+#       config:
+#         mountPath: /etc/app
+#         readOnly: true
 volumeMounts: {}
 
 # Chart-level ConfigMaps. Each entry creates a separate ConfigMap resource.
+# Map key → metadata.name suffix (k8s ConfigMap): "<release-fullname>-<key>".
 # mountPath: if set, the ConfigMap is automatically mounted into all containers at that path.
 # Each key in data becomes a separate file under mountPath.
 # Disable auto-mount per-workload with inherit.configMapMount: false.
 configMaps: {}
 # Example:
 # configMaps:
-#   app-config:
+#   app-config:                             # ← becomes <release>-app-config
 #     enabled: true
 #     mountPath: /etc/config        # optional: auto-mount into all containers
 #     readOnly: true                # default true; set false to allow writes
@@ -564,10 +617,13 @@ configMaps: {}
 #    setting hashSuffix: false and using a delete policy that recreates on every sync
 #    (e.g. argocd hooks.argocd.deletePolicy: BeforeHookCreation, or helm
 #    hooks.helm.deletePolicy: before-hook-creation). The Job will run on every sync.
+# jobGroups: outer map keyed by group name → metadata.name suffix
+# (k8s Job/CronJob): "<release-fullname>-<group>-<job>[-<sha8>]".
+# Inner `jobs:` map keyed by job name → second segment of metadata.name.
 jobGroups: {}
 # Example covering all features:
 # jobGroups:
-#   db:                                    # group name (truncated to 8 chars in resource name)
+#   db:                                    # ← group name (truncated to 8 chars in resource name)
 #     enabled: true
 #     kind: Job                            # default Job; or CronJob
 #     hooks:
@@ -597,8 +653,8 @@ jobGroups: {}
 #     resources:
 #       requests: { cpu: 100m, memory: 128Mi }
 #       limits: { memory: 256Mi }
-#     volumes: []
-#     volumeMounts: []
+#     volumes: {}                           # map keyed by volume name (see root `volumes`)
+#     volumeMounts: {}                      # map keyed by mount name (see root `volumeMounts`)
 #     useRootVolumes: true
 #     useRootVolumeMounts: true
 #     nodeSelector: {}
@@ -642,6 +698,11 @@ jobGroups: {}
 #         failedJobsHistoryLimit: 1
 #         command: ./cleanup.sh
 
+# Singleton Ingress (one per release).
+# hosts: map keyed by hostname. Map key → spec.rules[].host (k8s Ingress).
+# tls:   map keyed by k8s Secret name. Map key → spec.tls[].secretName (k8s Ingress).
+# paths inside hosts stay as a list — order of paths can matter for some ingress
+# controllers (legacy nginx and friends match in declared order on equal precedence).
 ingress:
   enabled: false
   # ingressClassName: if set, maps to spec.ingressClassName on the Ingress resource.
@@ -649,12 +710,28 @@ ingress:
   # Example values: nginx, traefik, alb, haproxy, kong
   ingressClassName: ""
   annotations: {}
-  hosts: []
-  tls: []
+  hosts: {}
+  tls: {}
+# Example:
+# ingress:
+#   enabled: true
+#   ingressClassName: nginx
+#   hosts:
+#     app.example.com:                      # ← becomes spec.rules[].host
+#       paths:
+#         - path: /api
+#           pathType: Prefix
+#           serviceName: my-release-api
+#           servicePort: 8080
+#   tls:
+#     app-tls:                              # ← becomes spec.tls[].secretName
+#       hosts:
+#         - app.example.com
 
 # Multi-ingress map: each key becomes a separate Ingress named <fullname>-<key>.
 # Useful when a single release needs multiple ingress controllers (e.g. internal + external).
 # Falls back to ingress.ingressClassName when ingressClassName is not specified per entry.
+# Inner shape (hosts/tls) is the same as the singleton `ingress` block above.
 ingresses: {}
 # Example:
 # ingresses:
@@ -664,29 +741,29 @@ ingresses: {}
 #     annotations:
 #       nginx.ingress.kubernetes.io/rewrite-target: /
 #     hosts:
-#       - host: "app.internal.example.com"
+#       app.internal.example.com:
 #         paths:
 #           - path: /
 #             pathType: Prefix
 #             serviceName: my-release-web
 #             servicePort: 80
-#     tls: []
+#     tls: {}
 #   external:
 #     enabled: true
 #     ingressClassName: nginx
 #     annotations:
 #       cert-manager.io/cluster-issuer: letsencrypt-prod
 #     hosts:
-#       - host: "app.example.com"
+#       app.example.com:
 #         paths:
 #           - path: /api
 #             pathType: Prefix
 #             serviceName: my-release-api
 #             servicePort: 8080
 #     tls:
-#       - hosts:
+#       app-tls:
+#         hosts:
 #           - app.example.com
-#         secretName: app-tls
 
 # Kubernetes Gateway API — HTTPRoute (gateway.networking.k8s.io/v1).
 # Requires the Gateway API CRDs and a compatible Gateway controller installed in the cluster
@@ -741,6 +818,7 @@ httpRoute:
   rules: []
 
 # Multi-HTTPRoute map: each key becomes a separate HTTPRoute named <fullname>-<key>.
+# Map key → metadata.name suffix (Gateway API HTTPRoute): "<release-fullname>-<key>".
 # Mirrors the ingresses map — useful when workloads in one release need separate routes
 # (e.g. different parentRefs, hostnames, or listener sections per route).
 httpRoutes: {}
@@ -827,6 +905,7 @@ grpcRoute:
   rules: []
 
 # Multi-GRPCRoute map: each key becomes a separate GRPCRoute named <fullname>-<key>.
+# Map key → metadata.name suffix (Gateway API GRPCRoute): "<release-fullname>-<key>".
 grpcRoutes: {}
 # Example:
 # grpcRoutes:
@@ -888,6 +967,7 @@ tlsRoute:
   rules: []
 
 # Multi-TLSRoute map: each key becomes a separate TLSRoute named <fullname>-<key>.
+# Map key → metadata.name suffix (Gateway API TLSRoute): "<release-fullname>-<key>".
 tlsRoutes: {}
 # Example:
 # tlsRoutes:
@@ -932,6 +1012,7 @@ referenceGrant:
   to: []
 
 # Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
+# Map key → metadata.name suffix (Gateway API ReferenceGrant): "<release-fullname>-<key>".
 # Useful when HTTPRoutes from multiple namespaces need access, or when different
 # source kinds (HTTPRoute, GRPCRoute) require separate grants.
 referenceGrants: {}
@@ -1011,12 +1092,32 @@ topologySpreadConstraints:
       whenUnsatisfiable: ScheduleAnyway
 
 # Map of Deployment workloads. Each key becomes a separate Deployment + Service.
+# Map key → metadata.name suffix (k8s Deployment/Service): "<release-fullname>-<key>".
 deployments: {}
 # Example:
 # deployments:
-#   web:
+#   web:                                    # ← becomes <release>-web
 #     enabled: true
 #     replicaCount: 2
+#     # service.ports: map keyed by port name. Map key → spec.ports[].name (k8s Service)
+#     # AND becomes the matching containerPort name in the pod template.
+#     # Omit to use the singleton service.port/targetPort fallback below.
+#     service:
+#       enabled: true
+#       type: ClusterIP
+#       port: 80                            # used only when ports is empty (single-port shorthand)
+#       targetPort: 8080
+#       ports:
+#         http:                             # ← becomes ports[].name
+#           port: 80
+#           targetPort: 8080
+#           protocol: TCP                   # optional, default TCP
+#         metrics:
+#           port: 9090
+#           targetPort: 9090
+#     # Direct container ports (used by sidecars or workloads without a Service).
+#     # Map key → spec.containers[].ports[].name (k8s Pod).
+#     ports: {}
 #     # Per-workload env inheritance control. Each flag defaults to true.
 #     # Set false to exclude that layer from this workload (and its sidecars).
 #     inherit:
@@ -1039,9 +1140,9 @@ deployments: {}
 #           - /fluent-bit/etc/fluent-bit.conf
 #         env: {}
 #         envSecrets: []
-#         volumeMounts: []
+#         volumeMounts: {}                  # map keyed by mount name
 #         resources: {}
-#         ports: []
+#         ports: {}                         # map keyed by port name (becomes ports[].name)
 #         # Root envSecrets are merged automatically for sidecars.
 #         # volumeMounts.<workload> is NOT inherited by sidecars; define mounts locally.
 #     # Per-workload host aliases (merged with root hostAliases by default).
@@ -1076,6 +1177,7 @@ deployments: {}
 #         - {}                    # no matches for TLSRoute — routing is SNI-based via root hostnames
 
 # Map of StatefulSet workloads. Each key becomes a separate StatefulSet + headless Service.
+# Map key → metadata.name suffix (k8s StatefulSet): "<release-fullname>-<key>".
 statefulSets: {}
 # Override image per StatefulSet:
 #   image:

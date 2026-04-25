@@ -289,3 +289,23 @@ tests:
       - lengthEqual:
           path: spec.ports
           count: 1
+
+  - it: should render service ports from a map keyed by name in sorted order
+    values:
+      - fixtures/service-multiport.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+      - equal:
+          path: spec.ports[1].port
+          value: 9090

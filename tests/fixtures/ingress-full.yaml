@@ -4,12 +4,12 @@ ingress:
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
   hosts:
-    - host: myapp.example.com
+    myapp.example.com:
       paths:
         - path: /
           pathType: Prefix
           servicePort: 8080
   tls:
-    - hosts:
+    myapp-tls:
+      hosts:
         - myapp.example.com
-      secretName: myapp-tls

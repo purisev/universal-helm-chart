@@ -71,12 +71,14 @@ spec:
       {{- if or (and $inheritParentVolumes $ctx.Values.volumes) $wl.volumes $hasAutoVols }}
       volumes:
         {{- if $inheritParentVolumes }}
-        {{- with $ctx.Values.volumes }}
-        {{- toYaml . | nindent 8 }}
+        {{- range $vName := keys ($ctx.Values.volumes | default dict) | sortAlpha }}
+        - name: {{ $vName }}
+          {{- toYaml (index $ctx.Values.volumes $vName) | nindent 10 }}
         {{- end }}
         {{- end }}
-        {{- with $wl.volumes }}
-        {{- toYaml . | nindent 8 }}
+        {{- range $vName := keys ($wl.volumes | default dict) | sortAlpha }}
+        - name: {{ $vName }}
+          {{- toYaml (index $wl.volumes $vName) | nindent 10 }}
         {{- end }}
         {{- if $cmm.enabled }}
         {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 8 }}

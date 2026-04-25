@@ -42,7 +42,11 @@ spec:
       {{- end }}
       {{- with .Values.integrations.argocd.imageUpdater.images }}
       images:
-        {{- toYaml . | nindent 8 }}
+        {{- range $alias := keys . | sortAlpha }}
+        {{- $img := index $.Values.integrations.argocd.imageUpdater.images $alias }}
+        - alias: {{ $alias }}
+          {{- toYaml $img | nindent 10 }}
+        {{- end }}
       {{- end }}
   {{- end }}
 {{- end }}

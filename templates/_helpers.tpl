@@ -349,19 +349,19 @@ Output at zero indent; caller controls nindent.
 envFrom:
   {{- range $rootSecrets }}
   - secretRef:
-      name: {{ .name }}
+      name: {{ . }}
   {{- end }}
   {{- range $workloadSecrets }}
   - secretRef:
-      name: {{ .name }}
+      name: {{ . }}
   {{- end }}
   {{- range $rootConfigMaps }}
   - configMapRef:
-      name: {{ .name }}
+      name: {{ . }}
   {{- end }}
   {{- range $workloadConfigMaps }}
   - configMapRef:
-      name: {{ .name }}
+      name: {{ . }}
   {{- end }}
 {{- end }}
 {{- end }}
@@ -391,19 +391,20 @@ Output at zero indent; caller controls nindent.
 {{- if not $inheritConfigMaps }}
   {{- $globalCMs = list }}
 {{- end }}
-{{- /* Resolve configMapRef shorthands: {configMapRef: key} → {name: <fullname>-key} */}}
+{{- /* Resolve envConfigMaps strings: chart-owned (matches a key in .Values.configMaps) → "<fullname>-<name>"; otherwise external CM name as-is. */}}
+{{- $chartCMKeys := keys ($ctx.Values.configMaps | default dict) }}
 {{- $resolvedRootCMs := list }}
 {{- range $globalCMs }}
-  {{- if hasKey . "configMapRef" }}
-    {{- $resolvedRootCMs = append $resolvedRootCMs (dict "name" (printf "%s-%s" (include "uhc.fullname" $ctx) .configMapRef)) }}
+  {{- if has . $chartCMKeys }}
+    {{- $resolvedRootCMs = append $resolvedRootCMs (printf "%s-%s" (include "uhc.fullname" $ctx) .) }}
   {{- else }}
     {{- $resolvedRootCMs = append $resolvedRootCMs . }}
   {{- end }}
 {{- end }}
 {{- $resolvedWorkloadCMs := list }}
 {{- range ($wl.envConfigMaps | default list) }}
-  {{- if hasKey . "configMapRef" }}
-    {{- $resolvedWorkloadCMs = append $resolvedWorkloadCMs (dict "name" (printf "%s-%s" (include "uhc.fullname" $ctx) .configMapRef)) }}
+  {{- if has . $chartCMKeys }}
+    {{- $resolvedWorkloadCMs = append $resolvedWorkloadCMs (printf "%s-%s" (include "uhc.fullname" $ctx) .) }}
   {{- else }}
     {{- $resolvedWorkloadCMs = append $resolvedWorkloadCMs . }}
   {{- end }}
@@ -438,15 +439,14 @@ Output at zero indent; caller controls nindent.
   {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
   {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
   {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
-  {{- $hasMetricsPortAlready := false -}}
-  {{- if and $wl.service $wl.service.ports -}}
-    {{- range $wl.service.ports -}}
-      {{- if eq (.name | toString) "metrics" -}}{{- $hasMetricsPortAlready = true -}}{{- end -}}
-    {{- end -}}
-  {{- end -}}
+  {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
   {{- if and .renderDirectPorts $wl.ports }}
   ports:
-    {{- toYaml $wl.ports | nindent 4 }}
+    {{- range $pName := keys $wl.ports | sortAlpha }}
+    {{- $p := index $wl.ports $pName }}
+    - name: {{ $pName }}
+      {{- toYaml $p | nindent 6 }}
+    {{- end }}
     {{- if and $addMetricsPort (not $hasMetricsPortAlready) }}
     {{- $expose := $exposeJson | fromJson }}
     - name: metrics
@@ -457,10 +457,11 @@ Output at zero indent; caller controls nindent.
   ports:
     {{- if and $wl.service $wl.service.enabled }}
     {{- if $wl.service.ports }}
-    {{- range $wl.service.ports }}
-    - name: {{ .name }}
-      containerPort: {{ .targetPort }}
-      protocol: {{ .protocol | default "TCP" }}
+    {{- range $pName := keys $wl.service.ports | sortAlpha }}
+    {{- $p := index $wl.service.ports $pName }}
+    - name: {{ $pName }}
+      containerPort: {{ $p.targetPort }}
+      protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
     {{- else }}
     - name: http
@@ -511,8 +512,8 @@ Output at zero indent; caller controls nindent.
   {{- $mountsKey = .rootVolumeMountsKey }}
   {{- end }}
   {{- $cmm := include "uhc.resolveConfigMapMount" $inheritSource | fromJson }}
-  {{- $parentVolumeMounts := index $ctx.Values.volumeMounts $mountsKey }}
-  {{- $workloadMounts := $wl.volumeMounts | default list }}
+  {{- $parentVolumeMounts := index ($ctx.Values.volumeMounts | default dict) $mountsKey | default dict }}
+  {{- $workloadMounts := $wl.volumeMounts | default dict }}
   {{- $hasAutoMounts := "" }}
   {{- if $cmm.enabled }}
     {{- $hasAutoMounts = include "uhc.hasConfigMapAutoVolumes" (dict "ctx" $ctx "granularDisable" $cmm.granular) }}
@@ -520,12 +521,14 @@ Output at zero indent; caller controls nindent.
   {{- if or (and $inheritParentMounts $parentVolumeMounts) $workloadMounts $hasAutoMounts }}
   volumeMounts:
     {{- if $inheritParentMounts }}
-    {{- with $parentVolumeMounts }}
-    {{- toYaml . | nindent 4 }}
+    {{- range $mName := keys $parentVolumeMounts | sortAlpha }}
+    - name: {{ $mName }}
+      {{- toYaml (index $parentVolumeMounts $mName) | nindent 6 }}
     {{- end }}
     {{- end }}
-    {{- with $workloadMounts }}
-    {{- toYaml . | nindent 4 }}
+    {{- range $mName := keys $workloadMounts | sortAlpha }}
+    - name: {{ $mName }}
+      {{- toYaml (index $workloadMounts $mName) | nindent 6 }}
     {{- end }}
     {{- if $cmm.enabled }}
     {{- range $cmName := keys ($ctx.Values.configMaps | default dict) | sortAlpha }}
@@ -576,7 +579,9 @@ Output at zero indent; caller controls nindent.
 {{- $wl := .wl }}
 {{- with $ctx.Values.imagePullSecrets }}
 imagePullSecrets:
-  {{- toYaml . | nindent 2 }}
+  {{- range . }}
+  - name: {{ . }}
+  {{- end }}
 {{- end }}
 serviceAccountName: {{ default (include "uhc.serviceAccountName" $ctx) $wl.serviceAccountName }}
 {{- $autoMount := $ctx.Values.automountServiceAccountToken | default false }}
@@ -938,7 +943,8 @@ Params: dict "groupName" $g "jobName" $j
 Merges group spec with per-job spec, applying:
   - Maps merged, job wins (env, image, securityContext, podSecurityContext, resources,
     nodeSelector, affinity, metadataAnnotations, inherit, hooks.argocd, hooks.helm)
-  - Lists concatenated, group then job (envSecrets, envConfigMaps, volumes, volumeMounts, tolerations)
+  - Lists concatenated, group then job (envSecrets, envConfigMaps, tolerations)
+  - Name-keyed maps merged, job wins on collisions (volumes, volumeMounts)
   - Scalars: job-override-else-group (backoffLimit, ttlSecondsAfterFinished,
     activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
     automountServiceAccountToken, terminationGracePeriodSeconds, useRootVolumes,
@@ -1009,9 +1015,10 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{/* Lists: concat group then job */}}
 {{- $_ := set $merged "envSecrets" (concat ($group.envSecrets | default list) ($job.envSecrets | default list)) -}}
 {{- $_ := set $merged "envConfigMaps" (concat ($group.envConfigMaps | default list) ($job.envConfigMaps | default list)) -}}
-{{- $_ := set $merged "volumes" (concat ($group.volumes | default list) ($job.volumes | default list)) -}}
-{{- $_ := set $merged "volumeMounts" (concat ($group.volumeMounts | default list) ($job.volumeMounts | default list)) -}}
 {{- $_ := set $merged "tolerations" (concat ($group.tolerations | default list) ($job.tolerations | default list)) -}}
+{{/* Maps: job overrides group on collisions */}}
+{{- $_ := set $merged "volumes" (merge (deepCopy ($job.volumes | default dict)) ($group.volumes | default dict)) -}}
+{{- $_ := set $merged "volumeMounts" (merge (deepCopy ($job.volumeMounts | default dict)) ($group.volumeMounts | default dict)) -}}
 {{/* Scalars: job-override-else-group */}}
 {{- range $k := list "backoffLimit" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
 {{- $jv := index $job $k -}}
@@ -1208,11 +1215,12 @@ Output at zero indent; caller controls nindent.
       {{- end }}
     {{- end }}
   {{- end }}
-  {{- $taskMounts := $wl.volumeMounts | default list }}
+  {{- $taskMounts := $wl.volumeMounts | default dict }}
   {{- if or $taskMounts $autoMounts }}
   volumeMounts:
-    {{- with $taskMounts }}
-    {{- toYaml . | nindent 4 }}
+    {{- range $mName := keys $taskMounts | sortAlpha }}
+    - name: {{ $mName }}
+      {{- toYaml (index $taskMounts $mName) | nindent 6 }}
     {{- end }}
     {{- range $autoMounts }}
     - name: {{ .name }}
