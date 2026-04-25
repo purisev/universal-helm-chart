@@ -139,3 +139,153 @@ tests:
       - hasDocuments:
           count: 2
 
+
+  # --- exposeService: dedicated metrics port ---
+
+  - it: should add metrics port when exposeService is enabled alongside main service
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+      - equal:
+          path: spec.ports[1].port
+          value: 9090
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 9090
+
+  - it: should use custom exposeService.port and targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.port: 9091
+      deployments.web.metrics.exposeService.targetPort: 8000
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - equal:
+          path: spec.ports[1].port
+          value: 9091
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 8000
+
+  - it: should create standalone metrics Service when service.enabled is false
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.exposeService.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-worker-metrics
+      - equal:
+          path: spec.ports[0].name
+          value: metrics
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+
+  - it: should NOT add metrics port when metrics.type is pod
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.type: pod
+      deployments.web.metrics.exposeService.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - notEqual:
+          path: spec.ports[0].name
+          value: metrics
+
+  - it: should NOT duplicate metrics port when service.ports already has one named metrics
+    # helm-unittest set: cannot create nested arrays (service.ports[].name) — using fixture.
+    values:
+      - fixtures/service-existing-metrics-port.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[1].port
+          value: 9999
+
+  - it: should use global monitoring.defaults.exposeService when per-workload not set
+    set:
+      monitoring.defaults.exposeService.enabled: true
+      monitoring.defaults.exposeService.port: 8000
+      monitoring.defaults.exposeService.targetPort: 8000
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - equal:
+          path: spec.ports[1].port
+          value: 8000
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 8000
+
+  - it: per-workload exposeService.enabled=false should override global default true
+    set:
+      monitoring.defaults.exposeService.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: false
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1

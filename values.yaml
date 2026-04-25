@@ -131,6 +131,68 @@ image:
 
 imagePullSecrets: []
 
+# monitoring.defaults — global scrape defaults applied to every workload.
+# EVERY field below has a per-workload override at deployments.<name>.metrics.*
+# (or statefulSets.<name>.metrics.*) — per-workload value always wins.
+# Values follow Prometheus upstream recommendations.
+monitoring:
+  defaults:
+    # provider controls which CRD API group is used for scraping in CRD mode.
+    # prometheus      → ServiceMonitor / PodMonitor  (monitoring.coreos.com/v1)
+    # victoriametrics → VMServiceScrape / VMPodScrape (operator.victoriametrics.com/v1beta1)
+    provider: prometheus
+    # discovery controls how scrape targets are registered.
+    # crd         → creates ServiceMonitor/PodMonitor/VMServiceScrape/VMPodScrape resources
+    # annotations → injects prometheus.io/* annotations into Service or Pod template.
+    #               Requires Prometheus/vmagent configured with kubernetes_sd + relabeling.
+    #               metrics.port must be NUMERIC if set (e.g. 8080) — port names are not
+    #               supported by prometheus.io/port annotation.
+    #               If metrics.port is not set, the chart falls back to service.targetPort
+    #               (or to monitoring.defaults.exposeService.port). If nothing resolves,
+    #               the prometheus.io/port annotation is omitted — Prometheus' kubernetes_sd
+    #               then auto-targets each declared containerPort. (Set metrics.port
+    #               explicitly only if your scrape_config uses 'action: keep, regex: \d+'
+    #               on the port annotation, which is non-standard.)
+    discovery: crd
+    # When true, monitoring is enabled for every workload by default; per-workload
+    # metrics.enabled: false explicitly disables. When false (default), each workload
+    # must opt in via metrics.enabled: true to be scraped.
+    enabled: false
+    type: service       # service | pod — per-workload metrics.type overrides
+    port: http          # CRD mode: NAME of the port in Service (type:service) or Pod
+                        # (type:pod) — Prometheus/VM CRDs require a string name, not a
+                        # number. If the container port has no name, give it one in the
+                        # workload spec (e.g. service.ports[].name=metrics) before setting
+                        # this. A numeric value here makes kubectl apply reject the CRD.
+                        #
+                        # Annotation mode: set per-workload metrics.port to a NUMBER
+                        # (e.g. 9090) — defaults.port is intentionally ignored here to
+                        # avoid emitting non-numeric prometheus.io/port values.
+    path: /metrics
+    scheme: http        # http | https — used in annotation mode
+    interval: 60s       # matches Prometheus global default scrape_interval
+    scrapeTimeout: 10s  # matches Prometheus global default scrape_timeout
+    # exposeService: when enabled, automatically adds a dedicated "metrics" port to
+    # the workload's Service and Pod template. Use this when the app exposes its
+    # /metrics endpoint on a separate process/port from the main HTTP API
+    # (avoids ALLOWED_HOSTS / middleware issues for in-cluster scraping).
+    # Port name is fixed as "metrics" (k8s convention). Per-workload metrics.exposeService
+    # overrides any of these. Ignored when metrics.type is "pod" (PodMonitor doesn't
+    # need a Service) and skipped if service.ports[] already has a "metrics" entry.
+    exposeService:
+      enabled: false
+      port: 9090       # ServicePort
+      targetPort: 9090 # containerPort
+    # Optional global overrides — per-workload metrics.* overrides any of these:
+    # relabelConfigs:
+    #   - sourceLabels: [__address__]
+    #     targetLabel: instance
+    # basicAuth:
+    #   password: { name: scrape-secret, key: password }
+    #   username: { name: scrape-secret, key: username }
+    # headers:
+    #   - "Authorization: Bearer ..."   # VictoriaMetrics only
+
 # ArgoCD sync-wave ordering for different resource types.
 syncWaves:
   jobsSyncWave: "3"

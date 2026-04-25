@@ -1,0 +1,603 @@
+suite: test metrics annotations discovery
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # ===================================================================
+  # SERVICE annotations (type: service, discovery: annotations)
+  # ===================================================================
+
+  - it: service should get prometheus.io/scrape annotation when discovery is annotations
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: service should use metrics.path for prometheus.io/path
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.path: /custom/metrics
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/path"]
+          value: /custom/metrics
+
+  - it: service should use monitoring.defaults.path for prometheus.io/path
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.path: /default-metrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/path"]
+          value: /default-metrics
+
+  - it: service should default prometheus.io/path to /metrics
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/path"]
+          value: /metrics
+
+  - it: service should use numeric metrics.port for prometheus.io/port
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.port: 9090
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "9090"
+
+  - it: service should fallback to service.port when metrics.port not set
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "80"
+
+  - it: service should render prometheus.io/scheme when metrics.scheme is https
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 443
+      deployments.web.service.targetPort: 443
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.scheme: https
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scheme"]
+          value: https
+
+  - it: service should not render prometheus.io/scheme when metrics.scheme is http
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.scheme: http
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scheme"]
+
+  - it: service should preserve user service.annotations alongside prometheus annotations
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.service.annotations.custom/label: my-value
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["custom/label"]
+          value: my-value
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: service should NOT inject prometheus annotations when discovery is crd (default)
+    templates:
+      - service.yaml
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scrape"]
+
+  - it: service should NOT inject prometheus annotations when metrics.type is pod
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.type: pod
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scrape"]
+
+  - it: service should NOT inject prometheus annotations when metrics disabled
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: false
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scrape"]
+
+  # ===================================================================
+  # DEPLOYMENT pod template annotations (type: pod)
+  # ===================================================================
+
+  - it: deployment pod template should get prometheus.io/scrape when discovery=annotations and type=pod
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.port: 9090
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: deployment pod template should use numeric metrics.port for prometheus.io/port
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.port: 9090
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/port"]
+          value: "9090"
+
+  - it: deployment pod template should omit prometheus.io/port when no port resolvable (Prometheus uses containerPort default)
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+      - isNull:
+          path: spec.template.metadata.annotations["prometheus.io/port"]
+
+  - it: deployment pod template should preserve global podAnnotations alongside prometheus annotations
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      podAnnotations:
+        existing/annotation: keep-this
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.port: 9090
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["existing/annotation"]
+          value: keep-this
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: deployment pod template should NOT inject annotations when type is service (default)
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.metrics.enabled: true
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+
+  - it: deployment pod template should NOT inject annotations when discovery is crd
+    templates:
+      - deployment.yaml
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+
+  # ===================================================================
+  # STATEFULSET pod template annotations (type: pod)
+  # ===================================================================
+
+  - it: statefulset pod template should get prometheus.io/scrape when discovery=annotations and type=pod
+    templates:
+      - statefulset.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: redis
+      statefulSets.redis.metrics.port: 6379
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.metrics.enabled: true
+      statefulSets.redis.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: statefulset pod template should use numeric metrics.port for prometheus.io/port
+    templates:
+      - statefulset.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.metrics.enabled: true
+      statefulSets.redis.metrics.type: pod
+      statefulSets.redis.metrics.port: 6379
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/port"]
+          value: "6379"
+
+  - it: statefulset pod template should NOT inject annotations when discovery is crd
+    templates:
+      - statefulset.yaml
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.metrics.enabled: true
+      statefulSets.redis.metrics.type: pod
+    asserts:
+      - isNull:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+
+  # ===================================================================
+  # GLOBAL defaults.enabled opt-out mode
+  # ===================================================================
+
+  - it: service should inject prometheus annotations when monitoring.defaults.enabled=true without per-workload opt-in
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: service per-workload metrics.enabled=false should override monitoring.defaults.enabled=true
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: false
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scrape"]
+
+  - it: deployment pod template should inject annotations when defaults.enabled=true and type=pod
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.port: 9090
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  # ===================================================================
+  # GLOBAL defaults.scheme and defaults.type
+  # ===================================================================
+
+  - it: service should use monitoring.defaults.scheme when per-workload not set
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.scheme: https
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 443
+      deployments.web.service.targetPort: 443
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scheme"]
+          value: https
+
+  - it: per-workload metrics.scheme=http should override defaults.scheme=https
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.scheme: https
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.scheme: http
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scheme"]
+
+  - it: deployment pod template should inject annotations when defaults.type=pod (no per-workload type)
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.type: pod
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.port: 9090
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: service annotation port falls back to service.port when defaults.port is a name
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "80"
+
+  - it: service annotation port should ignore monitoring.defaults.port (CRD-only) — falls back to service.port
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      monitoring.defaults.port: http
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "80"
+
+  - it: service annotation port should fallback to exposeService.port when metrics.port not set
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "9090"
+
+  - it: per-workload metrics.discovery=annotations should inject annotations even when global is crd
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: crd
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.discovery: annotations
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/scrape"]
+          value: "true"
+
+  - it: per-workload metrics.discovery=crd should NOT inject annotations even when global is annotations
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.discovery: crd
+    asserts:
+      - isNull:
+          path: metadata.annotations["prometheus.io/scrape"]
+
+  - it: prometheus.io/port should fallback to service.targetPort (not service.port) when metrics.port not set
+    templates:
+      - service.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8082
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["prometheus.io/port"]
+          value: "8082"
+
+  - it: pod template prometheus.io/port should fallback to service.targetPort for type=pod
+    templates:
+      - deployment.yaml
+    set:
+      monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.service.enabled: true
+      deployments.worker.service.port: 80
+      deployments.worker.service.targetPort: 8082
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations["prometheus.io/port"]
+          value: "8082"

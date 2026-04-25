@@ -3,7 +3,18 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.monitoring.defaults | default dict).type | default "service") -}}
+{{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
+{{- $hasMetricsPortAlready := false -}}
+{{- if and $wl.service $wl.service.ports -}}
+  {{- range $wl.service.ports -}}
+    {{- if eq (.name | toString) "metrics" -}}{{- $hasMetricsPortAlready = true -}}{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled }}
+{{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 ---
 apiVersion: v1
 kind: Service
@@ -11,9 +22,14 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- with $wl.service.annotations }}
+  {{- if or $wl.service.annotations $promAnnots }}
   annotations:
+    {{- with $wl.service.annotations }}
     {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- with $promAnnots }}
+    {{- . | nindent 4 }}
+    {{- end }}
   {{- end }}
 spec:
   type: {{ $wl.service.type }}
@@ -31,6 +47,33 @@ spec:
       protocol: TCP
       name: http
     {{- end }}
+    {{- if $injectMetricsPort }}
+    {{- $expose := $exposeJson | fromJson }}
+    - name: metrics
+      port: {{ $expose.port }}
+      targetPort: {{ $expose.targetPort }}
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- end }}
+{{- /* Standalone metrics-only Service for deployments without main service */ -}}
+{{- if and (hasKey $wl "enabled") $wl.enabled $injectMetricsPort (not (and $wl.service $wl.service.enabled)) }}
+{{- $expose := $exposeJson | fromJson }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}-metrics
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: {{ $expose.port }}
+      targetPort: {{ $expose.targetPort }}
+      protocol: TCP
   selector:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 {{- end }}
@@ -38,7 +81,18 @@ spec:
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName }}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.monitoring.defaults | default dict).type | default "service") -}}
+{{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
+{{- $hasMetricsPortAlready := false -}}
+{{- if and $wl.service $wl.service.ports -}}
+  {{- range $wl.service.ports -}}
+    {{- if eq (.name | toString) "metrics" -}}{{- $hasMetricsPortAlready = true -}}{{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 ---
 apiVersion: v1
 kind: Service
@@ -46,6 +100,10 @@ metadata:
   name: {{ $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- with $promAnnots }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
 spec:
   clusterIP: None
   ports:
@@ -67,6 +125,13 @@ spec:
     - name: http
       port: 80
       targetPort: 80
+      protocol: TCP
+    {{- end }}
+    {{- if $injectMetricsPort }}
+    {{- $expose := $exposeJson | fromJson }}
+    - name: metrics
+      port: {{ $expose.port }}
+      targetPort: {{ $expose.targetPort }}
       protocol: TCP
     {{- end }}
   selector:
