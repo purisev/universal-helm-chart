@@ -908,7 +908,7 @@ tests:
 
   # --- L1: full labels on pod template ---
 
-  - it: should include helm.sh/chart label on pod template
+  - it: should not emit helm.sh/chart label and should keep standard app.kubernetes.io/* labels
     set:
       image.repository: nginx
       image.tag: latest
@@ -918,10 +918,14 @@ tests:
       deployments.web.service.port: 80
       deployments.web.service.targetPort: 8080
     asserts:
-      - isNotNull:
+      - isNull:
           path: spec.template.metadata.labels["helm.sh/chart"]
       - isNotNull:
           path: spec.template.metadata.labels["app.kubernetes.io/managed-by"]
+      - isNull:
+          path: metadata.labels["helm.sh/chart"]
+      - isNotNull:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
 
   - it: should add metrics container port when exposeService is enabled
     set:

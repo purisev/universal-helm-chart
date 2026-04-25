@@ -26,58 +26,150 @@ If the release name already contains the chart name it is used as the full name.
 {{- end }}
 
 {{/*
-Create chart name and version as used by the chart label.
-*/}}
-{{- define "uhc.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{/*
-Common labels for chart-level singleton resources (ServiceAccount, Ingress).
+Common labels for chart-level singleton resources (ServiceAccount, Ingress, RBAC, etc.).
+Honors labels.standard.{enabled,partOf,name,instance,version,managedBy} toggles and merges
+.Values.commonLabels with standard-wins precedence (chart-managed app.kubernetes.io/* labels
+cannot be shadowed by commonLabels). Returns empty when all toggles are off and commonLabels
+is empty — caller decides whether to emit the labels: header.
+Params: $ctx (the dot)
 */}}
 {{- define "uhc.labels" -}}
-helm.sh/chart: {{ include "uhc.chart" . }}
-app.kubernetes.io/part-of: {{ include "uhc.fullname" . }}
-app.kubernetes.io/name: {{ include "uhc.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- end }}
-
-{{/*
-Selector labels
-*/}}
-{{- define "uhc.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "uhc.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
+{{- $std := .Values.labels.standard | default dict -}}
+{{- $stdLabels := dict -}}
+{{- if $std.enabled -}}
+  {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" (include "uhc.fullname" .) -}}{{- end -}}
+  {{- if $std.name -}}{{- $_ := set $stdLabels "app.kubernetes.io/name" (include "uhc.name" .) -}}{{- end -}}
+  {{- if $std.instance -}}{{- $_ := set $stdLabels "app.kubernetes.io/instance" .Release.Name -}}{{- end -}}
+  {{- if and $std.version .Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" (.Chart.AppVersion | toString) -}}{{- end -}}
+  {{- if $std.managedBy -}}{{- $_ := set $stdLabels "app.kubernetes.io/managed-by" .Release.Service -}}{{- end -}}
+{{- end -}}
+{{- $merged := merge $stdLabels (.Values.commonLabels | default dict) -}}
+{{- if $merged -}}
+{{- toYaml $merged -}}
+{{- end -}}
 {{- end }}
 
 {{/*
-Full labels for a named workload (Deployment, StatefulSet, Service, PDB, VPA, ScaledObject, HPA, ServiceMonitor, ConfigMap, Job).
+Full labels for a named workload (Deployment, StatefulSet, Service, PDB, VPA, ScaledObject,
+HPA, ServiceMonitor, ConfigMap, Job, ESO resources). Same standard.* toggles and commonLabels
+merge as uhc.labels, but instance is workload-scoped (fullName-workloadName).
 Params: dict "ctx" $ctx "workloadName" $wlName
 */}}
 {{- define "uhc.workloadLabels" -}}
-{{- $fullName := include "uhc.fullname" .ctx -}}
-helm.sh/chart: {{ include "uhc.chart" .ctx }}
-app.kubernetes.io/part-of: {{ $fullName }}
-app.kubernetes.io/name: {{ .workloadName }}
-app.kubernetes.io/instance: {{ printf "%s-%s" $fullName .workloadName }}
-{{- if .ctx.Chart.AppVersion }}
-app.kubernetes.io/version: {{ .ctx.Chart.AppVersion | quote }}
-{{- end }}
-app.kubernetes.io/managed-by: {{ .ctx.Release.Service }}
+{{- $ctx := .ctx -}}
+{{- $wlName := .workloadName -}}
+{{- $fullName := include "uhc.fullname" $ctx -}}
+{{- $std := $ctx.Values.labels.standard | default dict -}}
+{{- $stdLabels := dict -}}
+{{- if $std.enabled -}}
+  {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" $fullName -}}{{- end -}}
+  {{- if $std.name -}}{{- $_ := set $stdLabels "app.kubernetes.io/name" $wlName -}}{{- end -}}
+  {{- if $std.instance -}}{{- $_ := set $stdLabels "app.kubernetes.io/instance" (printf "%s-%s" $fullName $wlName) -}}{{- end -}}
+  {{- if and $std.version $ctx.Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" ($ctx.Chart.AppVersion | toString) -}}{{- end -}}
+  {{- if $std.managedBy -}}{{- $_ := set $stdLabels "app.kubernetes.io/managed-by" $ctx.Release.Service -}}{{- end -}}
+{{- end -}}
+{{- $merged := merge $stdLabels ($ctx.Values.commonLabels | default dict) -}}
+{{- if $merged -}}
+{{- toYaml $merged -}}
+{{- end -}}
 {{- end }}
 
 {{/*
-Selector labels for a named workload (matchLabels, Service/PDB/ServiceMonitor selectors).
+Selector labels for a named workload (matchLabels — Service/PDB/ServiceMonitor/PodMonitor
+selectors and Deployment/StatefulSet spec.selector.matchLabels). Always emits the minimal
+{name, instance} pair regardless of labels.standard.* toggles — selectors are immutable on
+workload resources, so they must NEVER be affected by user toggles or commonLabels.
 Params: dict "ctx" $ctx "workloadName" $wlName
 */}}
 {{- define "uhc.workloadSelectorLabels" -}}
 {{- $fullName := include "uhc.fullname" .ctx -}}
 app.kubernetes.io/name: {{ .workloadName }}
 app.kubernetes.io/instance: {{ printf "%s-%s" $fullName .workloadName }}
+{{- end }}
+
+{{/*
+uhc.reloaderAnnotations
+Returns YAML for the Stakater Reloader annotation dict (or empty if reloader disabled).
+When integrations.stakater.reloader.enabled is true:
+  - if .annotations is non-empty → emit it as-is (user fully overrides)
+  - else → emit { reloader.stakater.com/auto: "true" } as the chart default
+Used at four sites: Deployment / StatefulSet / ConfigMap metadata.annotations and
+ExternalSecret spec.target.template.metadata.annotations (ESO propagates to the Secret).
+Params: $ctx (the dot)
+*/}}
+{{- define "uhc.reloaderAnnotations" -}}
+{{- $reloader := (.Values.integrations | default dict).stakater | default dict -}}
+{{- $reloader = $reloader.reloader | default dict -}}
+{{- if $reloader.enabled -}}
+{{- $custom := $reloader.annotations | default dict -}}
+{{- if $custom -}}
+{{- toYaml $custom -}}
+{{- else -}}
+{{- toYaml (dict "reloader.stakater.com/auto" "true") -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+uhc.syncWaveAnnotation
+Returns YAML map { "argocd.argoproj.io/sync-wave": "<n>" } when:
+  - integrations.argocd.syncWaves.enabled is true (chart-wide gate)
+  - integrations.argocd.syncWaves.<kind> is set to a non-null value
+Returns empty otherwise. A null/missing per-kind field is the granular off-switch — it
+distinguishes from a 0 wave (which is a valid wave, not a disable).
+Params: dict "ctx" $ctx "kind" "<kind>"
+*/}}
+{{- define "uhc.syncWaveAnnotation" -}}
+{{- $sw := ((.ctx.Values.integrations | default dict).argocd | default dict).syncWaves | default dict -}}
+{{- if $sw.enabled -}}
+{{- if hasKey $sw .kind -}}
+{{- $val := index $sw .kind -}}
+{{- if not (kindIs "invalid" $val) -}}
+{{- toYaml (dict "argocd.argoproj.io/sync-wave" ($val | toString)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+uhc.metadataAnnotations
+Builds the merged annotation dict for a resource's metadata.annotations and emits it as
+YAML INCLUDING the leading "annotations:" header. Returns empty when the merged dict has
+no entries (so caller can blindly include it without producing an empty annotations: block).
+
+Merge precedence (lowest-to-highest, last wins on key conflict):
+  commonAnnotations → reloader (if includeReloader) → sync-wave (per kind) → extra
+
+Params: dict
+  "ctx"             $ctx
+  "kind"            "<resource-kind>" — e.g. "deployment", "service", "ingress" — used for
+                                       sync-wave lookup. Pass "" to skip sync-wave.
+  "includeReloader" bool (default false) — only Deployment/StatefulSet/ConfigMap and
+                                           ExternalSecret target template should pass true.
+  "extra"           dict (optional) — per-resource user annotations (highest precedence).
+
+Output is rendered at zero indent — caller controls nindent.
+*/}}
+{{- define "uhc.metadataAnnotations" -}}
+{{- $ctx := .ctx -}}
+{{- $kind := .kind -}}
+{{- $includeReloader := default false .includeReloader -}}
+{{- $extra := default dict .extra -}}
+{{- $annots := dict -}}
+{{- $annots = mergeOverwrite $annots ($ctx.Values.commonAnnotations | default dict) -}}
+{{- if $includeReloader -}}
+  {{- $rel := include "uhc.reloaderAnnotations" $ctx | fromYaml -}}
+  {{- if $rel -}}{{- $annots = mergeOverwrite $annots $rel -}}{{- end -}}
+{{- end -}}
+{{- if $kind -}}
+  {{- $sw := include "uhc.syncWaveAnnotation" (dict "ctx" $ctx "kind" $kind) | fromYaml -}}
+  {{- if $sw -}}{{- $annots = mergeOverwrite $annots $sw -}}{{- end -}}
+{{- end -}}
+{{- if $extra -}}{{- $annots = mergeOverwrite $annots $extra -}}{{- end -}}
+{{- if $annots -}}
+annotations:
+  {{- toYaml $annots | nindent 2 }}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -342,7 +434,7 @@ Output at zero indent; caller controls nindent.
     {{- include "uhc.envVars" (dict "ctx" $ctx "extraEnv" $wl.env "inherit" $envInherit) | nindent 4 }}
   {{- include "uhc.envFrom" (dict "rootSecrets" $ctx.Values.envSecrets "workloadSecrets" $wl.envSecrets "rootConfigMaps" $resolvedRootCMs "workloadConfigMaps" $resolvedWorkloadCMs) | nindent 2 }}
   {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
-  {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.monitoring.defaults | default dict).type | default "service") -}}
+  {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
   {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
   {{- $hasMetricsPortAlready := false -}}
   {{- if and $wl.service $wl.service.ports -}}
@@ -638,7 +730,7 @@ Usage: eq (include "uhc.metricsEnabled" (dict "ctx" $ctx "wl" $wl)) "true"
 */}}
 {{- define "uhc.metricsEnabled" -}}
 {{- $wl := .wl -}}
-{{- $defaults := .ctx.Values.monitoring.defaults | default dict -}}
+{{- $defaults := .ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $metrics := $wl.metrics | default dict -}}
 {{- if and (hasKey $wl "metrics") (hasKey $metrics "enabled") -}}
   {{- if $metrics.enabled -}}true{{- end -}}
@@ -655,7 +747,7 @@ Usage: $provider := include "uhc.metricsProvider" (dict "ctx" $ctx "wl" $wl)
 */}}
 {{- define "uhc.metricsProvider" -}}
 {{- $wl := .wl -}}
-{{- $defaults := .ctx.Values.monitoring.defaults | default dict -}}
+{{- $defaults := .ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $metrics := $wl.metrics | default dict -}}
 {{- if $metrics.provider -}}{{- $metrics.provider -}}
 {{- else if $defaults.provider -}}{{- $defaults.provider -}}
@@ -670,7 +762,7 @@ Usage: $discovery := include "uhc.metricsDiscovery" (dict "ctx" $ctx "wl" $wl)
 */}}
 {{- define "uhc.metricsDiscovery" -}}
 {{- $wl := .wl -}}
-{{- $defaults := .ctx.Values.monitoring.defaults | default dict -}}
+{{- $defaults := .ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $metrics := $wl.metrics | default dict -}}
 {{- if $metrics.discovery -}}{{- $metrics.discovery -}}
 {{- else if $defaults.discovery -}}{{- $defaults.discovery -}}
@@ -691,7 +783,7 @@ When disabled or unset, returns empty string. Caller does:
 */}}
 {{- define "uhc.metricsExposeService" -}}
 {{- $wl := .wl -}}
-{{- $defaultsExpose := (.ctx.Values.monitoring.defaults | default dict).exposeService | default dict -}}
+{{- $defaultsExpose := (.ctx.Values.integrations.monitoring.defaults | default dict).exposeService | default dict -}}
 {{- $wlExpose := ($wl.metrics | default dict).exposeService | default dict -}}
 {{- $enabled := false -}}
 {{- if hasKey $wlExpose "enabled" -}}
@@ -717,7 +809,7 @@ Params: dict "ctx" $ctx "wl" $wl "kind" "service"|"pod"
 {{- $ctx := .ctx -}}
 {{- $wl := .wl -}}
 {{- $kind := .kind -}}
-{{- $defaults := $ctx.Values.monitoring.defaults | default dict -}}
+{{- $defaults := $ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $metrics := $wl.metrics | default dict -}}
 {{- $metricsType := $metrics.type | default ($defaults.type | default "service") -}}
 {{- $metricsEnabled := eq (include "uhc.metricsEnabled" (dict "ctx" $ctx "wl" $wl)) "true" -}}
@@ -777,7 +869,7 @@ Params: dict "ctx" $ctx "wl" $wl "provider" $provider
 {{- $ctx := .ctx -}}
 {{- $wl := .wl -}}
 {{- $provider := .provider -}}
-{{- $defaults := $ctx.Values.monitoring.defaults | default dict -}}
+{{- $defaults := $ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $metrics := $wl.metrics | default dict -}}
 {{- $effectiveRelabelConfigs := $metrics.relabelConfigs | default $defaults.relabelConfigs -}}
 {{- $effectiveBasicAuth := $metrics.basicAuth | default $defaults.basicAuth -}}

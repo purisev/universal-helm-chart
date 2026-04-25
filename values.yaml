@@ -15,116 +15,352 @@ global:
 #   root:   false → exclude this env block
 env: {}
 
-# Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
-# Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
-# Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
-#
-# Full spec reference:
-#   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
-#
-# TWO MODES:
-#
-#   Shorthand mode (applicationRefs is empty — the default):
-#     A single applicationRef is built automatically.
-#     namePattern defaults to .Release.Name (override with appNamePattern).
-#     commonUpdateSettings, writeBackConfig and images are placed inside that
-#     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
-#     Use this when one release = one ArgoCD Application with a shared image.
-#
-#   Manual mode (applicationRefs is provided):
-#     applicationRefs is rendered as-is.
-#     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
-#     top level are ignored — all config must live inside each applicationRef entry.
-#     Use this when you need multiple application targets or fine-grained control.
-imageUpdater:
-  enabled: false
+# Unconditional metadata applied to every Kubernetes resource the chart creates.
+# commonLabels are also injected into pod template labels (so pods inherit them)
+# but NEVER into spec.selector.matchLabels (selectors are immutable on
+# Deployment/StatefulSet/Service — drift would break upgrades).
+# commonAnnotations are NOT propagated to pod templates — use podAnnotations for
+# pod-level annotations, or future per-feature integrations (e.g. integrations.vault).
+# When a key in commonLabels collides with a chart-managed app.kubernetes.io/* label,
+# the chart-managed value wins (commonLabels cannot shadow standard labels).
+commonLabels: {}
+commonAnnotations: {}
 
-  # CR metadata
-  # name: override the ImageUpdater resource name (default: chart fullname)
-  name: ""
-  # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
-  # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
-  # to scope which ArgoCD Applications it looks at.
-  namespace: ""
-  annotations: {}
+# Toggles for the chart's standard label set (the app.kubernetes.io/* labels emitted
+# into metadata.labels). Selector helpers (matchLabels) ignore these toggles —
+# selectors always retain name+instance to keep them immutable across upgrades.
+# Set labels.standard.enabled: false to short-circuit all five sub-flags at once
+# (useful in clusters with strict label-policy admission).
+labels:
+  standard:
+    enabled: true
+    partOf: true     # app.kubernetes.io/part-of
+    name: true       # app.kubernetes.io/name (selector copy is unaffected)
+    instance: true   # app.kubernetes.io/instance (selector copy is unaffected)
+    version: true    # app.kubernetes.io/version
+    managedBy: true  # app.kubernetes.io/managed-by
 
-  # --- Shorthand mode fields (ignored when applicationRefs is set) ---
+# integrations: ecosystem-specific knobs grouped by external system / controller.
+# Each subsection wraps one integration (ArgoCD, Stakater Reloader, External
+# Secrets Operator, Prometheus/VictoriaMetrics monitoring stack). Resources/CRDs
+# that those controllers consume live next to their on/off switches.
+integrations:
 
-  # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
-  # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
-  appNamePattern: ""
+  # --- ArgoCD ---
+  # Annotations and CRDs consumed by Argo CD: sync-wave ordering and the
+  # Image Updater CRD. JobGroup hook waves are user-set per group/job under
+  # jobGroups.<g>.hooks.argocd.* — no chart-level default applied for those.
+  argocd:
 
-  # commonUpdateSettings: update strategy applied to all images in this applicationRef.
-  #   updateStrategy: alphabetical | semver | latest | digest | name
-  #   forceUpdate: false
-  #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
-  #   ignoreTags: ["latest", "dev"]
-  #   pullSecret: "pullsecret:<namespace>/<secret-name>"
-  #   platforms: []
-  commonUpdateSettings: {}
+    # ArgoCD sync-wave ordering. Per-resource-kind defaults give a natural
+    # creation order with gaps of 10 for user-injected resources.
+    #   SA/RBAC (-30) → SecretStore (-20) → ExternalSecret/ConfigMap (-10) →
+    #   Service/ImageUpdater (0) → StatefulSet (10) → Deployment (20) →
+    #   derived: HPA/VPA/PDB/ScaledObject/ServiceMonitor/PodMonitor (21) →
+    #   NetworkPolicy/ReferenceGrant (25) → Ingress / *Routes (30)
+    #
+    # enabled: false strips the annotation from every kind chart-wide.
+    # Setting any individual field to null disables the annotation only for
+    # that kind (granular off-switch — independent of the global enabled flag).
+    syncWaves:
+      enabled: true
+      serviceAccount: -30
+      rbac: -30                    # Role / RoleBinding / ClusterRole / ClusterRoleBinding
+      secretStore: -20
+      externalSecret: -10
+      configMap: -10
+      service: 0
+      imageUpdater: 0              # neutral wave — CR consumed by an external observer
+                                   # controller, not part of the app creation chain
+      statefulSet: 10
+      deployment: 20
+      hpa: 21
+      vpa: 21
+      scaledObject: 21
+      podDisruptionBudget: 21
+      serviceMonitor: 21
+      podMonitor: 21
+      networkPolicy: 25
+      referenceGrant: 25
+      ingress: 30
+      httpRoute: 30
+      grpcRoute: 30
+      tlsRoute: 30
 
-  # writeBackConfig: how Image Updater writes the new image tag back.
-  #   method: argocd   — imperative via Argo CD API (default)
-  #   method: git      — declarative, commits the new tag to a Git repository
-  #   gitConfig:         required when method: git
-  #     repository: git@github.com:myorg/config.git
-  #     branch: main
-  #     writeBackTarget: "helmvalues:/values.yaml"
-  writeBackConfig: {}
+    # Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
+    # Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
+    # Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
+    #
+    # Full spec reference:
+    #   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
+    #
+    # TWO MODES:
+    #
+    #   Shorthand mode (applicationRefs is empty — the default):
+    #     A single applicationRef is built automatically.
+    #     namePattern defaults to .Release.Name (override with appNamePattern).
+    #     commonUpdateSettings, writeBackConfig and images are placed inside that
+    #     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
+    #     Use this when one release = one ArgoCD Application with a shared image.
+    #
+    #   Manual mode (applicationRefs is provided):
+    #     applicationRefs is rendered as-is.
+    #     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
+    #     top level are ignored — all config must live inside each applicationRef entry.
+    #     Use this when you need multiple application targets or fine-grained control.
+    imageUpdater:
+      enabled: false
 
-  # images: list of container images to track for the auto-generated applicationRef.
-  # Each image can override update settings and declare Helm value targets.
-  #   - alias: short identifier used as the write-back key
-  #     imageName: full image reference without tag (registry/repo)
-  #     commonUpdateSettings:    # optional per-image override
-  #       updateStrategy: semver
-  #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
-  #       ignoreTags: ["latest"]
-  #     manifestTargets:         # optional: where to write the new tag in the manifest
-  #       helm:
-  #         name: image.repository   # Helm value key for the repository
-  #         tag: image.tag           # Helm value key for the tag
-  #
-  # Example (shorthand mode):
-  # images:
-  #   - alias: app
-  #     imageName: myregistry/myapp
-  #     manifestTargets:
-  #       helm:
-  #         name: image.repository
-  #         tag: image.tag
-  images: []
+      # CR metadata
+      # name: override the ImageUpdater resource name (default: chart fullname)
+      name: ""
+      # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
+      # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
+      # to scope which ArgoCD Applications it looks at.
+      namespace: ""
+      annotations: {}
 
-  # --- Manual mode (takes precedence over all shorthand fields above) ---
-  #
-  # applicationRefs: full list of applicationRef entries rendered as-is.
-  # Each entry supports: namePattern, labelSelectors, useAnnotations,
-  # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
-  #
-  # Example:
-  # applicationRefs:
-  #   - namePattern: "my-app"
-  #     commonUpdateSettings:
-  #       updateStrategy: semver
-  #     writeBackConfig:
-  #       method: git
-  #       gitConfig:
-  #         repository: git@github.com:myorg/config.git
-  #         branch: main
-  #         writeBackTarget: "helmvalues:/values.yaml"
-  #     images:
-  #       - alias: app
-  #         imageName: myregistry/myapp
-  #         manifestTargets:
-  #           helm:
-  #             name: image.repository
-  #             tag: image.tag
-  #   - namePattern: "*"
-  #     labelSelectors:
-  #       matchLabels:
-  #         image-updater: my-updater
-  #     useAnnotations: true
-  applicationRefs: []
+      # --- Shorthand mode fields (ignored when applicationRefs is set) ---
+
+      # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
+      # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
+      appNamePattern: ""
+
+      # commonUpdateSettings: update strategy applied to all images in this applicationRef.
+      #   updateStrategy: alphabetical | semver | latest | digest | name
+      #   forceUpdate: false
+      #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
+      #   ignoreTags: ["latest", "dev"]
+      #   pullSecret: "pullsecret:<namespace>/<secret-name>"
+      #   platforms: []
+      commonUpdateSettings: {}
+
+      # writeBackConfig: how Image Updater writes the new image tag back.
+      #   method: argocd   — imperative via Argo CD API (default)
+      #   method: git      — declarative, commits the new tag to a Git repository
+      #   gitConfig:         required when method: git
+      #     repository: git@github.com:myorg/config.git
+      #     branch: main
+      #     writeBackTarget: "helmvalues:/values.yaml"
+      writeBackConfig: {}
+
+      # images: list of container images to track for the auto-generated applicationRef.
+      # Each image can override update settings and declare Helm value targets.
+      #   - alias: short identifier used as the write-back key
+      #     imageName: full image reference without tag (registry/repo)
+      #     commonUpdateSettings:    # optional per-image override
+      #       updateStrategy: semver
+      #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      #       ignoreTags: ["latest"]
+      #     manifestTargets:         # optional: where to write the new tag in the manifest
+      #       helm:
+      #         name: image.repository   # Helm value key for the repository
+      #         tag: image.tag           # Helm value key for the tag
+      #
+      # Example (shorthand mode):
+      # images:
+      #   - alias: app
+      #     imageName: myregistry/myapp
+      #     manifestTargets:
+      #       helm:
+      #         name: image.repository
+      #         tag: image.tag
+      images: []
+
+      # --- Manual mode (takes precedence over all shorthand fields above) ---
+      #
+      # applicationRefs: full list of applicationRef entries rendered as-is.
+      # Each entry supports: namePattern, labelSelectors, useAnnotations,
+      # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
+      #
+      # Example:
+      # applicationRefs:
+      #   - namePattern: "my-app"
+      #     commonUpdateSettings:
+      #       updateStrategy: semver
+      #     writeBackConfig:
+      #       method: git
+      #       gitConfig:
+      #         repository: git@github.com:myorg/config.git
+      #         branch: main
+      #         writeBackTarget: "helmvalues:/values.yaml"
+      #     images:
+      #       - alias: app
+      #         imageName: myregistry/myapp
+      #         manifestTargets:
+      #           helm:
+      #             name: image.repository
+      #             tag: image.tag
+      #   - namePattern: "*"
+      #     labelSelectors:
+      #       matchLabels:
+      #         image-updater: my-updater
+      #     useAnnotations: true
+      applicationRefs: []
+
+  # --- Stakater Reloader ---
+  # Annotates Deployments / StatefulSets / ConfigMaps and propagates annotations
+  # into ExternalSecret target templates so the Reloader controller restarts
+  # workloads on ConfigMap/Secret changes. Requires Stakater Reloader installed
+  # in the cluster.
+  stakater:
+    reloader:
+      enabled: false
+
+      # When enabled and `annotations` is empty, the chart applies the default:
+      #   reloader.stakater.com/auto: "true"
+      # When non-empty, this dict FULLY REPLACES the default — useful to switch
+      # to match-strategy: { "reloader.stakater.com/match": "true" } or to set
+      # reloader.stakater.com/search-cm-only / *-secret-only / etc.
+      # The same dict is applied to:
+      #   - Deployment / StatefulSet metadata.annotations
+      #   - ConfigMap metadata.annotations
+      #   - ExternalSecret spec.target.template.metadata.annotations
+      #     (ESO propagates the annotation onto the generated Secret)
+      annotations: {}
+
+  # --- External Secrets Operator ---
+  # SecretStores and ExternalSecrets resources. enabled: false short-circuits
+  # the rendering of both even if entries are declared — useful to "park"
+  # declarations in environments where ESO is not installed.
+  eso:
+    enabled: true
+
+    # SecretStores — access configuration for external secret backends (Vault, AWS, GCP).
+    # JWT auth uses serviceAccount.name by default; override per store via serviceAccountRef.
+    # API version (v1 / v1beta1) is auto-detected via .Capabilities at install time.
+    secretStores: {}
+    # Example:
+    # secretStores:
+    #   vault-store:
+    #     enabled: true
+    #     kind: SecretStore          # SecretStore | ClusterSecretStore (default: SecretStore)
+    #     provider:
+    #       vault:
+    #         server: https://vault.example.com
+    #         path: secret
+    #         version: v2
+    #         namespace: ""          # Vault Enterprise namespace (optional)
+    #         auth:
+    #           jwt:
+    #             mountPath: jwt
+    #             role: my-app-role
+    #             serviceAccountRef: ""   # default: serviceAccount.name
+    #             audiences:
+    #               - vault
+    #             expirationSeconds: 600
+    #   aws-store:
+    #     enabled: true
+    #     provider:
+    #       aws:
+    #         service: SecretsManager    # SecretsManager | ParameterStore
+    #         region: us-east-1
+    #         auth:
+    #           jwt:
+    #             serviceAccountRef: ""  # default: serviceAccount.name
+    #             audiences:
+    #               - sts.amazonaws.com
+    #   gcp-store:
+    #     enabled: true
+    #     provider:
+    #       gcpsm:
+    #         projectID: my-gcp-project
+    #         auth:
+    #           workloadIdentity:
+    #             clusterLocation: us-central1
+    #             clusterName: my-cluster
+    #             clusterProjectID: ""   # default: projectID
+    #             serviceAccountRef: ""  # default: serviceAccount.name
+
+    # ExternalSecrets — sync secrets from external backends into K8s Secrets.
+    # Requires ExternalSecrets Operator. API version is auto-detected via .Capabilities.
+    # data[] fetches individual keys; dataFrom[] extracts the entire secret.
+    # conversionStrategy/decodingStrategy/metadataPolicy default to Default/None/None.
+    externalSecrets: {}
+    # Example:
+    # externalSecrets:
+    #   db-creds:
+    #     enabled: true
+    #     secretStore: vault-store      # references secretStores key
+    #     storeKind: SecretStore        # SecretStore | ClusterSecretStore (default: SecretStore)
+    #     refreshInterval: 1h
+    #     targetName: db-creds          # K8s Secret name (default: map key)
+    #     type: Opaque                  # Opaque | kubernetes.io/tls | kubernetes.io/dockerconfigjson
+    #     data:
+    #       - remoteKey: my-app/db
+    #         secretKey: DB_PASSWORD
+    #         property: password
+    #         conversionStrategy: Default   # Default | Unicode
+    #         decodingStrategy: None        # None | Auto | Base64 | Base64URL
+    #         metadataPolicy: None          # None | Fetch
+    #     dataFrom:
+    #       - remoteKey: my-app/config
+    #         conversionStrategy: Default
+    #         decodingStrategy: None
+    #         metadataPolicy: None
+
+  # --- Monitoring (Prometheus / VictoriaMetrics) ---
+  # monitoring.defaults — global scrape defaults applied to every workload.
+  # EVERY field below has a per-workload override at deployments.<name>.metrics.*
+  # (or statefulSets.<name>.metrics.*) — per-workload value always wins.
+  # Values follow Prometheus upstream recommendations.
+  monitoring:
+    defaults:
+      # provider controls which CRD API group is used for scraping in CRD mode.
+      # prometheus      → ServiceMonitor / PodMonitor  (monitoring.coreos.com/v1)
+      # victoriametrics → VMServiceScrape / VMPodScrape (operator.victoriametrics.com/v1beta1)
+      provider: prometheus
+      # discovery controls how scrape targets are registered.
+      # crd         → creates ServiceMonitor/PodMonitor/VMServiceScrape/VMPodScrape resources
+      # annotations → injects prometheus.io/* annotations into Service or Pod template.
+      #               Requires Prometheus/vmagent configured with kubernetes_sd + relabeling.
+      #               metrics.port must be NUMERIC if set (e.g. 8080) — port names are not
+      #               supported by prometheus.io/port annotation.
+      #               If metrics.port is not set, the chart falls back to service.targetPort
+      #               (or to integrations.monitoring.defaults.exposeService.port). If nothing
+      #               resolves, the prometheus.io/port annotation is omitted — Prometheus'
+      #               kubernetes_sd then auto-targets each declared containerPort. (Set
+      #               metrics.port explicitly only if your scrape_config uses
+      #               'action: keep, regex: \d+' on the port annotation, which is non-standard.)
+      discovery: crd
+      # When true, monitoring is enabled for every workload by default; per-workload
+      # metrics.enabled: false explicitly disables. When false (default), each workload
+      # must opt in via metrics.enabled: true to be scraped.
+      enabled: false
+      type: service       # service | pod — per-workload metrics.type overrides
+      port: http          # CRD mode: NAME of the port in Service (type:service) or Pod
+                          # (type:pod) — Prometheus/VM CRDs require a string name, not a
+                          # number. If the container port has no name, give it one in the
+                          # workload spec (e.g. service.ports[].name=metrics) before setting
+                          # this. A numeric value here makes kubectl apply reject the CRD.
+                          #
+                          # Annotation mode: set per-workload metrics.port to a NUMBER
+                          # (e.g. 9090) — defaults.port is intentionally ignored here to
+                          # avoid emitting non-numeric prometheus.io/port values.
+      path: /metrics
+      scheme: http        # http | https — used in annotation mode
+      interval: 60s       # matches Prometheus global default scrape_interval
+      scrapeTimeout: 10s  # matches Prometheus global default scrape_timeout
+      # exposeService: when enabled, automatically adds a dedicated "metrics" port to
+      # the workload's Service and Pod template. Use this when the app exposes its
+      # /metrics endpoint on a separate process/port from the main HTTP API
+      # (avoids ALLOWED_HOSTS / middleware issues for in-cluster scraping).
+      # Port name is fixed as "metrics" (k8s convention). Per-workload metrics.exposeService
+      # overrides any of these. Ignored when metrics.type is "pod" (PodMonitor doesn't
+      # need a Service) and skipped if service.ports[] already has a "metrics" entry.
+      exposeService:
+        enabled: false
+        port: 9090       # ServicePort
+        targetPort: 9090 # containerPort
+      # Optional global overrides — per-workload metrics.* overrides any of these:
+      # relabelConfigs:
+      #   - sourceLabels: [__address__]
+      #     targetLabel: instance
+      # basicAuth:
+      #   password: { name: scrape-secret, key: password }
+      #   username: { name: scrape-secret, key: username }
+      # headers:
+      #   - "Authorization: Bearer ..."   # VictoriaMetrics only
 
 # Default image used by all workloads unless overridden per-workload.
 image:
@@ -134,73 +370,6 @@ image:
   tag: ""
 
 imagePullSecrets: []
-
-# monitoring.defaults — global scrape defaults applied to every workload.
-# EVERY field below has a per-workload override at deployments.<name>.metrics.*
-# (or statefulSets.<name>.metrics.*) — per-workload value always wins.
-# Values follow Prometheus upstream recommendations.
-monitoring:
-  defaults:
-    # provider controls which CRD API group is used for scraping in CRD mode.
-    # prometheus      → ServiceMonitor / PodMonitor  (monitoring.coreos.com/v1)
-    # victoriametrics → VMServiceScrape / VMPodScrape (operator.victoriametrics.com/v1beta1)
-    provider: prometheus
-    # discovery controls how scrape targets are registered.
-    # crd         → creates ServiceMonitor/PodMonitor/VMServiceScrape/VMPodScrape resources
-    # annotations → injects prometheus.io/* annotations into Service or Pod template.
-    #               Requires Prometheus/vmagent configured with kubernetes_sd + relabeling.
-    #               metrics.port must be NUMERIC if set (e.g. 8080) — port names are not
-    #               supported by prometheus.io/port annotation.
-    #               If metrics.port is not set, the chart falls back to service.targetPort
-    #               (or to monitoring.defaults.exposeService.port). If nothing resolves,
-    #               the prometheus.io/port annotation is omitted — Prometheus' kubernetes_sd
-    #               then auto-targets each declared containerPort. (Set metrics.port
-    #               explicitly only if your scrape_config uses 'action: keep, regex: \d+'
-    #               on the port annotation, which is non-standard.)
-    discovery: crd
-    # When true, monitoring is enabled for every workload by default; per-workload
-    # metrics.enabled: false explicitly disables. When false (default), each workload
-    # must opt in via metrics.enabled: true to be scraped.
-    enabled: false
-    type: service       # service | pod — per-workload metrics.type overrides
-    port: http          # CRD mode: NAME of the port in Service (type:service) or Pod
-                        # (type:pod) — Prometheus/VM CRDs require a string name, not a
-                        # number. If the container port has no name, give it one in the
-                        # workload spec (e.g. service.ports[].name=metrics) before setting
-                        # this. A numeric value here makes kubectl apply reject the CRD.
-                        #
-                        # Annotation mode: set per-workload metrics.port to a NUMBER
-                        # (e.g. 9090) — defaults.port is intentionally ignored here to
-                        # avoid emitting non-numeric prometheus.io/port values.
-    path: /metrics
-    scheme: http        # http | https — used in annotation mode
-    interval: 60s       # matches Prometheus global default scrape_interval
-    scrapeTimeout: 10s  # matches Prometheus global default scrape_timeout
-    # exposeService: when enabled, automatically adds a dedicated "metrics" port to
-    # the workload's Service and Pod template. Use this when the app exposes its
-    # /metrics endpoint on a separate process/port from the main HTTP API
-    # (avoids ALLOWED_HOSTS / middleware issues for in-cluster scraping).
-    # Port name is fixed as "metrics" (k8s convention). Per-workload metrics.exposeService
-    # overrides any of these. Ignored when metrics.type is "pod" (PodMonitor doesn't
-    # need a Service) and skipped if service.ports[] already has a "metrics" entry.
-    exposeService:
-      enabled: false
-      port: 9090       # ServicePort
-      targetPort: 9090 # containerPort
-    # Optional global overrides — per-workload metrics.* overrides any of these:
-    # relabelConfigs:
-    #   - sourceLabels: [__address__]
-    #     targetLabel: instance
-    # basicAuth:
-    #   password: { name: scrape-secret, key: password }
-    #   username: { name: scrape-secret, key: username }
-    # headers:
-    #   - "Authorization: Bearer ..."   # VictoriaMetrics only
-
-# ArgoCD sync-wave ordering for resource types that don't expose per-instance settings.
-# Per-job sync-waves are configured inside jobGroups.<group>.hooks.argocd.syncWave.
-syncWaves:
-  deploymentSyncWave: "10"
 
 # 10 revisions — matches Kubernetes default; gives safer rollback history.
 revisionHistoryLimit: 10
@@ -231,11 +400,6 @@ envSecrets: []
 # Disable per-workload with inherit.configMaps: false; add workload-local refs via envConfigMaps.
 # Shorthand: {configMapRef: key} resolves to {name: <fullname>-key} (references configMaps entries).
 envConfigMaps: []
-
-# Stakater Reloader integration — annotates Deployments and StatefulSets to
-# restart on ConfigMap/Secret changes. Disable if Reloader is not installed.
-reloader:
-  enabled: true
 
 nameOverride: ""
 fullnameOverride: ""
@@ -910,77 +1074,4 @@ statefulSets: {}
 #     tag: v1.0
 #     pullPolicy: IfNotPresent
 # Optional: volumeClaimTemplates. Update strategy uses the same strategy key as Deployments.
-
-# SecretStores — access configuration for external secret backends (Vault, AWS, GCP).
-# JWT auth uses serviceAccount.name by default; override per store via serviceAccountRef.
-# API version (v1 / v1beta1) is auto-detected via .Capabilities at install time.
-secretStores: {}
-# Example:
-# secretStores:
-#   vault-store:
-#     enabled: true
-#     kind: SecretStore          # SecretStore | ClusterSecretStore (default: SecretStore)
-#     provider:
-#       vault:
-#         server: https://vault.example.com
-#         path: secret
-#         version: v2
-#         namespace: ""          # Vault Enterprise namespace (optional)
-#         auth:
-#           jwt:
-#             mountPath: jwt
-#             role: my-app-role
-#             serviceAccountRef: ""   # default: serviceAccount.name
-#             audiences:
-#               - vault
-#             expirationSeconds: 600
-#   aws-store:
-#     enabled: true
-#     provider:
-#       aws:
-#         service: SecretsManager    # SecretsManager | ParameterStore
-#         region: us-east-1
-#         auth:
-#           jwt:
-#             serviceAccountRef: ""  # default: serviceAccount.name
-#             audiences:
-#               - sts.amazonaws.com
-#   gcp-store:
-#     enabled: true
-#     provider:
-#       gcpsm:
-#         projectID: my-gcp-project
-#         auth:
-#           workloadIdentity:
-#             clusterLocation: us-central1
-#             clusterName: my-cluster
-#             clusterProjectID: ""   # default: projectID
-#             serviceAccountRef: ""  # default: serviceAccount.name
-
-# ExternalSecrets — sync secrets from external backends into K8s Secrets.
-# Requires ExternalSecrets Operator. API version is auto-detected via .Capabilities.
-# data[] fetches individual keys; dataFrom[] extracts the entire secret.
-# conversionStrategy/decodingStrategy/metadataPolicy default to Default/None/None.
-externalSecrets: {}
-# Example:
-# externalSecrets:
-#   db-creds:
-#     enabled: true
-#     secretStore: vault-store      # references secretStores key
-#     storeKind: SecretStore        # SecretStore | ClusterSecretStore (default: SecretStore)
-#     refreshInterval: 1h
-#     targetName: db-creds          # K8s Secret name (default: map key)
-#     type: Opaque                  # Opaque | kubernetes.io/tls | kubernetes.io/dockerconfigjson
-#     data:
-#       - remoteKey: my-app/db
-#         secretKey: DB_PASSWORD
-#         property: password
-#         conversionStrategy: Default   # Default | Unicode
-#         decodingStrategy: None        # None | Auto | Base64 | Base64URL
-#         metadataPolicy: None          # None | Fetch
-#     dataFrom:
-#       - remoteKey: my-app/config
-#         conversionStrategy: Default
-#         decodingStrategy: None
-#         metadataPolicy: None
 

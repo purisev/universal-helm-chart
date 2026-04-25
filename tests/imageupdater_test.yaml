@@ -15,7 +15,7 @@ tests:
 
   - it: should render ImageUpdater when enabled
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - hasDocuments:
           count: 1
@@ -27,7 +27,7 @@ tests:
 
   - it: should default name to chart fullname
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
       fullnameOverride: test-release
     asserts:
       - equal:
@@ -36,8 +36,8 @@ tests:
 
   - it: should use custom name when specified
     set:
-      imageUpdater.enabled: true
-      imageUpdater.name: my-custom-updater
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.name: my-custom-updater
     asserts:
       - equal:
           path: metadata.name
@@ -45,7 +45,7 @@ tests:
 
   - it: should default namespace to release namespace
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - equal:
           path: metadata.namespace
@@ -53,8 +53,8 @@ tests:
 
   - it: should use custom namespace when specified
     set:
-      imageUpdater.enabled: true
-      imageUpdater.namespace: argocd
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.namespace: argocd
     asserts:
       - equal:
           path: metadata.namespace
@@ -62,7 +62,7 @@ tests:
 
   - it: should have helm labels
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/managed-by"]
@@ -70,8 +70,8 @@ tests:
 
   - it: should render annotations when set
     set:
-      imageUpdater.enabled: true
-      imageUpdater.annotations:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.annotations:
         my-annotation: my-value
     asserts:
       - equal:
@@ -82,7 +82,7 @@ tests:
 
   - it: shorthand - should build single applicationRef with release name as default namePattern
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - equal:
           path: spec.applicationRefs[0].namePattern
@@ -90,8 +90,8 @@ tests:
 
   - it: shorthand - should use appNamePattern when specified
     set:
-      imageUpdater.enabled: true
-      imageUpdater.appNamePattern: "my-app"
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.appNamePattern: "my-app"
     asserts:
       - equal:
           path: spec.applicationRefs[0].namePattern
@@ -146,21 +146,21 @@ tests:
 
   - it: shorthand - should omit commonUpdateSettings when not set
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - isNull:
           path: spec.applicationRefs[0].commonUpdateSettings
 
   - it: shorthand - should omit writeBackConfig when not set
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - isNull:
           path: spec.applicationRefs[0].writeBackConfig
 
   - it: shorthand - should omit images when not set
     set:
-      imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.enabled: true
     asserts:
       - isNull:
           path: spec.applicationRefs[0].images
@@ -205,8 +205,8 @@ tests:
 
   - it: manual - should render useAnnotations
     set:
-      imageUpdater.enabled: true
-      imageUpdater.applicationRefs:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.applicationRefs:
         - namePattern: "*"
           useAnnotations: true
     asserts:

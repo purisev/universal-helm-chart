@@ -11,9 +11,9 @@ metadata:
   name: {{ $releaseName }}
   labels:
     {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "ingress" "extra" (.Values.ingress.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if .Values.ingress.ingressClassName }}
@@ -61,9 +61,9 @@ metadata:
   name: {{ $releaseName }}-{{ $ingressName }}
   labels:
     {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $ing.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "ingress" "extra" ($ing.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- $ingressClass := $ing.ingressClassName | default $ctx.Values.ingress.ingressClassName }}

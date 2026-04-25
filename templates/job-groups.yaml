@@ -14,15 +14,14 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ $resourceName }}
-  {{- $hookAnn := include "uhc.jobGroupHookAnnotations" (dict "merged" $merged) | trim }}
-  {{- if or $hookAnn $merged.metadataAnnotations }}
+  {{- $jAnnots := dict }}
+  {{- $jAnnots = mergeOverwrite $jAnnots ($ctx.Values.commonAnnotations | default dict) }}
+  {{- $hookDict := (include "uhc.jobGroupHookAnnotations" (dict "merged" $merged) | fromYaml) | default dict }}
+  {{- $jAnnots = mergeOverwrite $jAnnots $hookDict }}
+  {{- $jAnnots = mergeOverwrite $jAnnots ($merged.metadataAnnotations | default dict) }}
+  {{- if $jAnnots }}
   annotations:
-    {{- with $hookAnn }}
-    {{- . | nindent 4 }}
-    {{- end }}
-    {{- with $merged.metadataAnnotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
+    {{- toYaml $jAnnots | nindent 4 }}
   {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}

@@ -27,9 +27,9 @@ metadata:
   name: {{ $releaseName }}
   labels:
     {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.httpRoute.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "httpRoute" "extra" (.Values.httpRoute.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if .Values.httpRoute.parentRefs }}
@@ -121,9 +121,9 @@ metadata:
   name: {{ $releaseName }}-{{ $routeName }}
   labels:
     {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $route.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "httpRoute" "extra" ($route.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if $route.parentRefs }}

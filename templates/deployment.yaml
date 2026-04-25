@@ -9,11 +9,10 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    {{- if $ctx.Values.reloader.enabled }}
-    "reloader.stakater.com/auto": "true"
-    {{- end }}
-    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "deployment" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:

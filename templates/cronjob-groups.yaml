@@ -14,9 +14,12 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ $resourceName }}
-  {{- with $merged.metadataAnnotations }}
+  {{- $cAnnots := dict }}
+  {{- $cAnnots = mergeOverwrite $cAnnots ($ctx.Values.commonAnnotations | default dict) }}
+  {{- $cAnnots = mergeOverwrite $cAnnots ($merged.metadataAnnotations | default dict) }}
+  {{- if $cAnnots }}
   annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- toYaml $cAnnots | nindent 4 }}
   {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}

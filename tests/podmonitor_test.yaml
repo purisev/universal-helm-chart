@@ -26,7 +26,7 @@ tests:
 
   - it: should render VMPodScrape when metrics.type is pod and provider is victoriametrics
     set:
-      monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.provider: victoriametrics
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -143,8 +143,8 @@ tests:
 
   - it: should use global monitoring.defaults when per-workload not set
     set:
-      monitoring.defaults.port: metrics
-      monitoring.defaults.interval: 120s
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.interval: 120s
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -160,8 +160,8 @@ tests:
 
   - it: per-workload metrics values should override global defaults
     set:
-      monitoring.defaults.port: metrics
-      monitoring.defaults.interval: 120s
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.interval: 120s
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -227,7 +227,7 @@ tests:
 
   - it: should render relabelConfigs for victoriametrics provider
     set:
-      monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.provider: victoriametrics
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -244,7 +244,7 @@ tests:
 
   - it: should render vm_scrape_params headers for victoriametrics provider
     set:
-      monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.provider: victoriametrics
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -270,11 +270,11 @@ tests:
 
   # --- ArgoCD sync-wave ---
 
-  - it: should set argocd sync-wave annotation as deploymentSyncWave + 1
+  - it: should set argocd sync-wave annotation from per-kind podMonitor wave
     set:
       image.repository: nginx
       image.tag: alpine
-      syncWaves.deploymentSyncWave: "5"
+      integrations.argocd.syncWaves.podMonitor: 6
       deployments.worker.enabled: true
       deployments.worker.metrics.enabled: true
       deployments.worker.metrics.type: pod
@@ -285,7 +285,7 @@ tests:
 
   - it: should not render when discovery is annotations
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -297,9 +297,9 @@ tests:
 
   # --- Global default-enable opt-out mode ---
 
-  - it: should render when monitoring.defaults.enabled=true and metrics.type=pod without metrics.enabled
+  - it: should render when integrations.monitoring.defaults.enabled=true and metrics.type=pod without metrics.enabled
     set:
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -310,9 +310,9 @@ tests:
       - isKind:
           of: PodMonitor
 
-  - it: per-workload metrics.enabled=false should override monitoring.defaults.enabled=true
+  - it: per-workload metrics.enabled=false should override integrations.monitoring.defaults.enabled=true
     set:
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -324,9 +324,9 @@ tests:
 
   # --- Global defaults: type ---
 
-  - it: should render PodMonitor when monitoring.defaults.type is pod without per-workload type
+  - it: should render PodMonitor when integrations.monitoring.defaults.type is pod without per-workload type
     set:
-      monitoring.defaults.type: pod
+      integrations.monitoring.defaults.type: pod
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -339,7 +339,7 @@ tests:
 
   - it: per-workload metrics.type=service should override defaults.type=pod
     set:
-      monitoring.defaults.type: pod
+      integrations.monitoring.defaults.type: pod
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true

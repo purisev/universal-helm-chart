@@ -28,7 +28,7 @@ tests:
 
   - it: should render ServiceMonitor when provider is explicitly prometheus
     set:
-      monitoring.defaults.provider: prometheus
+      integrations.monitoring.defaults.provider: prometheus
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -47,7 +47,7 @@ tests:
 
   - it: should render VMServiceScrape when provider is victoriametrics
     set:
-      monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.provider: victoriametrics
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -142,10 +142,10 @@ tests:
 
   - it: should use global monitoring.defaults when per-workload not set
     set:
-      monitoring.defaults.port: metrics
-      monitoring.defaults.path: /custom-metrics
-      monitoring.defaults.interval: 120s
-      monitoring.defaults.scrapeTimeout: 30s
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.path: /custom-metrics
+      integrations.monitoring.defaults.interval: 120s
+      integrations.monitoring.defaults.scrapeTimeout: 30s
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -169,8 +169,8 @@ tests:
 
   - it: per-workload metrics values should override global defaults
     set:
-      monitoring.defaults.port: metrics
-      monitoring.defaults.interval: 120s
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.interval: 120s
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -226,11 +226,11 @@ tests:
 
   # --- ArgoCD sync-wave ---
 
-  - it: should set argocd sync-wave annotation as deploymentSyncWave + 1
+  - it: should set argocd sync-wave annotation from per-kind serviceMonitor wave
     set:
       image.repository: nginx
       image.tag: alpine
-      syncWaves.deploymentSyncWave: "10"
+      integrations.argocd.syncWaves.serviceMonitor: 11
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
@@ -261,7 +261,7 @@ tests:
 
   - it: should render relabelConfigs (not relabelings) for victoriametrics provider
     set:
-      monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.provider: victoriametrics
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -309,7 +309,7 @@ tests:
 
   - it: should render vm_scrape_params headers for victoriametrics provider
     set:
-      monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.provider: victoriametrics
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -376,7 +376,7 @@ tests:
 
   - it: should not render when discovery is annotations
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -390,9 +390,9 @@ tests:
 
   # --- Global default-enable opt-out mode ---
 
-  - it: should render when monitoring.defaults.enabled=true even without per-workload metrics.enabled
+  - it: should render when integrations.monitoring.defaults.enabled=true even without per-workload metrics.enabled
     set:
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -405,9 +405,9 @@ tests:
       - isKind:
           of: ServiceMonitor
 
-  - it: per-workload metrics.enabled=false should override monitoring.defaults.enabled=true
+  - it: per-workload metrics.enabled=false should override integrations.monitoring.defaults.enabled=true
     set:
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -421,9 +421,9 @@ tests:
 
   # --- Global defaults: type, relabelConfigs, basicAuth, headers ---
 
-  - it: should not render when monitoring.defaults.type is pod
+  - it: should not render when integrations.monitoring.defaults.type is pod
     set:
-      monitoring.defaults.type: pod
+      integrations.monitoring.defaults.type: pod
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -437,7 +437,7 @@ tests:
 
   - it: per-workload metrics.type=service should override defaults.type=pod
     set:
-      monitoring.defaults.type: pod
+      integrations.monitoring.defaults.type: pod
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -452,9 +452,9 @@ tests:
       - isKind:
           of: ServiceMonitor
 
-  - it: should apply global monitoring.defaults.relabelConfigs when per-workload not set
+  - it: should apply global integrations.monitoring.defaults.relabelConfigs when per-workload not set
     set:
-      monitoring.defaults.relabelConfigs[0].targetLabel: instance
+      integrations.monitoring.defaults.relabelConfigs[0].targetLabel: instance
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -468,7 +468,7 @@ tests:
 
   - it: per-workload metrics.relabelConfigs should override global defaults
     set:
-      monitoring.defaults.relabelConfigs[0].targetLabel: from-defaults
+      integrations.monitoring.defaults.relabelConfigs[0].targetLabel: from-defaults
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -482,12 +482,12 @@ tests:
           path: spec.endpoints[0].relabelings[0].targetLabel
           value: from-workload
 
-  - it: should apply global monitoring.defaults.basicAuth when per-workload not set
+  - it: should apply global integrations.monitoring.defaults.basicAuth when per-workload not set
     set:
-      monitoring.defaults.basicAuth.password.name: scrape-secret
-      monitoring.defaults.basicAuth.password.key: password
-      monitoring.defaults.basicAuth.username.name: scrape-secret
-      monitoring.defaults.basicAuth.username.key: username
+      integrations.monitoring.defaults.basicAuth.password.name: scrape-secret
+      integrations.monitoring.defaults.basicAuth.password.key: password
+      integrations.monitoring.defaults.basicAuth.username.name: scrape-secret
+      integrations.monitoring.defaults.basicAuth.username.key: username
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -500,10 +500,10 @@ tests:
           path: spec.endpoints[0].basicAuth.password.name
           value: scrape-secret
 
-  - it: should apply global monitoring.defaults.headers for victoriametrics provider
+  - it: should apply global integrations.monitoring.defaults.headers for victoriametrics provider
     set:
-      monitoring.defaults.provider: victoriametrics
-      monitoring.defaults.headers[0]: "X-Token: abc"
+      integrations.monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.headers[0]: "X-Token: abc"
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -553,7 +553,7 @@ tests:
 
   - it: per-workload metrics.provider should override default provider
     set:
-      monitoring.defaults.provider: prometheus
+      integrations.monitoring.defaults.provider: prometheus
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -570,7 +570,7 @@ tests:
 
   - it: per-workload metrics.discovery=annotations should skip CRD render even when global is crd
     set:
-      monitoring.defaults.discovery: crd
+      integrations.monitoring.defaults.discovery: crd
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -585,7 +585,7 @@ tests:
 
   - it: per-workload metrics.discovery=crd should render CRD even when global is annotations
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true

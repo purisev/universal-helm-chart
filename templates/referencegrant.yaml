@@ -14,9 +14,9 @@ metadata:
   name: {{ $releaseName }}
   labels:
     {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.referenceGrant.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "referenceGrant" "extra" (.Values.referenceGrant.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   from:
@@ -38,9 +38,9 @@ metadata:
   name: {{ $releaseName }}-{{ $grantName }}
   labels:
     {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $grant.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "referenceGrant" "extra" ($grant.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   from:

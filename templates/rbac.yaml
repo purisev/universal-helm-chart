@@ -6,6 +6,10 @@ metadata:
   name: {{ include "uhc.fullname" . }}
   labels:
     {{- include "uhc.labels" . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "rbac") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 rules:
   {{- toYaml .Values.rbac.rules | nindent 2 }}
 ---
@@ -15,6 +19,10 @@ metadata:
   name: {{ include "uhc.fullname" . }}
   labels:
     {{- include "uhc.labels" . | nindent 4 }}
+  {{- $annots = include "uhc.metadataAnnotations" (dict "ctx" . "kind" "rbac") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

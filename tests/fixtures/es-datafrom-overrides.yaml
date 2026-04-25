@@ -1,8 +1,10 @@
-externalSecrets:
-  cfg:
-    enabled: true
-    secretStore: vault-store
-    dataFrom:
-      - remoteKey: my-app/config
-        decodingStrategy: Base64
-        metadataPolicy: Fetch
+integrations:
+  eso:
+    externalSecrets:
+      cfg:
+        enabled: true
+        secretStore: vault-store
+        dataFrom:
+          - remoteKey: my-app/config
+            decodingStrategy: Base64
+            metadataPolicy: Fetch

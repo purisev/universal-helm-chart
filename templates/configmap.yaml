@@ -10,8 +10,10 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}-config
   labels:
     {{- include "uhc.labels" $ctx | nindent 4 }}
-  annotations:
-    reloader.stakater.com/auto: "true"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 data:
   {{- if $wl.configData }}
   {{- toYaml $wl.configData | nindent 2 }}
@@ -32,8 +34,10 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}-config
   labels:
     {{- include "uhc.labels" $ctx | nindent 4 }}
-  annotations:
-    reloader.stakater.com/auto: "true"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 data:
   {{- if $wl.configData }}
   {{- toYaml $wl.configData | nindent 2 }}
@@ -54,6 +58,10 @@ metadata:
   name: {{ $releaseName }}-{{ $cmName }}
   labels:
     {{- include "uhc.labels" $ctx | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 data:
   {{- if $cm.data }}
   {{- toYaml $cm.data | nindent 2 }}

@@ -14,8 +14,10 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "podDisruptionBudget") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:
@@ -46,8 +48,10 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "podDisruptionBudget") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:

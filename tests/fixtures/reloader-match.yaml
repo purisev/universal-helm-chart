@@ -1,0 +1,6 @@
+integrations:
+  stakater:
+    reloader:
+      enabled: true
+      annotations:
+        reloader.stakater.com/match: "true"
