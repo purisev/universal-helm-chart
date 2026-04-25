@@ -1,0 +1,254 @@
+suite: test jobGroups (CronJob kind)
+templates:
+  - cronjob-groups.yaml
+release:
+  name: test-release
+  namespace: test-ns
+tests:
+  # ---------- enable / disable ----------
+  - it: should render nothing when no CronJob groups exist
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.task.enabled: true
+      jobGroups.db.jobs.task.command: "true"
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render CronJob when group enabled and kind=CronJob
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 2 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - isKind:
+          of: CronJob
+      - equal:
+          path: apiVersion
+          value: batch/v1
+
+  - it: should fail when CronJob job has no schedule
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: "jobGroups.cron.jobs.run.schedule is required when kind: CronJob"
+
+  - it: should render schedule and timeZone
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "*/5 * * * *"
+      jobGroups.cron.jobs.run.timeZone: UTC
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: "*/5 * * * *"
+      - equal:
+          path: spec.timeZone
+          value: UTC
+
+  - it: should render CronJob fields (concurrencyPolicy, history, startingDeadline)
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.concurrencyPolicy: Forbid
+      jobGroups.cron.jobs.run.successfulJobsHistoryLimit: 3
+      jobGroups.cron.jobs.run.failedJobsHistoryLimit: 1
+      jobGroups.cron.jobs.run.startingDeadlineSeconds: 60
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.concurrencyPolicy
+          value: Forbid
+      - equal:
+          path: spec.successfulJobsHistoryLimit
+          value: 3
+      - equal:
+          path: spec.failedJobsHistoryLimit
+          value: 1
+      - equal:
+          path: spec.startingDeadlineSeconds
+          value: 60
+
+  - it: should default restartPolicy to Never
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.restartPolicy
+          value: Never
+
+  - it: should fail-fast when CronJob group declares any hooks
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.hooks.argocd.hook: Sync
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - failedTemplate:
+          errorMessage: "jobGroups.cron.jobs.run: hooks are not applicable to kind: CronJob (set hooks only on Job groups)"
+
+  - it: should render container with jobName in single-container mode
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.cleanup.enabled: true
+      jobGroups.cron.jobs.cleanup.schedule: "0 2 * * *"
+      jobGroups.cron.jobs.cleanup.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].name
+          value: cleanup
+
+  - it: should produce metadata.name with sha8 suffix by default
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: -cron-run-[0-9a-f]{8}$
+
+  - it: should drop hash when hashSuffix is false
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.hashSuffix: false
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - matchRegex:
+          path: metadata.name
+          pattern: -cron-run$
+
+  - it: should render multiple CronJobs from one group
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.daily.enabled: true
+      jobGroups.cron.jobs.daily.schedule: "0 2 * * *"
+      jobGroups.cron.jobs.daily.command: "true"
+      jobGroups.cron.jobs.hourly.enabled: true
+      jobGroups.cron.jobs.hourly.schedule: "0 * * * *"
+      jobGroups.cron.jobs.hourly.command: "true"
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should let job override group schedule
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 5 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.schedule
+          value: "0 5 * * *"
+
+  - it: should render initContainers and job-completed when tasks present
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.tasks.step.enabled: true
+      jobGroups.cron.jobs.run.tasks.step.command: "true"
+    asserts:
+      - lengthEqual:
+          path: spec.jobTemplate.spec.template.spec.initContainers
+          count: 1
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.initContainers[0].name
+          value: step
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].name
+          value: job-completed
+
+  - it: should label resource with truncated group-job name
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.cleanup.enabled: true
+      jobGroups.cron.jobs.cleanup.schedule: "0 2 * * *"
+      jobGroups.cron.jobs.cleanup.command: "true"
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: cron-cleanup
+
+  - it: should add cm volume for CronJob with configMap mountPath
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-cfg.enabled: true
+      configMaps.app-cfg.mountPath: /etc/app
+      configMaps.app-cfg.data.foo: bar
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.volumes
+          content:
+            name: cm-app-cfg
+            configMap:
+              name: test-release-universal-helm-chart-app-cfg
+      - contains:
+          path: spec.jobTemplate.spec.template.spec.containers[0].volumeMounts
+          content:
+            name: cm-app-cfg
+            mountPath: /etc/app
+            readOnly: true

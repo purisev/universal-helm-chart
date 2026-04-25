@@ -54,11 +54,10 @@ spec:
         {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | nindent 8 }}
         {{- include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
       {{- $inheritParentVolumes := ne ($wl.useRootVolumes | toString) "false" }}
-      {{- $hasAutoVols := false }}
-      {{- range $cmName, $cm := ($ctx.Values.configMaps | default dict) }}
-        {{- if and (hasKey $cm "enabled") $cm.enabled $cm.mountPath }}
-          {{- $hasAutoVols = true }}
-        {{- end }}
+      {{- $cmm := include "uhc.resolveConfigMapMount" ($wl.inherit | default dict) | fromJson }}
+      {{- $hasAutoVols := "" }}
+      {{- if $cmm.enabled }}
+      {{- $hasAutoVols = include "uhc.hasConfigMapAutoVolumes" (dict "ctx" $ctx "granularDisable" $cmm.granular) }}
       {{- end }}
       {{- if or (and $inheritParentVolumes $ctx.Values.volumes) $wl.volumes $hasAutoVols }}
       volumes:
@@ -70,7 +69,9 @@ spec:
         {{- with $wl.volumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-        {{- include "uhc.configMapAutoVolumes" $ctx | nindent 8 }}
+        {{- if $cmm.enabled }}
+        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 8 }}
+        {{- end }}
       {{- end }}
       {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
 {{- end }}

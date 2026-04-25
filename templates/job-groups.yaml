@@ -1,0 +1,95 @@
+{{- $ctx := . }}
+{{- include "uhc.assertNoLegacyJobKeys" $ctx -}}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- range $groupName, $group := ($ctx.Values.jobGroups | default dict) }}
+{{- if and (hasKey $group "enabled") $group.enabled (eq (default "Job" $group.kind) "Job") }}
+{{- range $jobName := keys ($group.jobs | default dict) | sortAlpha }}
+{{- $job := index $group.jobs $jobName }}
+{{- if $job.enabled }}
+{{- $merged := include "uhc.jobGroupSpec" (dict "ctx" $ctx "group" $group "job" $job "groupName" $groupName "jobName" $jobName) | fromYaml }}
+{{- $wlName := include "uhc.jobGroupName" (dict "groupName" $groupName "jobName" $jobName) }}
+{{- $resourceName := include "uhc.jobGroupResourceName" (dict "ctx" $ctx "groupName" $groupName "jobName" $jobName "merged" $merged) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $resourceName }}
+  {{- $hookAnn := include "uhc.jobGroupHookAnnotations" (dict "merged" $merged) | trim }}
+  {{- if or $hookAnn $merged.metadataAnnotations }}
+  annotations:
+    {{- with $hookAnn }}
+    {{- . | nindent 4 }}
+    {{- end }}
+    {{- with $merged.metadataAnnotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  backoffLimit: {{ default 3 $merged.backoffLimit }}
+  {{- with $merged.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . | int }}
+  {{- end }}
+  {{- with $merged.activeDeadlineSeconds }}
+  activeDeadlineSeconds: {{ . | int }}
+  {{- end }}
+  template:
+    metadata:
+      {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}
+      {{- with $merged.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
+    spec:
+      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | nindent 6 }}
+      restartPolicy: {{ default "Never" $merged.restartPolicy }}
+      {{- if $merged.tasks }}
+      initContainers:
+        {{- include "uhc.jobTasksContainers" (dict "ctx" $ctx "wl" $merged) | nindent 8 }}
+      containers:
+        - name: job-completed
+          image: {{ default (default "alpine:3.21" $ctx.Values.jobCompletionImage) $merged.completionImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "-c", "echo SUCCESS"]
+          {{- with $merged.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 16Mi
+      {{- else }}
+      containers:
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | nindent 8 }}
+      {{- end }}
+      {{- $useRootVolumes := ne ($merged.useRootVolumes | toString) "false" }}
+      {{- $cmm := include "uhc.resolveConfigMapMount" ($merged.inherit | default dict) | fromJson }}
+      {{- $hasAutoVols := "" }}
+      {{- if $cmm.enabled }}
+      {{- $hasAutoVols = include "uhc.hasConfigMapAutoVolumes" (dict "ctx" $ctx "granularDisable" $cmm.granular) }}
+      {{- end }}
+      {{- if or (and $useRootVolumes $ctx.Values.volumes) $merged.volumes $hasAutoVols }}
+      volumes:
+        {{- if $useRootVolumes }}
+        {{- with $ctx.Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        {{- with $merged.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if $cmm.enabled }}
+        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

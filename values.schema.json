@@ -54,6 +54,9 @@
     "jobPodAnnotations": {
       "type": "object"
     },
+    "jobCompletionImage": {
+      "type": "string"
+    },
     "nameOverride": {
       "type": "string"
     },
@@ -94,9 +97,6 @@
       "type": "object"
     },
     "statefulSets": {
-      "type": "object"
-    },
-    "cronJobs": {
       "type": "object"
     },
     "configMaps": {
@@ -284,143 +284,70 @@
         }
       }
     },
-    "initJob": {
+    "jobGroups": {
       "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "backoffLimit": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "ttlSecondsAfterFinished": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "activeDeadlineSeconds": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 1
-        },
-        "tasks": {
-          "type": "object"
-        },
-        "env": {
-          "type": "object"
-        },
-        "metadataAnnotations": {
-          "type": "object"
-        },
-        "completionImage": {
-          "type": "string"
-        }
-      }
-    },
-    "dbJob": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "backoffLimit": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "ttlSecondsAfterFinished": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "activeDeadlineSeconds": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 1
-        },
-        "image": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "repository": {
-              "type": "string"
-            },
-            "tag": {
-              "type": "string"
-            },
-            "pullPolicy": {
-              "type": "string",
-              "enum": [
-                "Always",
-                "IfNotPresent",
-                "Never"
-              ]
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": { "type": "boolean" },
+          "kind": { "type": "string", "enum": ["Job", "CronJob"] },
+          "hooks": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "argocd": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hook": { "type": "string", "enum": ["", "PreSync", "Sync", "PostSync", "SyncFail"] },
+                  "syncWave": { "type": ["string", "integer"] },
+                  "deletePolicy": { "type": "string", "enum": ["", "HookSucceeded", "HookFailed", "BeforeHookCreation"] }
+                }
+              },
+              "helm": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "hook": { "type": "string" },
+                  "weight": { "type": ["string", "integer"] },
+                  "deletePolicy": { "type": "string", "enum": ["", "before-hook-creation", "hook-succeeded", "hook-failed"] }
+                }
+              }
             }
+          },
+          "image": { "type": "object" },
+          "env": { "type": "object" },
+          "envSecrets": { "type": "array" },
+          "envConfigMaps": { "type": "array" },
+          "inherit": { "type": "object" },
+          "backoffLimit": { "type": "integer", "minimum": 0 },
+          "ttlSecondsAfterFinished": { "type": ["integer", "null"], "minimum": 0 },
+          "activeDeadlineSeconds": { "type": ["integer", "null"], "minimum": 1 },
+          "restartPolicy": { "type": "string", "enum": ["Never", "OnFailure"] },
+          "podSecurityContext": { "type": "object" },
+          "securityContext": { "type": "object" },
+          "resources": { "type": "object" },
+          "serviceAccountName": { "type": "string" },
+          "automountServiceAccountToken": { "type": ["boolean", "null"] },
+          "terminationGracePeriodSeconds": { "type": ["integer", "null"], "minimum": 0 },
+          "volumes": { "type": "array" },
+          "volumeMounts": { "type": "array" },
+          "useRootVolumes": { "type": "boolean" },
+          "useRootVolumeMounts": { "type": "boolean" },
+          "nodeSelector": { "type": "object" },
+          "affinity": { "type": "object" },
+          "tolerations": { "type": "array" },
+          "metadataAnnotations": { "type": "object" },
+          "podAnnotations": { "type": "object" },
+          "hashSuffix": { "type": "boolean" },
+          "hashIncludePodAnnotations": { "type": "boolean" },
+          "jobs": {
+            "type": "object",
+            "additionalProperties": { "type": "object" }
           }
         },
-        "imagePullSecrets": {
-          "type": "array"
-        },
-        "tasks": {
-          "type": "object"
-        },
-        "env": {
-          "type": "object"
-        },
-        "metadataAnnotations": {
-          "type": "object"
-        },
-        "completionImage": {
-          "type": "string"
-        }
-      }
-    },
-    "postSync": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "syncWave": {
-          "type": [
-            "string",
-            "integer"
-          ]
-        },
-        "backoffLimit": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "ttlSecondsAfterFinished": {
-          "type": [
-            "integer",
-            "null"
-          ],
-          "minimum": 0
-        },
-        "hookDeletePolicy": {
-          "type": "string"
-        },
-        "jobs": {
-          "type": "object"
-        },
-        "env": {
-          "type": "object"
-        },
-        "metadataAnnotations": {
-          "type": "object"
-        }
+        "required": ["jobs"]
       }
     },
     "monitoring": {
@@ -472,18 +399,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "jobsSyncWave": {
-          "type": [
-            "string",
-            "integer"
-          ]
-        },
-        "databaseJobsSyncWave": {
-          "type": [
-            "string",
-            "integer"
-          ]
-        },
         "deploymentSyncWave": {
           "type": [
             "string",
