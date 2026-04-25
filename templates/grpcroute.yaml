@@ -24,11 +24,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
 metadata:
   name: {{ $releaseName }}
+  {{- $lbls := include "uhc.labels" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.grpcRoute.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "grpcRoute" "extra" (.Values.grpcRoute.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if .Values.grpcRoute.parentRefs }}
@@ -117,11 +120,14 @@ apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
 metadata:
   name: {{ $releaseName }}-{{ $routeName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $route.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "grpcRoute" "extra" ($route.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if $route.parentRefs }}

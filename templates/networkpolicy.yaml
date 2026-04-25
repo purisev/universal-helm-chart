@@ -11,6 +11,10 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "networkPolicy") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 spec:
   podSelector:
     matchLabels:
@@ -39,6 +43,10 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "networkPolicy") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 spec:
   podSelector:
     matchLabels:

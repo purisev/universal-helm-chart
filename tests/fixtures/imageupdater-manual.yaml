@@ -1,24 +1,26 @@
-imageUpdater:
-  enabled: true
-  namespace: argocd
-  applicationRefs:
-    - namePattern: "my-app"
-      commonUpdateSettings:
-        updateStrategy: semver
-        forceUpdate: false
-      writeBackConfig:
-        method: argocd
-      images:
-        - alias: app
-          imageName: myregistry/myapp
-          manifestTargets:
-            helm:
-              name: image.repository
-              tag: image.tag
-    - namePattern: "my-app-*"
-      labelSelectors:
-        matchLabels:
-          environment: production
-      images:
-        - alias: app
-          imageName: myregistry/myapp
+integrations:
+  argocd:
+    imageUpdater:
+      enabled: true
+      namespace: argocd
+      applicationRefs:
+        - namePattern: "my-app"
+          commonUpdateSettings:
+            updateStrategy: semver
+            forceUpdate: false
+          writeBackConfig:
+            method: argocd
+          images:
+            - alias: app
+              imageName: myregistry/myapp
+              manifestTargets:
+                helm:
+                  name: image.repository
+                  tag: image.tag
+        - namePattern: "my-app-*"
+          labelSelectors:
+            matchLabels:
+              environment: production
+          images:
+            - alias: app
+              imageName: myregistry/myapp

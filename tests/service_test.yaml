@@ -246,11 +246,11 @@ tests:
           path: spec.ports[1].port
           value: 9999
 
-  - it: should use global monitoring.defaults.exposeService when per-workload not set
+  - it: should use global integrations.monitoring.defaults.exposeService when per-workload not set
     set:
-      monitoring.defaults.exposeService.enabled: true
-      monitoring.defaults.exposeService.port: 8000
-      monitoring.defaults.exposeService.targetPort: 8000
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 8000
+      integrations.monitoring.defaults.exposeService.targetPort: 8000
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -272,7 +272,7 @@ tests:
 
   - it: per-workload exposeService.enabled=false should override global default true
     set:
-      monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true

@@ -11,8 +11,10 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "vpa") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:
@@ -40,8 +42,10 @@ apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "vpa") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:

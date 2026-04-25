@@ -1,25 +1,28 @@
-{{- if .Values.imageUpdater.enabled }}
+{{- if .Values.integrations.argocd.imageUpdater.enabled }}
 ---
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
 metadata:
-  name: {{ .Values.imageUpdater.name | default (include "uhc.fullname" .) }}
-  namespace: {{ .Values.imageUpdater.namespace | default .Release.Namespace }}
+  name: {{ .Values.integrations.argocd.imageUpdater.name | default (include "uhc.fullname" .) }}
+  namespace: {{ .Values.integrations.argocd.imageUpdater.namespace | default .Release.Namespace }}
+  {{- $lbls := include "uhc.labels" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.imageUpdater.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "imageUpdater" "extra" (.Values.integrations.argocd.imageUpdater.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
-  {{- if .Values.imageUpdater.applicationRefs }}
+  {{- if .Values.integrations.argocd.imageUpdater.applicationRefs }}
   {{- /*
     Manual mode: applicationRefs provided explicitly.
     All settings (commonUpdateSettings, writeBackConfig, images) must be
     defined inside each applicationRef entry.
   */}}
   applicationRefs:
-    {{- toYaml .Values.imageUpdater.applicationRefs | nindent 4 }}
+    {{- toYaml .Values.integrations.argocd.imageUpdater.applicationRefs | nindent 4 }}
   {{- else }}
   {{- /*
     Shorthand mode: build a single applicationRef automatically.
@@ -28,16 +31,16 @@ spec:
     applicationRef — matching the structure Argo CD Image Updater >= 1.x expects.
   */}}
   applicationRefs:
-    - namePattern: {{ .Values.imageUpdater.appNamePattern | default .Release.Name | quote }}
-      {{- with .Values.imageUpdater.commonUpdateSettings }}
+    - namePattern: {{ .Values.integrations.argocd.imageUpdater.appNamePattern | default .Release.Name | quote }}
+      {{- with .Values.integrations.argocd.imageUpdater.commonUpdateSettings }}
       commonUpdateSettings:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.imageUpdater.writeBackConfig }}
+      {{- with .Values.integrations.argocd.imageUpdater.writeBackConfig }}
       writeBackConfig:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.imageUpdater.images }}
+      {{- with .Values.integrations.argocd.imageUpdater.images }}
       images:
         {{- toYaml . | nindent 8 }}
       {{- end }}

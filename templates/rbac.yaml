@@ -1,11 +1,18 @@
 {{- if and .Values.serviceAccount.create .Values.rbac.enabled }}
+{{- $lbls := include "uhc.labels" . -}}
+{{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "rbac") -}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ include "uhc.fullname" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 rules:
   {{- toYaml .Values.rbac.rules | nindent 2 }}
 ---
@@ -13,8 +20,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ include "uhc.fullname" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role

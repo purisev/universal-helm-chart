@@ -167,7 +167,7 @@ tests:
 
   # --- L1: full labels on pod template ---
 
-  - it: should include helm.sh/chart label on pod template
+  - it: should not emit helm.sh/chart label and should keep standard app.kubernetes.io/* labels
     set:
       image.repository: redis
       image.tag: alpine
@@ -177,10 +177,14 @@ tests:
       statefulSets.redis.service.port: 6379
       statefulSets.redis.service.targetPort: 6379
     asserts:
-      - isNotNull:
+      - isNull:
           path: spec.template.metadata.labels["helm.sh/chart"]
       - isNotNull:
           path: spec.template.metadata.labels["app.kubernetes.io/managed-by"]
+      - isNull:
+          path: metadata.labels["helm.sh/chart"]
+      - isNotNull:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
 
   # --- L4: podManagementPolicy ---
 

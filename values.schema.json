@@ -102,12 +102,6 @@
     "configMaps": {
       "type": "object"
     },
-    "secretStores": {
-      "type": "object"
-    },
-    "externalSecrets": {
-      "type": "object"
-    },
     "serviceAccount": {
       "type": "object",
       "additionalProperties": false,
@@ -132,15 +126,6 @@
         },
         "rules": {
           "type": "array"
-        }
-      }
-    },
-    "reloader": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {
-          "type": "boolean"
         }
       }
     },
@@ -350,63 +335,6 @@
         "required": ["jobs"]
       }
     },
-    "monitoring": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "defaults": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "provider": {
-              "type": "string",
-              "enum": ["prometheus", "victoriametrics"]
-            },
-            "discovery": {
-              "type": "string",
-              "enum": ["crd", "annotations"]
-            },
-            "enabled": { "type": "boolean" },
-            "type": {
-              "type": "string",
-              "enum": ["service", "pod"]
-            },
-            "port": { "type": "string" },
-            "path": { "type": "string" },
-            "scheme": {
-              "type": "string",
-              "enum": ["http", "https"]
-            },
-            "interval": { "type": "string" },
-            "scrapeTimeout": { "type": "string" },
-            "relabelConfigs": { "type": "array" },
-            "basicAuth": { "type": "object" },
-            "headers": { "type": "array" },
-            "exposeService": {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "enabled": { "type": "boolean" },
-                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-                "targetPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "syncWaves": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "deploymentSyncWave": {
-          "type": [
-            "string",
-            "integer"
-          ]
-        }
-      }
-    },
     "topologySpreadConstraints": {
       "type": "object",
       "additionalProperties": false,
@@ -599,36 +527,150 @@
         }
       }
     },
-    "imageUpdater": {
+    "commonLabels": {
+      "type": "object"
+    },
+    "commonAnnotations": {
+      "type": "object"
+    },
+    "labels": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {
-          "type": "boolean"
+        "standard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "partOf": { "type": "boolean" },
+            "name": { "type": "boolean" },
+            "instance": { "type": "boolean" },
+            "version": { "type": "boolean" },
+            "managedBy": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "integrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "argocd": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "syncWaves": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "serviceAccount": { "type": ["integer", "string", "null"] },
+                "rbac": { "type": ["integer", "string", "null"] },
+                "secretStore": { "type": ["integer", "string", "null"] },
+                "externalSecret": { "type": ["integer", "string", "null"] },
+                "configMap": { "type": ["integer", "string", "null"] },
+                "service": { "type": ["integer", "string", "null"] },
+                "imageUpdater": { "type": ["integer", "string", "null"] },
+                "statefulSet": { "type": ["integer", "string", "null"] },
+                "deployment": { "type": ["integer", "string", "null"] },
+                "hpa": { "type": ["integer", "string", "null"] },
+                "vpa": { "type": ["integer", "string", "null"] },
+                "scaledObject": { "type": ["integer", "string", "null"] },
+                "podDisruptionBudget": { "type": ["integer", "string", "null"] },
+                "serviceMonitor": { "type": ["integer", "string", "null"] },
+                "podMonitor": { "type": ["integer", "string", "null"] },
+                "networkPolicy": { "type": ["integer", "string", "null"] },
+                "referenceGrant": { "type": ["integer", "string", "null"] },
+                "ingress": { "type": ["integer", "string", "null"] },
+                "httpRoute": { "type": ["integer", "string", "null"] },
+                "grpcRoute": { "type": ["integer", "string", "null"] },
+                "tlsRoute": { "type": ["integer", "string", "null"] }
+              }
+            },
+            "imageUpdater": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "name": { "type": "string" },
+                "namespace": { "type": "string" },
+                "annotations": { "type": "object" },
+                "appNamePattern": { "type": "string" },
+                "commonUpdateSettings": { "type": "object" },
+                "writeBackConfig": { "type": "object" },
+                "images": { "type": "array" },
+                "applicationRefs": { "type": "array" }
+              }
+            }
+          }
         },
-        "name": {
-          "type": "string"
+        "stakater": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reloader": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "annotations": { "type": "object" }
+              }
+            }
+          }
         },
-        "namespace": {
-          "type": "string"
+        "eso": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "secretStores": { "type": "object" },
+            "externalSecrets": { "type": "object" }
+          }
         },
-        "annotations": {
-          "type": "object"
-        },
-        "appNamePattern": {
-          "type": "string"
-        },
-        "commonUpdateSettings": {
-          "type": "object"
-        },
-        "writeBackConfig": {
-          "type": "object"
-        },
-        "images": {
-          "type": "array"
-        },
-        "applicationRefs": {
-          "type": "array"
+        "monitoring": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "defaults": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "enum": ["prometheus", "victoriametrics"]
+                },
+                "discovery": {
+                  "type": "string",
+                  "enum": ["crd", "annotations"]
+                },
+                "enabled": { "type": "boolean" },
+                "type": {
+                  "type": "string",
+                  "enum": ["service", "pod"]
+                },
+                "port": { "type": "string" },
+                "path": { "type": "string" },
+                "scheme": {
+                  "type": "string",
+                  "enum": ["http", "https"]
+                },
+                "interval": { "type": "string" },
+                "scrapeTimeout": { "type": "string" },
+                "relabelConfigs": { "type": "array" },
+                "basicAuth": { "type": "object" },
+                "headers": { "type": "array" },
+                "exposeService": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "enabled": { "type": "boolean" },
+                    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                    "targetPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }

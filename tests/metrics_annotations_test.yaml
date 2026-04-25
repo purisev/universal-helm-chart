@@ -12,7 +12,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -29,7 +29,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -43,12 +43,12 @@ tests:
           path: metadata.annotations["prometheus.io/path"]
           value: /custom/metrics
 
-  - it: service should use monitoring.defaults.path for prometheus.io/path
+  - it: service should use integrations.monitoring.defaults.path for prometheus.io/path
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.path: /default-metrics
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.path: /default-metrics
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -65,7 +65,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -82,7 +82,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -100,7 +100,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -117,7 +117,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -135,7 +135,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -152,7 +152,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -188,7 +188,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -205,7 +205,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -225,7 +225,7 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -241,7 +241,7 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -257,7 +257,7 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -274,7 +274,7 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       podAnnotations:
         existing/annotation: keep-this
       image.repository: nginx
@@ -295,7 +295,7 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -325,7 +325,7 @@ tests:
     templates:
       - statefulset.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: redis
       statefulSets.redis.metrics.port: 6379
       image.tag: alpine
@@ -341,7 +341,7 @@ tests:
     templates:
       - statefulset.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: redis
       image.tag: alpine
       statefulSets.redis.enabled: true
@@ -370,12 +370,12 @@ tests:
   # GLOBAL defaults.enabled opt-out mode
   # ===================================================================
 
-  - it: service should inject prometheus annotations when monitoring.defaults.enabled=true without per-workload opt-in
+  - it: service should inject prometheus annotations when integrations.monitoring.defaults.enabled=true without per-workload opt-in
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -387,12 +387,12 @@ tests:
           path: metadata.annotations["prometheus.io/scrape"]
           value: "true"
 
-  - it: service per-workload metrics.enabled=false should override monitoring.defaults.enabled=true
+  - it: service per-workload metrics.enabled=false should override integrations.monitoring.defaults.enabled=true
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -408,8 +408,8 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.enabled: true
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -424,12 +424,12 @@ tests:
   # GLOBAL defaults.scheme and defaults.type
   # ===================================================================
 
-  - it: service should use monitoring.defaults.scheme when per-workload not set
+  - it: service should use integrations.monitoring.defaults.scheme when per-workload not set
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.scheme: https
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.scheme: https
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -446,8 +446,8 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.scheme: https
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.scheme: https
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -464,8 +464,8 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.type: pod
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.type: pod
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true
@@ -480,7 +480,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -493,12 +493,12 @@ tests:
           path: metadata.annotations["prometheus.io/port"]
           value: "80"
 
-  - it: service annotation port should ignore monitoring.defaults.port (CRD-only) — falls back to service.port
+  - it: service annotation port should ignore integrations.monitoring.defaults.port (CRD-only) — falls back to service.port
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
-      monitoring.defaults.port: http
+      integrations.monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.port: http
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -515,7 +515,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -536,7 +536,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: crd
+      integrations.monitoring.defaults.discovery: crd
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -554,7 +554,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -571,7 +571,7 @@ tests:
     templates:
       - service.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
@@ -588,7 +588,7 @@ tests:
     templates:
       - deployment.yaml
     set:
-      monitoring.defaults.discovery: annotations
+      integrations.monitoring.defaults.discovery: annotations
       image.repository: nginx
       image.tag: alpine
       deployments.worker.enabled: true

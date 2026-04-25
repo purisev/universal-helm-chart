@@ -4,7 +4,7 @@
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
 {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
-{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.monitoring.defaults | default dict).type | default "service") -}}
+{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := false -}}
 {{- if and $wl.service $wl.service.ports -}}
@@ -15,6 +15,7 @@
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
+{{- $extra := mergeOverwrite (deepCopy ($wl.service.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 ---
 apiVersion: v1
 kind: Service
@@ -22,14 +23,9 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- if or $wl.service.annotations $promAnnots }}
-  annotations:
-    {{- with $wl.service.annotations }}
-    {{- toYaml . | nindent 4 }}
-    {{- end }}
-    {{- with $promAnnots }}
-    {{- . | nindent 4 }}
-    {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" $extra) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   type: {{ $wl.service.type }}
@@ -67,6 +63,10 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}-metrics
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 spec:
   type: ClusterIP
   ports:
@@ -82,7 +82,7 @@ spec:
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName }}
 {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
-{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.monitoring.defaults | default dict).type | default "service") -}}
+{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := false -}}
 {{- if and $wl.service $wl.service.ports -}}
@@ -93,6 +93,7 @@ spec:
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
+{{- $extra := ($promAnnots | fromYaml) | default dict }}
 ---
 apiVersion: v1
 kind: Service
@@ -100,9 +101,9 @@ metadata:
   name: {{ $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- with $promAnnots }}
-  annotations:
-    {{- . | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" $extra) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   clusterIP: None
