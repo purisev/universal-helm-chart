@@ -6,12 +6,7 @@
 {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
 {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
-{{- $hasMetricsPortAlready := false -}}
-{{- if and $wl.service $wl.service.ports -}}
-  {{- range $wl.service.ports -}}
-    {{- if eq (.name | toString) "metrics" -}}{{- $hasMetricsPortAlready = true -}}{{- end -}}
-  {{- end -}}
-{{- end -}}
+{{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
@@ -31,11 +26,12 @@ spec:
   type: {{ $wl.service.type }}
   ports:
     {{- if $wl.service.ports }}
-    {{- range $wl.service.ports }}
-    - name: {{ .name }}
-      port: {{ .port }}
-      targetPort: {{ .targetPort }}
-      protocol: {{ .protocol | default "TCP" }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
+    {{- $p := index $wl.service.ports $pName }}
+    - name: {{ $pName }}
+      port: {{ $p.port }}
+      targetPort: {{ $p.targetPort }}
+      protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
     {{- else }}
     - port: {{ $wl.service.port }}
@@ -84,12 +80,7 @@ spec:
 {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
 {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
-{{- $hasMetricsPortAlready := false -}}
-{{- if and $wl.service $wl.service.ports -}}
-  {{- range $wl.service.ports -}}
-    {{- if eq (.name | toString) "metrics" -}}{{- $hasMetricsPortAlready = true -}}{{- end -}}
-  {{- end -}}
-{{- end -}}
+{{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
@@ -110,11 +101,12 @@ spec:
   ports:
     {{- if and $wl.service $wl.service.enabled }}
     {{- if $wl.service.ports }}
-    {{- range $wl.service.ports }}
-    - name: {{ .name }}
-      port: {{ .port | default .targetPort }}
-      targetPort: {{ .targetPort }}
-      protocol: {{ .protocol | default "TCP" }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
+    {{- $p := index $wl.service.ports $pName }}
+    - name: {{ $pName }}
+      port: {{ $p.port | default $p.targetPort }}
+      targetPort: {{ $p.targetPort }}
+      protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
     {{- else }}
     - name: http

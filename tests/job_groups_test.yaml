@@ -863,3 +863,34 @@ tests:
       - failedTemplate:
           errorMessage: "Legacy values key 'cronJobs' is no longer supported. Migrate to jobGroups (see jobGroups example in values.yaml)."
 
+  - it: should let job-level volume override group-level on name collision
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups:
+        db:
+          enabled: true
+          volumes:
+            shared:
+              emptyDir: {}
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+              volumes:
+                shared:
+                  configMap:
+                    name: cm
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 1
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: shared
+      - equal:
+          path: spec.template.spec.volumes[0].configMap.name
+          value: cm
+      - isNull:
+          path: spec.template.spec.volumes[0].emptyDir
+

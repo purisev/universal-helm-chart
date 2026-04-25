@@ -92,12 +92,14 @@ spec:
           {{- if or (and $useRootVolumes $ctx.Values.volumes) $merged.volumes $hasAutoVols }}
           volumes:
             {{- if $useRootVolumes }}
-            {{- with $ctx.Values.volumes }}
-            {{- toYaml . | nindent 12 }}
+            {{- range $vName := keys ($ctx.Values.volumes | default dict) | sortAlpha }}
+            - name: {{ $vName }}
+              {{- toYaml (index $ctx.Values.volumes $vName) | nindent 14 }}
             {{- end }}
             {{- end }}
-            {{- with $merged.volumes }}
-            {{- toYaml . | nindent 12 }}
+            {{- range $vName := keys ($merged.volumes | default dict) | sortAlpha }}
+            - name: {{ $vName }}
+              {{- toYaml (index $merged.volumes $vName) | nindent 14 }}
             {{- end }}
             {{- if $cmm.enabled }}
             {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 12 }}

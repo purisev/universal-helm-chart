@@ -5,6 +5,6 @@ integrations:
         enabled: true
         secretStore: vault-store
         data:
-          - remoteKey: my-app/db
-            secretKey: DB_PASSWORD
+          DB_PASSWORD:
+            remoteKey: my-app/db
             property: password

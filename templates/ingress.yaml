@@ -24,22 +24,22 @@ spec:
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
-    {{- range .Values.ingress.tls }}
+    {{- range $secretName := keys .Values.ingress.tls | sortAlpha }}
+    {{- $entry := index $.Values.ingress.tls $secretName }}
     - hosts:
-        {{- range .hosts }}
+        {{- range $entry.hosts }}
         - {{ . | quote }}
         {{- end }}
-      {{- if .secretName }}
-      secretName: {{ .secretName }}
-      {{- end }}
+      secretName: {{ $secretName }}
     {{- end }}
   {{- end }}
   rules:
-  {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+  {{- range $host := keys .Values.ingress.hosts | sortAlpha }}
+  {{- $hostCfg := index $.Values.ingress.hosts $host }}
+    - host: {{ $host | quote }}
       http:
         paths:
-        {{- range .paths }}
+        {{- range $hostCfg.paths }}
           - path: {{ .path }}
             pathType: {{ .pathType | default "ImplementationSpecific" }}
             backend:
@@ -78,22 +78,22 @@ spec:
   {{- end }}
   {{- if $ing.tls }}
   tls:
-    {{- range $ing.tls }}
+    {{- range $secretName := keys $ing.tls | sortAlpha }}
+    {{- $entry := index $ing.tls $secretName }}
     - hosts:
-        {{- range .hosts }}
+        {{- range $entry.hosts }}
         - {{ . | quote }}
         {{- end }}
-      {{- if .secretName }}
-      secretName: {{ .secretName }}
-      {{- end }}
+      secretName: {{ $secretName }}
     {{- end }}
   {{- end }}
   rules:
-  {{- range $ing.hosts }}
-    - host: {{ .host | quote }}
+  {{- range $host := keys $ing.hosts | sortAlpha }}
+  {{- $hostCfg := index $ing.hosts $host }}
+    - host: {{ $host | quote }}
       http:
         paths:
-        {{- range .paths }}
+        {{- range $hostCfg.paths }}
           - path: {{ .path }}
             pathType: {{ .pathType | default "ImplementationSpecific" }}
             backend:

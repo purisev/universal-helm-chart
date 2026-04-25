@@ -73,9 +73,11 @@ tests:
       deployments.web.service.targetPort: 80
       serviceAccount.create: true
       ingress.enabled: true
-      ingress.hosts[0].host: app.example.com
-      ingress.hosts[0].paths[0].path: /
-      ingress.hosts[0].paths[0].pathType: Prefix
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /
+              pathType: Prefix
       commonLabels.team: platform
     template: service.yaml
     asserts:
@@ -154,9 +156,11 @@ tests:
     template: ingress.yaml
     set:
       ingress.enabled: true
-      ingress.hosts[0].host: app.example.com
-      ingress.hosts[0].paths[0].path: /
-      ingress.hosts[0].paths[0].pathType: Prefix
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /
+              pathType: Prefix
       labels.standard.name: false
     asserts:
       - isNull:
@@ -267,9 +271,11 @@ tests:
     template: ingress.yaml
     set:
       ingress.enabled: true
-      ingress.hosts[0].host: app.example.com
-      ingress.hosts[0].paths[0].path: /
-      ingress.hosts[0].paths[0].pathType: Prefix
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /
+              pathType: Prefix
     asserts:
       - equal:
           path: metadata.annotations["argocd.argoproj.io/sync-wave"]

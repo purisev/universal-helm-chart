@@ -121,3 +121,98 @@ tests:
     asserts:
       - isNull:
           path: spec.tls
+
+  - it: should render multiple hosts in sorted order from a map
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        zeta.example.com:
+          paths:
+            - path: /z
+              pathType: Prefix
+        alpha.example.com:
+          paths:
+            - path: /a
+              pathType: Prefix
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 2
+      - equal:
+          path: spec.rules[0].host
+          value: alpha.example.com
+      - equal:
+          path: spec.rules[1].host
+          value: zeta.example.com
+
+  - it: should use map key as TLS secretName
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /
+              pathType: Prefix
+      ingress.tls:
+        app-tls:
+          hosts:
+            - app.example.com
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: app-tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: app.example.com
+
+  - it: should render multi-ingress map entries with separate ingress resources
+    set:
+      ingresses:
+        internal:
+          enabled: true
+          ingressClassName: nginx-internal
+          hosts:
+            internal.example.com:
+              paths:
+                - path: /
+                  pathType: Prefix
+        external:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            external.example.com:
+              paths:
+                - path: /
+                  pathType: Prefix
+    asserts:
+      - hasDocuments:
+          count: 2
+      - matchRegex:
+          path: metadata.name
+          pattern: -external$
+        documentIndex: 0
+      - matchRegex:
+          path: metadata.name
+          pattern: -internal$
+        documentIndex: 1
+
+  - it: should preserve declared path order inside a host (not alphabetical)
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /b
+              pathType: Prefix
+            - path: /a
+              pathType: Prefix
+    asserts:
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 2
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /b
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: /a

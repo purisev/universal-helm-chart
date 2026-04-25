@@ -289,3 +289,60 @@ tests:
       - lengthEqual:
           path: spec.ports
           count: 1
+
+  - it: should render service ports from a map keyed by name in sorted order
+    values:
+      - fixtures/service-multiport.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+      - equal:
+          path: spec.ports[1].port
+          value: 9090
+
+  - it: should keep http first and metrics last around alphabetically-sorted middle ports
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.ports:
+        admin:
+          port: 8081
+          targetPort: 8081
+        metrics:
+          port: 9090
+          targetPort: 9090
+        http:
+          port: 80
+          targetPort: 8080
+        zzz-debug:
+          port: 9999
+          targetPort: 9999
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 4
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[1].name
+          value: admin
+      - equal:
+          path: spec.ports[2].name
+          value: zzz-debug
+      - equal:
+          path: spec.ports[3].name
+          value: metrics

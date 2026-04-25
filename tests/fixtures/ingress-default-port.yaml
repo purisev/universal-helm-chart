@@ -1,6 +1,6 @@
 ingress:
   enabled: true
   hosts:
-    - host: example.com
+    example.com:
       paths:
         - path: /

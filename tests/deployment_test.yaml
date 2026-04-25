@@ -155,10 +155,10 @@ tests:
       securityContext:
         allowPrivilegeEscalation: false
       envSecrets:
-        - name: shared-secret
+        - shared-secret
       volumeMounts:
         web:
-          - name: app-config
+          app-config:
             mountPath: /etc/config
       deployments:
         web:
@@ -177,13 +177,13 @@ tests:
                 - -c
                 - /fluent-bit/etc/fluent-bit.conf
               envSecrets:
-                - name: fluent-secret
+                - fluent-secret
               ports:
-                - name: metrics
+                metrics:
                   containerPort: 2020
                   protocol: TCP
               volumeMounts:
-                - name: local-only
+                local-only:
                   mountPath: /etc/metrics
     asserts:
       - equal:
@@ -224,7 +224,7 @@ tests:
         tag: latest
       volumeMounts:
         web:
-          - name: app-config
+          app-config:
             mountPath: /etc/config
       deployments:
         web:
@@ -237,7 +237,7 @@ tests:
           sidecars:
             fluent-bit:
               volumeMounts:
-                - name: local-only
+                local-only:
                   mountPath: /etc/metrics
     asserts:
       - equal:
@@ -515,13 +515,14 @@ tests:
       - isNull:
           path: spec.template.spec.containers[0].volumeMounts[1]
 
-  - it: should resolve configMapRef shorthand in envConfigMaps
+  - it: should resolve chart-owned configMap name in envConfigMaps
     set:
       image.repository: nginx
       image.tag: latest
       configMaps.env-config.enabled: true
       configMaps.env-config.data.LOG_LEVEL: info
-      envConfigMaps[0].configMapRef: env-config
+      envConfigMaps:
+        - env-config
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -531,6 +532,18 @@ tests:
       - matchRegex:
           path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
           pattern: -env-config$
+
+  - it: should leave external envConfigMaps name as-is when not in configMaps
+    set:
+      image.repository: nginx
+      image.tag: latest
+      envConfigMaps:
+        - external-cm
+      deployments.web.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
+          value: external-cm
 
   - it: should propagate inherit.configMapMount false to sidecars
     set:
@@ -556,7 +569,8 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      envConfigMaps[0].name: shared-config
+      envConfigMaps:
+        - shared-config
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -571,13 +585,15 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      envConfigMaps[0].name: global-config
+      envConfigMaps:
+        - global-config
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
       deployments.web.service.targetPort: 8080
-      deployments.web.envConfigMaps[0].name: web-config
+      deployments.web.envConfigMaps:
+        - web-config
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
@@ -590,7 +606,8 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      envConfigMaps[0].name: global-config
+      envConfigMaps:
+        - global-config
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -605,14 +622,16 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      envConfigMaps[0].name: global-config
+      envConfigMaps:
+        - global-config
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
       deployments.web.service.targetPort: 8080
       deployments.web.inherit.configMaps: false
-      deployments.web.envConfigMaps[0].name: web-only-config
+      deployments.web.envConfigMaps:
+        - web-only-config
     asserts:
       - equal:
           path: spec.template.spec.containers[0].envFrom[0].configMapRef.name
@@ -624,7 +643,8 @@ tests:
     set:
       image.repository: nginx
       image.tag: latest
-      envConfigMaps[0].name: global-config
+      envConfigMaps:
+        - global-config
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -961,3 +981,108 @@ tests:
       - lengthEqual:
           path: spec.template.spec.containers[0].ports
           count: 1
+
+  - it: should render imagePullSecrets as name entries
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      imagePullSecrets:
+        - regcred-prod
+        - regcred-mirror
+      deployments.web.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.imagePullSecrets
+          value:
+            - name: regcred-prod
+            - name: regcred-mirror
+
+  - it: should omit imagePullSecrets key when list is empty
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+    asserts:
+      - notExists:
+          path: spec.template.spec.imagePullSecrets
+
+  - it: should render root volumes from a map keyed by name in sorted order
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      volumes:
+        zeta:
+          emptyDir: {}
+        alpha:
+          configMap:
+            name: my-cm
+      deployments.web.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: alpha
+      - equal:
+          path: spec.template.spec.volumes[0].configMap.name
+          value: my-cm
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: zeta
+      - exists:
+          path: spec.template.spec.volumes[1].emptyDir
+
+  - it: should render volumeMounts as map keyed by name in sorted order
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      volumes:
+        cache:
+          emptyDir: {}
+        config:
+          configMap:
+            name: my-cm
+      volumeMounts:
+        web:
+          config:
+            mountPath: /etc/app
+            readOnly: true
+          cache:
+            mountPath: /tmp/cache
+      deployments.web.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].name
+          value: cache
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[0].mountPath
+          value: /tmp/cache
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].name
+          value: config
+      - equal:
+          path: spec.template.spec.containers[0].volumeMounts[1].readOnly
+          value: true
+
+  - it: should render workload-local volumes merged with root volumes
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      volumes:
+        shared:
+          emptyDir: {}
+      deployments:
+        web:
+          enabled: true
+          volumes:
+            local:
+              configMap:
+                name: web-cm
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.volumes
+          count: 2
+      - equal:
+          path: spec.template.spec.volumes[0].name
+          value: shared
+      - equal:
+          path: spec.template.spec.volumes[1].name
+          value: local
