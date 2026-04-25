@@ -939,3 +939,38 @@ tests:
           path: spec.template.metadata.labels["helm.sh/chart"]
       - isNotNull:
           path: spec.template.metadata.labels["app.kubernetes.io/managed-by"]
+
+  - it: should add metrics container port when exposeService is enabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.targetPort: 9091
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].name
+          value: metrics
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].containerPort
+          value: 9091
+
+  - it: should NOT add metrics container port when metrics.type is pod
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.type: pod
+      deployments.web.metrics.exposeService.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].ports
+          count: 1

@@ -444,6 +444,51 @@
         }
       }
     },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "defaults": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "provider": {
+              "type": "string",
+              "enum": ["prometheus", "victoriametrics"]
+            },
+            "discovery": {
+              "type": "string",
+              "enum": ["crd", "annotations"]
+            },
+            "enabled": { "type": "boolean" },
+            "type": {
+              "type": "string",
+              "enum": ["service", "pod"]
+            },
+            "port": { "type": "string" },
+            "path": { "type": "string" },
+            "scheme": {
+              "type": "string",
+              "enum": ["http", "https"]
+            },
+            "interval": { "type": "string" },
+            "scrapeTimeout": { "type": "string" },
+            "relabelConfigs": { "type": "array" },
+            "basicAuth": { "type": "object" },
+            "headers": { "type": "array" },
+            "exposeService": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "targetPort": { "type": "integer", "minimum": 1, "maximum": 65535 }
+              }
+            }
+          }
+        }
+      }
+    },
     "syncWaves": {
       "type": "object",
       "additionalProperties": false,
