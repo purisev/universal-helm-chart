@@ -197,10 +197,9 @@ monitoring:
     # headers:
     #   - "Authorization: Bearer ..."   # VictoriaMetrics only
 
-# ArgoCD sync-wave ordering for different resource types.
+# ArgoCD sync-wave ordering for resource types that don't expose per-instance settings.
+# Per-job sync-waves are configured inside jobGroups.<group>.hooks.argocd.syncWave.
 syncWaves:
-  jobsSyncWave: "3"
-  databaseJobsSyncWave: "2"
   deploymentSyncWave: "10"
 
 # 10 revisions — matches Kubernetes default; gives safer rollback history.
@@ -238,27 +237,6 @@ envConfigMaps: []
 reloader:
   enabled: true
 
-# Database setup job — runs before application Deployments (lower sync wave).
-dbJob:
-  enabled: false
-  image:
-    repository: ""
-    pullPolicy: IfNotPresent
-    tag: ""
-  imagePullSecrets: []
-  backoffLimit: 3
-  # activeDeadlineSeconds: abort the job if it runs longer than this (prevents infinite hangs).
-  activeDeadlineSeconds: null
-  # ttlSecondsAfterFinished: auto-delete completed jobs after this many seconds.
-  ttlSecondsAfterFinished: 3600
-  env: {}
-  # Sequential tasks executed as initContainers.
-  tasks: {}
-  # Extra annotations merged onto the Job metadata (ArgoCD defaults are always set).
-  metadataAnnotations: {}
-  # Image used for the completion container (signals job success to Kubernetes).
-  completionImage: alpine:3.21
-
 nameOverride: ""
 fullnameOverride: ""
 
@@ -283,9 +261,19 @@ rbac:
 # like Vault agent injection or Datadog admission. Use jobPodAnnotations for Job-only annotations.
 podAnnotations: {}
 
-# Annotations added exclusively to pod templates of Jobs (dbJob, initJob, postSync) and CronJobs.
-# Merged with podAnnotations — values here take precedence.
+# Annotations added exclusively to pod templates of Jobs and CronJobs from jobGroups.
+# Merged with podAnnotations — values here take precedence. Effective resolution order
+# (highest wins): jobGroups.<g>.jobs.<j>.podAnnotations → jobGroups.<g>.podAnnotations →
+# jobPodAnnotations → podAnnotations. Changes propagate into the jobGroups hash by
+# default, so adding/removing an injection annotation (Vault, Datadog, etc.) recreates
+# the affected Jobs. Set jobGroups.<g>.hashIncludePodAnnotations: false to opt out.
 jobPodAnnotations: {}
+
+# Image used for the trailing "job-completed" container in tasks-mode jobGroups (the
+# tiny container whose only job is to echo SUCCESS so the Job pod reports completion).
+# Override per group/job via jobGroups.<g>.completionImage; override globally for all
+# jobGroups (e.g. air-gapped clusters with internal mirrors) here.
+jobCompletionImage: alpine:3.21
 
 # Secure pod-level defaults: run as a non-root user, enable RuntimeDefault seccomp profile.
 # Meets Kubernetes Pod Security Standards "Restricted" level.
@@ -355,52 +343,131 @@ configMaps: {}
 #     data:                         # no mountPath — use via envConfigMaps
 #       LOG_LEVEL: info
 
-# Init job — runs after dbJob but before Deployments (Sync hook).
-initJob:
-  enabled: false
-  backoffLimit: 3
-  # activeDeadlineSeconds: abort the job if it runs longer than this (prevents infinite hangs).
-  activeDeadlineSeconds: null
-  # ttlSecondsAfterFinished: auto-delete completed jobs after this many seconds.
-  ttlSecondsAfterFinished: 3600
-  env: {}
-  # Sequential tasks executed as initContainers.
-  tasks: {}
-  # Extra annotations merged onto the Job metadata (ArgoCD defaults are always set).
-  metadataAnnotations: {}
-  # Image used for the completion container (signals job success to Kubernetes).
-  completionImage: alpine:3.21
-
-# PostSync hook jobs — run after a successful ArgoCD Sync.
-# Each job has its own image and command.
-# https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/
-postSync:
-  enabled: false
-  syncWave: "0"
-  backoffLimit: 1
-  hookDeletePolicy: HookSucceeded
-  # ttlSecondsAfterFinished: fallback cleanup for non-ArgoCD environments.
-  ttlSecondsAfterFinished: 600
-  env: {}
-  metadataAnnotations: {}
-  jobs: {}
-  # Example:
-  # jobs:
-  #   notify-slack:
-  #     enabled: true
-  #     image:
-  #       repository: curlimages/curl
-  #       tag: latest
-  #       pullPolicy: IfNotPresent
-  #     command: |
-  #       curl -sS -X POST -H 'Content-type: application/json' \
-  #         --data '{"text":"Deploy OK"}' https://hooks.slack.com/...
-  #   smoke-check:
-  #     enabled: true
-  #     image:
-  #       repository: alpine
-  #       tag: "3"
-  #     command: wget -q -O- http://myapp-web:80/health || exit 1
+# Unified Job / CronJob configuration. Each top-level key is a "group" — a logical bundle
+# of one-or-more jobs sharing image, env, hooks and other params. Each job inside `jobs:`
+# becomes a separate Job (or CronJob) resource. Per-job fields override group fields.
+#
+# Resource name: "{release}-{group[:8]}-{job}-{sha8}" where sha8 is computed from the
+# spec fields that affect Job behavior (image, command, env, volumes, resources, tasks, ...).
+# When the spec doesn't change, the name doesn't change → ArgoCD/Flux/Helm see the resource
+# as already in desired state and don't re-run it. Old Jobs (from previous specs) are cleaned
+# up via ttlSecondsAfterFinished. The chart enforces fail-fast on configurations that would
+# break this contract (e.g. hashSuffix=true together with deletePolicy that removes the Job
+# after success — use hashSuffix: false or a different deletePolicy in that case).
+#
+# `kind` is set on the group only (Job | CronJob); per-job override is intentionally not
+# supported. Build separate groups when you need both Job and CronJob members.
+#
+# `podAnnotations` (effective merge of root podAnnotations + root jobPodAnnotations + group
+# + job) participate in the hash by default, so adding a Vault/Datadog injection annotation
+# recreates Jobs. Set hashIncludePodAnnotations: false on the group to opt out (useful when
+# a mutating webhook adds annotations post-render and you don't want spurious recreations).
+#
+# === Mutable image tags (dev / stage / main) ===
+# The hash is computed from the rendered spec text. If image.tag is "dev" and a new image
+# is pushed under the same tag, the rendered string is unchanged → hash is unchanged →
+# the Job is NOT re-created and migrations/init scripts will NOT run on the new image.
+# pullPolicy: Always doesn't help — it only matters when a Pod is actually created.
+#
+# Recommended setups:
+#
+# 1. ArgoCD Image Updater with `update-strategy: digest` (preferred for mutable tags):
+#    Image Updater polls the registry, detects a new digest under the same tag, and
+#    rewrites image.tag to "dev@sha256:..." via parameter overrides on the Application.
+#    The digest becomes part of the rendered spec → hash changes → Job recreated.
+#    No chart changes required (k8s natively understands "repo:tag@sha256:..." form).
+#    Example annotations on the Application CR:
+#      argocd-image-updater.argoproj.io/image-list: migrator=myrepo/migrator
+#      argocd-image-updater.argoproj.io/migrator.update-strategy: digest
+#      argocd-image-updater.argoproj.io/migrator.allow-tags: regexp:^dev$
+#      argocd-image-updater.argoproj.io/migrator.helm.image-name: jobGroups.db.image.repository
+#      argocd-image-updater.argoproj.io/migrator.helm.image-tag: jobGroups.db.image.tag
+#      argocd-image-updater.argoproj.io/write-back-method: argocd
+#
+# 2. Immutable tags (semver / git-sha): just works — every release has a unique tag,
+#    hash naturally changes between deploys.
+#
+# 3. No Image Updater + mutable tags: opt out of idempotency on the affected groups by
+#    setting hashSuffix: false and using a delete policy that recreates on every sync
+#    (e.g. argocd hooks.argocd.deletePolicy: BeforeHookCreation, or helm
+#    hooks.helm.deletePolicy: before-hook-creation). The Job will run on every sync.
+jobGroups: {}
+# Example covering all features:
+# jobGroups:
+#   db:                                    # group name (truncated to 8 chars in resource name)
+#     enabled: true
+#     kind: Job                            # default Job; or CronJob
+#     hooks:
+#       argocd:                            # rendered as argocd.argoproj.io/* annotations
+#         hook: Sync                       # "" | PreSync | Sync | PostSync | SyncFail
+#         syncWave: "2"
+#         deletePolicy: ""                 # "" | HookSucceeded | HookFailed | BeforeHookCreation
+#       helm:                              # rendered as helm.sh/* annotations
+#         hook: pre-install,pre-upgrade
+#         weight: "-5"
+#         deletePolicy: hook-succeeded     # "" | before-hook-creation | hook-succeeded | hook-failed
+#     image:
+#       repository: my/migrator
+#       tag: v1
+#       pullPolicy: IfNotPresent
+#     env: { LOG_LEVEL: info }
+#     envSecrets: []
+#     envConfigMaps: []
+#     inherit:
+#       env: { global: true, root: true }
+#       configMaps: true
+#     backoffLimit: 3
+#     ttlSecondsAfterFinished: 3600
+#     activeDeadlineSeconds: null
+#     restartPolicy: Never                 # Never | OnFailure
+#     securityContext: {}
+#     resources:
+#       requests: { cpu: 100m, memory: 128Mi }
+#       limits: { memory: 256Mi }
+#     volumes: []
+#     volumeMounts: []
+#     useRootVolumes: true
+#     useRootVolumeMounts: true
+#     nodeSelector: {}
+#     affinity: {}
+#     tolerations: []
+#     metadataAnnotations: {}
+#     podAnnotations: {}
+#     hashSuffix: true                     # default true; set false for stable names
+#     hashIncludePodAnnotations: true      # default true; affects whether podAnnotations changes recreate the Job
+#     jobs:
+#       migrate:
+#         enabled: true
+#         tasks:                           # tasks-mode: each becomes initContainer (sortAlpha)
+#           schema:
+#             enabled: true
+#             command: |
+#               psql -c "CREATE TABLE IF NOT EXISTS ..."
+#           seed:
+#             enabled: true
+#             args: ["seed", "--rows=100"]
+#         completionImage: alpine:3.21
+#       smoke-check:
+#         enabled: true
+#         # single-container mode (mutually exclusive with tasks)
+#         command: wget -q -O- http://myapp-web/health || exit 1
+#         # per-job overrides
+#         backoffLimit: 1
+#         hooks:
+#           argocd: { syncWave: "3" }
+#   nightly:
+#     enabled: true
+#     kind: CronJob                        # CronJobs ignore hooks; schedule is per-job
+#     image: { repository: my/cleaner, tag: v1 }
+#     jobs:
+#       cleanup:
+#         enabled: true
+#         schedule: "0 2 * * *"
+#         timeZone: UTC
+#         concurrencyPolicy: Forbid
+#         successfulJobsHistoryLimit: 3
+#         failedJobsHistoryLimit: 1
+#         command: ./cleanup.sh
 
 ingress:
   enabled: false
@@ -917,38 +984,3 @@ externalSecrets: {}
 #         decodingStrategy: None
 #         metadataPolicy: None
 
-# Map of CronJob workloads. Each key becomes a separate CronJob resource.
-cronJobs: {}
-# Example:
-# cronJobs:
-#   cleanup:
-#     enabled: true
-#     schedule: "0 2 * * *"
-#     timeZone: "UTC"                  # IANA timezone (Kubernetes 1.27+)
-#     concurrencyPolicy: Forbid        # Allow | Forbid | Replace (default: Allow)
-#     successfulJobsHistoryLimit: 3
-#     failedJobsHistoryLimit: 1
-#     startingDeadlineSeconds: 60
-#     backoffLimit: 2
-#     # ttlSecondsAfterFinished: auto-delete completed job pods after this many seconds.
-#     ttlSecondsAfterFinished: 3600
-#     # activeDeadlineSeconds: abort the job if it runs longer than this.
-#     activeDeadlineSeconds: 600
-#     restartPolicy: Never             # Never | OnFailure
-#     command: |
-#       echo "running cleanup"
-#     args: []
-#     env: {}
-#     envSecrets: []
-#     # resources should always be set to prevent BestEffort QoS and enable HPA metrics.
-#     resources:
-#       requests:
-#         cpu: 100m
-#         memory: 128Mi
-#       limits:
-#         memory: 256Mi
-#     # Per-workload image override (falls back to root image.*).
-#     image:
-#       repository: ""
-#       tag: ""
-#       pullPolicy: IfNotPresent
