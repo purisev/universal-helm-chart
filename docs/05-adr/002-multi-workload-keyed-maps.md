@@ -19,7 +19,7 @@ The three workload maps are:
 - `statefulSets` — one StatefulSet + headless Service per key.
 - `jobGroups` — one Job-or-CronJob *group* per key. See [ADR 005](005-jobgroups-unification.md).
 
-The same shape is applied to per-workload sub-collections (e.g. `service.ports`, `volumes`, `volumeMounts`, `sidecars`) — see [ADR 004](004-maps-over-lists.md) for the broader rule.
+The same shape is applied to per-workload sub-collections (e.g. `service.ports`, `volumes`, `volumeMounts`, `sidecars`, `initContainers`) — see [ADR 004](004-maps-over-lists.md) for the broader rule.
 
 ## Consequences
 

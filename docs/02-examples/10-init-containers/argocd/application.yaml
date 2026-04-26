@@ -1,0 +1,69 @@
+# Argo CD Application — single source.
+# Chart and values both live inside this manifest (values inlined under spec.source.helm.values).
+#
+# Apply with:
+#   kubectl apply -f argocd/application.yaml -n argocd
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: init-containers
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: init-containers
+  source:
+    repoURL: ghcr.io/purisev
+    chart: universal-helm-chart
+    targetRevision: 2.0.0
+    helm:
+      releaseName: init-containers
+      values: |
+        deployments:
+          web:
+            enabled: true
+            replicaCount: 1
+            image:
+              repository: nginx
+              tag: "1.27"
+              pullPolicy: IfNotPresent
+            service:
+              enabled: true
+              type: ClusterIP
+              port: 80
+              targetPort: 80
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+            initContainers:
+              01-wait-for-db:
+                image:
+                  repository: busybox
+                  tag: "1.36"
+                  pullPolicy: IfNotPresent
+                command: |
+                  until nc -z postgres.example.svc 5432; do
+                    echo "waiting for postgres..."
+                    sleep 2
+                  done
+              02-migrate:
+                image:
+                  repository: myrepo/migrations
+                  tag: v1.2.3
+                command:
+                  - /bin/migrate
+                  - --database=$(DATABASE_URL)
+                  - --source=file:///etc/migrations
+                envSecrets:
+                  - db-credentials
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
