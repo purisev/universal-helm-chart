@@ -1,7 +1,5 @@
 # Quickstart
 
-> Stub — full walk-through lands in a follow-up PR.
-
 The minimal viable `values.yaml`:
 
 ```yaml
@@ -12,7 +10,8 @@ deployments:
       tag: "1.27"
     service:
       ports:
-        http: 80
+        http:
+          port: 80
 ```
 
 Install:

@@ -219,8 +219,9 @@ integrations:
       # When enabled and `annotations` is empty, the chart applies the default:
       #   reloader.stakater.com/auto: "true"
       # When non-empty, this dict FULLY REPLACES the default — useful to switch
-      # to match-strategy: { "reloader.stakater.com/match": "true" } or to set
-      # reloader.stakater.com/search-cm-only / *-secret-only / etc.
+      # to match-strategy by setting `reloader.stakater.com/match: "true"` (instead
+      # of `auto`) or to add `reloader.stakater.com/search-cm-only` /
+      # `*-secret-only` / etc.
       # The same dict is applied to:
       #   - Deployment / StatefulSet metadata.annotations
       #   - ConfigMap metadata.annotations
@@ -373,8 +374,12 @@ integrations:
       #   - sourceLabels: [__address__]
       #     targetLabel: instance
       # basicAuth:
-      #   password: { name: scrape-secret, key: password }
-      #   username: { name: scrape-secret, key: username }
+      #   password:
+      #     name: scrape-secret
+      #     key: password
+      #   username:
+      #     name: scrape-secret
+      #     key: username
       # headers:
       #   - "Authorization: Bearer ..."   # VictoriaMetrics only
 
@@ -386,8 +391,8 @@ image:
   tag: ""
 
 # List of registry pull secrets. Each entry is the k8s Secret name; the chart wraps
-# it as {name: <s>} for spec.imagePullSecrets[]. Referenced Secrets must already exist
-# in the namespace.
+# it as an object with a `name` field under spec.imagePullSecrets[]. Referenced
+# Secrets must already exist in the namespace.
 # Example:
 #   imagePullSecrets:
 #     - regcred-prod
@@ -418,7 +423,7 @@ statefulSetUpdateStrategy:
 
 # Secrets mounted as environment variables in all containers via envFrom[].secretRef.
 # List of k8s Secret names (must already exist in the namespace). The chart wraps each
-# entry as {secretRef: {name: <s>}} for envFrom.
+# entry as a `secretRef` object pointing at the Secret name, under envFrom[].
 # Example:
 #   envSecrets:
 #     - db-creds
@@ -427,16 +432,19 @@ envSecrets: []
 
 # ConfigMaps mounted as environment variables in all containers via envFrom[].configMapRef.
 # List of names. Resolution per entry:
-#   - if the name matches a key in `.Values.configMaps` → chart-owned: rendered as
-#     {name: <fullname>-<name>} (uses the chart-managed CM resource);
-#   - otherwise → external CM: rendered as {name: <name>} as-is.
+#   - if the name matches a key in `.Values.configMaps` → chart-owned: the
+#     reference points at the chart-managed ConfigMap "<release-fullname>-<name>";
+#   - otherwise → external CM: the reference points at "<name>" as-is.
 # On collision (an external CM and a chart-owned configMaps.<name> with the same name)
 # the chart-owned one wins and the external CM is shadowed. Two CMs with the same logical
 # name in one release is itself a smell — pick distinct names if you need both.
 # Disable per-workload inheritance with inherit.configMaps: false.
 # Example:
 #   configMaps:
-#     app-config: { enabled: true, data: { ... } }
+#     app-config:
+#       enabled: true
+#       data:
+#         LOG_LEVEL: info
 #   envConfigMaps:
 #     - app-config        # chart-owned → <fullname>-app-config
 #     - external-cm       # external → external-cm
@@ -642,11 +650,15 @@ jobGroups: {}
 #       repository: my/migrator
 #       tag: v1
 #       pullPolicy: IfNotPresent
-#     env: { LOG_LEVEL: info }
+#     env:
+#       LOG_LEVEL:
+#         value: info
 #     envSecrets: []
 #     envConfigMaps: []
 #     inherit:
-#       env: { global: true, root: true }
+#       env:
+#         global: true
+#         root: true
 #       configMaps: true
 #     backoffLimit: 3
 #     ttlSecondsAfterFinished: 3600
@@ -654,8 +666,11 @@ jobGroups: {}
 #     restartPolicy: Never                 # Never | OnFailure
 #     securityContext: {}
 #     resources:
-#       requests: { cpu: 100m, memory: 128Mi }
-#       limits: { memory: 256Mi }
+#       requests:
+#         cpu: 100m
+#         memory: 128Mi
+#       limits:
+#         memory: 256Mi
 #     volumes: {}                           # map keyed by volume name (see root `volumes`)
 #     volumeMounts: {}                      # map keyed by mount name (see root `volumeMounts`)
 #     useRootVolumes: true
@@ -670,14 +685,20 @@ jobGroups: {}
 #     jobs:
 #       migrate:
 #         enabled: true
-#         tasks:                           # tasks-mode: each becomes initContainer (sortAlpha)
-#           schema:
+#         # tasks-mode: each task becomes an initContainer. Kubernetes runs
+#         # initContainers sequentially in declared order, and the chart sorts
+#         # the tasks map alphabetically — prefix names with 01-, 02-, ... when
+#         # ordering matters.
+#         tasks:
+#           01-schema:
 #             enabled: true
 #             command: |
 #               psql -c "CREATE TABLE IF NOT EXISTS ..."
-#           seed:
+#           02-seed:
 #             enabled: true
-#             args: ["seed", "--rows=100"]
+#             args:
+#               - seed
+#               - --rows=100
 #         completionImage: alpine:3.21
 #       smoke-check:
 #         enabled: true
@@ -686,11 +707,14 @@ jobGroups: {}
 #         # per-job overrides
 #         backoffLimit: 1
 #         hooks:
-#           argocd: { syncWave: "3" }
+#           argocd:
+#             syncWave: "3"
 #   nightly:
 #     enabled: true
 #     kind: CronJob                        # CronJobs ignore hooks; schedule is per-job
-#     image: { repository: my/cleaner, tag: v1 }
+#     image:
+#       repository: my/cleaner
+#       tag: v1
 #     jobs:
 #       cleanup:
 #         enabled: true

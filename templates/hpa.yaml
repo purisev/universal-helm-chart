@@ -5,7 +5,9 @@
 {{- $wl := index $deploymentSpecs $wlName }}
 {{- if and (hasKey $wl "enabled") $wl.enabled }}
 {{- if and $wl.hpa $wl.hpa.enabled }}
-{{- if not (and $wl.keda $wl.keda.enabled) }}
+{{- if and $wl.keda $wl.keda.enabled }}
+{{- fail (printf "deployments.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -32,7 +34,6 @@ spec:
   behavior:
     {{- toYaml $wl.hpa.behavior | nindent 4 }}
   {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

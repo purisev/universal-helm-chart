@@ -1,7 +1,5 @@
 # Installation
 
-> Stub — full prose lands in a follow-up PR. Until then, the [`02-examples/01-minimal/`](../02-examples/01-minimal/) folder is enough to install the chart.
-
 ## OCI registry
 
 The chart is published to GHCR as an OCI artifact:

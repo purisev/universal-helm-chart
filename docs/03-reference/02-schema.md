@@ -8,8 +8,7 @@
 - enum constraints (`pullPolicy: Always | IfNotPresent | Never`, `provider: prometheus | victoriametrics`, …);
 - closed objects (`additionalProperties: false`) — typoed keys at the leaf are rejected;
 - minimum / maximum on integers;
-- regex on map keys (port names ≤15 chars, DNS-1123 labels, …);
-- conditional shape via `if/then` (e.g. some sub-fields become required when a feature is enabled).
+- regex on map keys (port names ≤15 chars, DNS-1123 labels, …).
 
 ## What the schema doesn't catch
 

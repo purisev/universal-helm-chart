@@ -18,8 +18,13 @@ The smallest viable `values.yaml`:
 ```yaml
 deployments:
   api:
-    image: { repository: nginx, tag: "1.27" }
-    service: { ports: { http: 80 } }
+    image:
+      repository: nginx
+      tag: "1.27"
+    service:
+      ports:
+        http:
+          port: 80
 ```
 
 ## Documentation

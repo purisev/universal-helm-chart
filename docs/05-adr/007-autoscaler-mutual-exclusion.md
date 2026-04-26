@@ -49,4 +49,5 @@ All three are off by default. This is per-workload too — `hpa.enabled`, `keda.
 - `values.yaml` — the `verticalPodAutoscaler` block (chart-wide VPA defaults) and per-workload `hpa` / `keda` / `verticalPodAutoscaler` entries.
 - `templates/hpa.yaml`, `templates/scaledobject.yaml`, `templates/verticalpodautoscaler.yaml`.
 - `templates/deployment.yaml`, `templates/statefulset.yaml` — `spec.replicas` is omitted when an HPA-class scaler is enabled.
-- `tests/deployment_test.yaml` — replica-omission cases; `tests/scaledobject_test.yaml` — KEDA exclusion check.
+- `tests/deployment_test.yaml` — replica-omission cases.
+- `tests/hpa_test.yaml` and `tests/scaledobject_test.yaml` — `expectFail` cases that pin the HPA + KEDA fail-fast guard.
