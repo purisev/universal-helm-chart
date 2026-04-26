@@ -202,3 +202,36 @@ tests:
         rules: []
     asserts:
       - notFailedTemplate: {}
+
+  - it: should reject metadataAnnotations on the root .Values.httpRoute (silent no-op)
+    # All six route callsites pass `extra: $route.annotations` to the
+    # uhc.metadataAnnotations helper — there is no callsite that passes
+    # `$route.metadataAnnotations`. The field was previously accepted in the
+    # full routeEntry shape but never rendered. Drop it from the schema; users
+    # who actually want chart annotations on the rendered route already have
+    # `annotations` for that.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      httpRoute:
+        enabled: true
+        metadataAnnotations:
+          foo: bar
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'metadataAnnotations' not allowed"
+
+  - it: should reject metadataAnnotations on a plural-map httpRoutes entry (silent no-op)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      httpRoutes:
+        internal:
+          enabled: true
+          metadataAnnotations:
+            foo: bar
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'metadataAnnotations' not allowed"

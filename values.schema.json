@@ -206,7 +206,6 @@
         "enabled": {"type": "boolean"},
         "priority": {"type": "integer", "minimum": 0},
         "annotations": {"type": "object"},
-        "metadataAnnotations": {"type": "object"},
         "parentRefs": {"type": "array"},
         "hostnames": {
           "type": "array",
