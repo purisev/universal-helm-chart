@@ -19,6 +19,9 @@ serviceName defaults to <fullname>-<workloadName>; servicePort defaults to workl
   {{- end }}
 {{- end }}
 {{- if or .Values.grpcRoute.enabled (get $wlState "has") -}}
+{{- if not .Values.grpcRoute.parentRefs -}}
+{{- fail "grpcRoute is enabled (root or by a workload) but .Values.grpcRoute.parentRefs is empty. The chart's singleton GRPCRoute model takes parentRefs from the root entry and shares it across every merged per-workload rule — without a parentRef the rendered GRPCRoute attaches to no Gateway and routes no traffic. Set .Values.grpcRoute.parentRefs to the Gateway(s) the route should bind to, or use the plural-map shape (.Values.grpcRoutes.<name>) where each entry carries its own parentRefs." -}}
+{{- end -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
@@ -115,6 +118,9 @@ Mirrors the httpRoutes map — useful when different workloads need separate gRP
 {{- range $routeName := keys ($ctx.Values.grpcRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.grpcRoutes $routeName }}
 {{- if and (hasKey $route "enabled") $route.enabled }}
+{{- if not $route.parentRefs -}}
+{{- fail (printf "grpcRoutes.%s is enabled but parentRefs is empty. Each plural-map GRPCRoute carries its own parentRefs — without a parentRef the rendered GRPCRoute attaches to no Gateway and routes no traffic. Set grpcRoutes.%s.parentRefs to the Gateway(s) the route should bind to." $routeName $routeName) -}}
+{{- end -}}
 {{- $grFullName := printf "%s-%s" $releaseName $routeName }}
 {{- include "uhc.assertNameLength" (dict "name" $grFullName "kind" (printf "GRPCRoute %q" $routeName)) }}
 ---

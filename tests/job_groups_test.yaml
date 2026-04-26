@@ -894,3 +894,19 @@ tests:
       - isNull:
           path: spec.template.spec.volumes[0].emptyDir
 
+
+  - it: should respect backoffLimit=0 (try once, no retry)
+    # `default 3 $merged.backoffLimit` would have collapsed 0 to 3, defeating
+    # the canonical 'no retry' use case for migrations where retry is dangerous.
+    set:
+      image.repository: nginx
+      image.tag: latest
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.backoffLimit: 0
+    asserts:
+      - equal:
+          path: spec.backoffLimit
+          value: 0

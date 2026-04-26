@@ -235,3 +235,44 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "additional properties 'metadataAnnotations' not allowed"
+
+  - it: should reject typo inside an ESO secretStore vault provider
+    # Closing the ESO secretStore shape catches typos like `serverr` (extra r)
+    # in the provider config — pre-fix schema accepted any object here.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      integrations:
+        eso:
+          enabled: true
+          secretStores:
+            vault:
+              enabled: true
+              provider:
+                vault:
+                  serverr: https://vault.example.com
+                  path: secret
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'serverr' not allowed"
+
+  - it: should reject typo inside an ESO externalSecret data entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      integrations:
+        eso:
+          enabled: true
+          externalSecrets:
+            db:
+              enabled: true
+              secretStore: vault
+              data:
+                PASSWORD:
+                  remoteKeey: my/secret
+                  property: password
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'remoteKeey' not allowed"

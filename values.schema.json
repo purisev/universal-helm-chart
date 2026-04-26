@@ -223,6 +223,132 @@
         "rules": {"type": "array"}
       }
     },
+    "esoSecretStoreEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "kind": {"type": "string", "enum": ["SecretStore", "ClusterSecretStore"]},
+        "provider": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "vault": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "server": {"type": "string"},
+                "path": {"type": "string"},
+                "version": {"type": "string", "enum": ["v1", "v2"]},
+                "namespace": {"type": "string"},
+                "auth": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "jwt": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "mountPath": {"type": "string"},
+                        "role": {"type": "string"},
+                        "serviceAccountRef": {"type": "string"},
+                        "audiences": {"type": "array", "items": {"type": "string"}},
+                        "expirationSeconds": {"type": "integer", "minimum": 1}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "aws": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "service": {"type": "string", "enum": ["SecretsManager", "ParameterStore"]},
+                "region": {"type": "string"},
+                "auth": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "jwt": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "serviceAccountRef": {"type": "string"},
+                        "audiences": {"type": "array", "items": {"type": "string"}}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "gcpsm": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "projectID": {"type": "string"},
+                "auth": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "workloadIdentity": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "clusterLocation": {"type": "string"},
+                        "clusterName": {"type": "string"},
+                        "clusterProjectID": {"type": "string"},
+                        "serviceAccountRef": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "esoExternalSecretRemoteRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "remoteKey": {"type": "string"},
+        "property": {"type": "string"},
+        "conversionStrategy": {"type": "string", "enum": ["Default", "Unicode"]},
+        "decodingStrategy": {"type": "string", "enum": ["None", "Auto", "Base64", "Base64URL"]},
+        "metadataPolicy": {"type": "string", "enum": ["None", "Fetch"]}
+      }
+    },
+    "esoExternalSecretEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "secretStore": {"type": "string"},
+        "storeKind": {"type": "string", "enum": ["SecretStore", "ClusterSecretStore"]},
+        "refreshInterval": {"type": "string"},
+        "targetName": {"type": "string"},
+        "type": {"type": "string"},
+        "data": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/esoExternalSecretRemoteRef"}
+        },
+        "dataFrom": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "remoteKey": {"type": "string"},
+              "conversionStrategy": {"type": "string", "enum": ["Default", "Unicode"]},
+              "decodingStrategy": {"type": "string", "enum": ["None", "Auto", "Base64", "Base64URL"]},
+              "metadataPolicy": {"type": "string", "enum": ["None", "Fetch"]}
+            }
+          }
+        }
+      }
+    },
     "ingressShape": {
       "type": "object",
       "additionalProperties": false,
@@ -919,8 +1045,14 @@
           "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
-            "secretStores": { "type": "object" },
-            "externalSecrets": { "type": "object" }
+            "secretStores": {
+              "type": "object",
+              "additionalProperties": {"$ref": "#/$defs/esoSecretStoreEntry"}
+            },
+            "externalSecrets": {
+              "type": "object",
+              "additionalProperties": {"$ref": "#/$defs/esoExternalSecretEntry"}
+            }
           }
         },
         "monitoring": {

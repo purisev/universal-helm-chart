@@ -23,7 +23,11 @@ spec:
     name: {{ $releaseName }}-{{ $wlName }}
     kind: Deployment
     envSourceContainerName: {{ $wlName }}
-  minReplicaCount: {{ $wl.keda.minReplicas | default 1 }}
+  {{- $minReplicas := 1 }}
+  {{- if hasKey $wl.keda "minReplicas" }}
+  {{- $minReplicas = $wl.keda.minReplicas }}
+  {{- end }}
+  minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "deployments.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
     {{- toYaml $wl.keda.triggers | nindent 4 }}
@@ -61,7 +65,11 @@ spec:
     name: {{ $releaseName }}-{{ $wlName }}
     kind: StatefulSet
     envSourceContainerName: {{ $wlName }}
-  minReplicaCount: {{ $wl.keda.minReplicas | default 1 }}
+  {{- $minReplicas := 1 }}
+  {{- if hasKey $wl.keda "minReplicas" }}
+  {{- $minReplicas = $wl.keda.minReplicas }}
+  {{- end }}
+  minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "statefulSets.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
     {{- toYaml $wl.keda.triggers | nindent 4 }}

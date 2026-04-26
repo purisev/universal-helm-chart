@@ -235,3 +235,16 @@ tests:
       - equal:
           path: spec.applicationRefs[0].images[1].alias
           value: zeta
+
+  - it: should fail fast when manual mode (applicationRefs) is mixed with shorthand fields
+    set:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.applicationRefs:
+        - namePattern: my-app
+          images:
+            - alias: app
+              imageName: nginx
+      integrations.argocd.imageUpdater.appNamePattern: stale-shorthand
+    asserts:
+      - failedTemplate:
+          errorPattern: "manual mode .* and shorthand mode .* are mutually exclusive"

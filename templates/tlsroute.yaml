@@ -20,6 +20,12 @@ hostnames is required — must be set at root tlsRoute level.
   {{- end }}
 {{- end }}
 {{- if or .Values.tlsRoute.enabled (get $wlState "has") -}}
+{{- if not .Values.tlsRoute.parentRefs -}}
+{{- fail "tlsRoute is enabled (root or by a workload) but .Values.tlsRoute.parentRefs is empty. The chart's singleton TLSRoute model takes parentRefs from the root entry and shares it across every merged per-workload rule — without a parentRef the rendered TLSRoute attaches to no Gateway and routes no traffic. Set .Values.tlsRoute.parentRefs to the Gateway(s) the route should bind to, or use the plural-map shape (.Values.tlsRoutes.<name>) where each entry carries its own parentRefs." -}}
+{{- end -}}
+{{- if not .Values.tlsRoute.hostnames -}}
+{{- fail "tlsRoute is enabled (root or by a workload) but .Values.tlsRoute.hostnames is empty. TLSRoute matches purely by SNI hostname — without hostnames the rendered TLSRoute terminates nothing. Set .Values.tlsRoute.hostnames to the SNI value(s) the route should match." -}}
+{{- end -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
@@ -98,6 +104,12 @@ Useful when multiple hostnames or listeners require separate TLS routes.
 {{- range $routeName := keys ($ctx.Values.tlsRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.tlsRoutes $routeName }}
 {{- if and (hasKey $route "enabled") $route.enabled }}
+{{- if not $route.parentRefs -}}
+{{- fail (printf "tlsRoutes.%s is enabled but parentRefs is empty. Each plural-map TLSRoute carries its own parentRefs — without a parentRef the rendered TLSRoute attaches to no Gateway and routes no traffic. Set tlsRoutes.%s.parentRefs to the Gateway(s) the route should bind to." $routeName $routeName) -}}
+{{- end -}}
+{{- if not $route.hostnames -}}
+{{- fail (printf "tlsRoutes.%s is enabled but hostnames is empty. TLSRoute matches purely by SNI hostname — without hostnames the rendered TLSRoute terminates nothing. Set tlsRoutes.%s.hostnames to the SNI value(s) the route should match." $routeName $routeName) -}}
+{{- end -}}
 {{- $tlsFullName := printf "%s-%s" $releaseName $routeName }}
 {{- include "uhc.assertNameLength" (dict "name" $tlsFullName "kind" (printf "TLSRoute %q" $routeName)) }}
 ---

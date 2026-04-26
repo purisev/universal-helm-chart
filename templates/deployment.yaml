@@ -18,7 +18,11 @@ metadata:
 spec:
   {{- if not (and $wl.keda $wl.keda.enabled) }}
   {{- if not (and $wl.hpa $wl.hpa.enabled) }}
-  replicas: {{ $wl.replicaCount | default 1 }}
+  {{- $replicas := 1 }}
+  {{- if hasKey $wl "replicaCount" }}
+  {{- $replicas = $wl.replicaCount }}
+  {{- end }}
+  replicas: {{ $replicas }}
   {{- end }}
   {{- end }}
   progressDeadlineSeconds: {{ default (default 600 $ctx.Values.progressDeadlineSeconds) $wl.progressDeadlineSeconds | int }}

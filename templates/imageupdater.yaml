@@ -1,4 +1,8 @@
 {{- if .Values.integrations.argocd.imageUpdater.enabled }}
+{{- $iu := .Values.integrations.argocd.imageUpdater -}}
+{{- if and $iu.applicationRefs (or $iu.appNamePattern $iu.commonUpdateSettings $iu.writeBackConfig $iu.images) -}}
+{{- fail "integrations.argocd.imageUpdater: manual mode (applicationRefs) and shorthand mode (appNamePattern / commonUpdateSettings / writeBackConfig / images) are mutually exclusive. The shorthand fields are only used when applicationRefs is empty (the chart auto-builds a single applicationRef from them); when applicationRefs is set, all settings must be inside each entry, and the top-level shorthand fields are silently ignored. Pick one of the two modes." -}}
+{{- end -}}
 ---
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
