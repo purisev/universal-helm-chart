@@ -5,10 +5,12 @@
 {{- $wl := index $ctx.Values.deployments $wlName -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
 ---
+{{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
+{{- include "uhc.assertNameLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}-config
+  name: {{ $cmFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:
@@ -31,10 +33,12 @@ data:
 {{- $wl := index $ctx.Values.statefulSets $wlName -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
 ---
+{{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
+{{- include "uhc.assertNameLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}-config
+  name: {{ $cmFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:
@@ -57,10 +61,12 @@ data:
 {{- $cm := index $ctx.Values.configMaps $cmName }}
 {{- if and (hasKey $cm "enabled") $cm.enabled }}
 ---
+{{- $cmFullName := printf "%s-%s" $releaseName $cmName }}
+{{- include "uhc.assertNameLength" (dict "name" $cmFullName "kind" (printf "ConfigMap %q" $cmName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $releaseName }}-{{ $cmName }}
+  name: {{ $cmFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:

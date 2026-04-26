@@ -431,3 +431,23 @@ tests:
       - equal:
           path: spec.serviceName
           value: my-existing-headless
+
+  # --- per-workload metadataAnnotations ---
+
+  - it: should render per-workload metadataAnnotations on the StatefulSet object
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          metadataAnnotations:
+            example.com/owner: data-team
+            example.com/criticality: tier-1
+    asserts:
+      - equal:
+          path: metadata.annotations["example.com/owner"]
+          value: data-team
+      - equal:
+          path: metadata.annotations["example.com/criticality"]
+          value: tier-1

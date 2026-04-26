@@ -57,11 +57,13 @@ Allows different ingress controllers for different workloads in the same release
 {{- range $ingressName := keys ($ctx.Values.ingresses | default dict) | sortAlpha }}
 {{- $ing := index $ctx.Values.ingresses $ingressName }}
 {{- if and (hasKey $ing "enabled") $ing.enabled }}
+{{- $ingFullName := printf "%s-%s" $releaseName $ingressName }}
+{{- include "uhc.assertNameLength" (dict "name" $ingFullName "kind" (printf "Ingress %q" $ingressName)) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $releaseName }}-{{ $ingressName }}
+  name: {{ $ingFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:

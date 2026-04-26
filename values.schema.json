@@ -215,6 +215,15 @@
         "rules": {"type": "array"}
       }
     },
+    "workloadRouteEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "priority": {"type": "integer", "minimum": 0},
+        "rules": {"type": "array"}
+      }
+    },
     "ingressShape": {
       "type": "object",
       "additionalProperties": false,
@@ -340,9 +349,9 @@
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/containerEntry"}
         },
-        "httpRoute": {"$ref": "#/$defs/routeEntry"},
-        "grpcRoute": {"$ref": "#/$defs/routeEntry"},
-        "tlsRoute": {"$ref": "#/$defs/routeEntry"},
+        "httpRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "grpcRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "strategy": {"$ref": "#/$defs/strategyShape"},
         "progressDeadlineSeconds": {"type": "integer", "minimum": 1},
         "minReadySeconds": {"type": "integer", "minimum": 0},
@@ -426,9 +435,9 @@
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/containerEntry"}
         },
-        "httpRoute": {"$ref": "#/$defs/routeEntry"},
-        "grpcRoute": {"$ref": "#/$defs/routeEntry"},
-        "tlsRoute": {"$ref": "#/$defs/routeEntry"},
+        "httpRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "grpcRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
         "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
         "volumeClaimTemplates": {"type": "object"},

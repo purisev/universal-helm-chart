@@ -21,7 +21,7 @@ Each `jobGroups.<g>.jobs.<j>` entry produces a Kubernetes Job (or CronJob) named
 <release-fullname>-<group[:8]>-<job>-<sha8>
 ```
 
-where `sha8` is the first 8 hex characters of `sha256` over a deterministic JSON serialisation of the rendered Job/CronJob `spec`. Computed by `templates/_helpers.tpl:uhc.jobGroupHash`.
+where `sha8` is the first 8 hex characters of `sha256` over a deterministic JSON serialisation of the rendered Job/CronJob `spec`. Computed by `templates/_jobs.tpl:uhc.jobGroupHash`.
 
 **What's included in the hash:**
 
@@ -93,7 +93,7 @@ Renders Job `myrelease-db-migrate-3f9a1b2c`. Bump tag to `v2`: Job becomes `myre
 ## References
 
 - `values.yaml` — the `jobGroups` block carries the narrative on Job idempotency, mutable tags, recommended setups, and the `hashSuffix` / `hashIncludePodAnnotations` toggles.
-- `templates/_helpers.tpl` — `uhc.jobGroupHash`, `uhc.jobGroupSpec` (assembles the spec input).
+- `templates/_jobs.tpl` — `uhc.jobGroupHash`, `uhc.jobGroupSpec` (assembles the spec input).
 - `templates/job-groups.yaml`, `templates/cronjob-groups.yaml` — fail-fast guard.
 - Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`.
 - Related: [ADR 005](005-jobgroups-unification.md)

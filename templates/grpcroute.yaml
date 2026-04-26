@@ -115,11 +115,13 @@ Mirrors the httpRoutes map — useful when different workloads need separate gRP
 {{- range $routeName := keys ($ctx.Values.grpcRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.grpcRoutes $routeName }}
 {{- if and (hasKey $route "enabled") $route.enabled }}
+{{- $grFullName := printf "%s-%s" $releaseName $routeName }}
+{{- include "uhc.assertNameLength" (dict "name" $grFullName "kind" (printf "GRPCRoute %q" $routeName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: GRPCRoute
 metadata:
-  name: {{ $releaseName }}-{{ $routeName }}
+  name: {{ $grFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:

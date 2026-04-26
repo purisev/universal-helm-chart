@@ -37,7 +37,7 @@ The CI workflow at `.github/workflows/ci.yaml` runs `helm lint` then `helm unitt
 
 - A new feature lands with tests. PR reviewers can run `helm unittest .` locally in seconds.
 - The fixture catalogue serves as **executable documentation**: reading `tests/fixtures/keda-deployment.yaml` shows a working KEDA + Deployment combination quicker than reading the docs.
-- Regressions are caught before merge. The `_helpers.tpl` is dense; tests are the only practical safety net.
+- Regressions are caught before merge. The helper library (`templates/_labels.tpl`, `_annotations.tpl`, `_env.tpl`, `_workload.tpl`, `_metrics.tpl`, `_jobs.tpl`, `_helpers.tpl`) is dense; tests are the only practical safety net.
 
 **What it costs:**
 

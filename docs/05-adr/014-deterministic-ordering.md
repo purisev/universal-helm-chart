@@ -36,7 +36,7 @@ For `service.ports` and per-container `ports`, the order is:
 "http" (if present)  →  others alphabetically  →  "metrics" (if present)
 ```
 
-Implemented in `templates/_helpers.tpl:uhc.orderedPortNames`. The metrics port auto-injected by `integrations.monitoring.defaults.exposeService` ([ADR 016](016-metrics-port-auto-exposure.md)) is also appended last.
+Implemented in `templates/_workload.tpl:uhc.orderedPortNames`. The metrics port auto-injected by `integrations.monitoring.defaults.exposeService` ([ADR 016](016-metrics-port-auto-exposure.md)) is also appended last.
 
 Rationale: the first port in a Service's `ports[]` is the one that matters most — health probes, kubectl port-forward shorthand, default network-policy assumptions all point at it. Putting "http" first makes the common case consistent. Putting "metrics" last keeps observability ports out of the way of operational reading.
 
@@ -115,7 +115,7 @@ Order in merged HTTPRoute `rules[]`: `z-api` (priority 10), `api` (priority 20),
 
 ## References
 
-- `templates/_helpers.tpl` — `uhc.orderedPortNames`
+- `templates/_workload.tpl` — `uhc.orderedPortNames`
 - `templates/service.yaml`, `templates/deployment.yaml`, `templates/statefulset.yaml` (ports rendering)
 - `templates/httproute.yaml`, `templates/grpcroute.yaml`, `templates/tlsroute.yaml` (rule merge with priority)
 - Tests: `tests/service_test.yaml`, `tests/fixtures/service-multiport.yaml`, `tests/fixtures/httproute-sort.yaml`

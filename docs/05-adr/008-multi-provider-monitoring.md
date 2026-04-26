@@ -83,6 +83,6 @@ deployments:
 
 - `values.yaml` — the `integrations.monitoring.defaults` block.
 - `templates/servicemonitor.yaml`, `templates/podmonitor.yaml`.
-- `templates/_helpers.tpl` — `uhc.metricsProvider`, `uhc.metricsDiscovery`, `uhc.metricsTargetType`, `uhc.metricsExposeService`.
+- `templates/_metrics.tpl` — `uhc.metricsProvider`, `uhc.metricsDiscovery`, `uhc.metricsExposeService`, `uhc.metricsAnnotations`, `uhc.scrapeEndpoint`, `uhc.metricsEnabled`, `uhc.serviceWorkloads`.
 - Tests: `tests/servicemonitor_test.yaml`, `tests/podmonitor_test.yaml`, `tests/metrics_annotations_test.yaml`.
 - Related: [ADR 006](006-integrations-namespace.md), [ADR 016](016-metrics-port-auto-exposure.md).
