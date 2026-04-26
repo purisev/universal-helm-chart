@@ -1,0 +1,29 @@
+# Argo CD Application — multi-source: chart from OCI, values from this chart's repo at v2.0.0.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gateway
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gateway
+  sources:
+    - repoURL: ghcr.io/purisev
+      chart: universal-helm-chart
+      targetRevision: 2.0.0
+      helm:
+        releaseName: gateway
+        valueFiles:
+          - $values/docs/02-examples/04-gateway-api/values.yaml
+    - repoURL: https://github.com/purisev/universal-helm-chart.git
+      targetRevision: v2.0.0
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

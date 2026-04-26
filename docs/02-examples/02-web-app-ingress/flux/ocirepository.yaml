@@ -1,0 +1,10 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: universal-helm-chart
+  namespace: flux-system
+spec:
+  interval: 10m
+  url: oci://ghcr.io/purisev/universal-helm-chart
+  ref:
+    tag: "2.0.0"

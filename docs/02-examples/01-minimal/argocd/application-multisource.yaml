@@ -1,0 +1,42 @@
+# Argo CD Application — multi-source.
+#
+# Chart pulled from the OCI registry; values pulled from a git source (this same repo,
+# tagged release) and referenced via the $values special source. This is the recommended
+# shape for production GitOps: chart and values version independently, values changes go
+# through code review without touching the Application CR.
+#
+# This example points at this chart's repo so it works as-is. In your own setup, repoint
+# the second source to your config repository and adjust the valueFiles path accordingly.
+#
+# Apply with:
+#   kubectl apply -f argocd/application-multisource.yaml -n argocd
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minimal
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minimal
+  sources:
+    # The chart itself, from OCI.
+    - repoURL: ghcr.io/purisev
+      chart: universal-helm-chart
+      targetRevision: 2.0.0
+      helm:
+        releaseName: minimal
+        valueFiles:
+          - $values/docs/02-examples/01-minimal/values.yaml
+    # The values, from this chart's repository at the matching release tag.
+    - repoURL: https://github.com/purisev/universal-helm-chart.git
+      targetRevision: v2.0.0
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

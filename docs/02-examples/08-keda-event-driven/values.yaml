@@ -1,0 +1,75 @@
+# 08-keda-event-driven — Kafka-lag-driven scaling on a Deployment, VPA orthogonal.
+
+integrations:
+  monitoring:
+    defaults:
+      enabled: true
+      provider: prometheus
+      discovery: crd
+      type: service
+      exposeService:
+        enabled: true                 # auto metrics-only Service for service-less workloads
+        port: 9090
+        targetPort: 9090
+
+deployments:
+
+  worker:
+    enabled: true
+    image:
+      repository: ghcr.io/example/orders-worker
+      tag: v0.9.0
+      pullPolicy: IfNotPresent
+
+    service:
+      enabled: false                  # no inbound traffic; metrics-only Service auto-emitted
+
+    metrics:
+      enabled: true
+      type: pod                       # PodMonitor scrapes pod IPs directly
+
+    keda:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 30
+      pollingInterval: 30             # seconds between metric polls
+      cooldownPeriod: 300             # seconds without load before scaling to min
+      triggers:
+        - type: kafka
+          metadata:
+            bootstrapServers: kafka.kafka:9092
+            consumerGroup: orders-worker
+            topic: orders
+            lagThreshold: "100"       # one replica per 100 messages of lag
+            offsetResetPolicy: earliest
+
+    # VPA is orthogonal to KEDA — VPA touches resources.requests, KEDA touches replicas.
+    # Initial mode applies the recommendation only on pod creation; it doesn't evict.
+    verticalPodAutoscaler:
+      enabled: true
+      updateMode: Initial
+      resourcePolicy:
+        containerPolicies:
+          - containerName: "*"
+            minAllowed:
+              cpu: 50m
+              memory: 128Mi
+            maxAllowed:
+              cpu: "2"
+              memory: 1Gi
+
+    env:
+      LOG_LEVEL:
+        value: info
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+# A modest PDB so KEDA's scale-down doesn't take everything at once.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1

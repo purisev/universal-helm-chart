@@ -1,0 +1,46 @@
+# Flux HelmRelease consuming the OCIRepository declared in ocirepository.yaml.
+#
+# For releases pulling a chart from a classic Helm repo (HTTP) instead of OCI, replace
+# spec.chart.spec.sourceRef with a HelmRepository reference and add a HelmRepository resource:
+#
+#   apiVersion: source.toolkit.fluxcd.io/v1
+#   kind: HelmRepository
+#   metadata: { name: my-repo, namespace: flux-system }
+#   spec: { interval: 10m, url: https://example.com/charts }
+#
+# Apply with:
+#   kubectl apply -f flux/helmrelease.yaml
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: minimal
+  namespace: minimal
+spec:
+  interval: 5m
+  releaseName: minimal
+  chartRef:
+    kind: OCIRepository
+    name: universal-helm-chart
+    namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    deployments:
+      web:
+        enabled: true
+        replicaCount: 1
+        image:
+          repository: nginx
+          tag: "1.27"
+          pullPolicy: IfNotPresent
+        service:
+          enabled: true
+          type: ClusterIP
+          port: 80
+          targetPort: 80
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi

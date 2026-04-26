@@ -1,0 +1,79 @@
+# 04-gateway-api — two Deployments routed by Gateway API HTTPRoute, cross-namespace.
+
+# Singleton HTTPRoute. Per-workload deployments.<n>.httpRoute.rules merge into this.
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: external
+      namespace: gateway-system
+      sectionName: https             # listener name on the Gateway
+  hostnames:
+    - "app.example.com"
+
+# Allow gateway-system to reference Services in this release's namespace.
+referenceGrant:
+  enabled: true
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: gateway-system
+  to:
+    - group: ""
+      kind: Service
+
+deployments:
+
+  api:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: ghcr.io/example/api
+      tag: v1.4.2
+    service:
+      enabled: true
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+    httpRoute:
+      enabled: true
+      priority: 10                   # routed first when paths overlap
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /api
+        # backendRefs default to this workload's Service + service.ports.http
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+  web:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: nginx
+      tag: "1.27"
+    service:
+      enabled: true
+      ports:
+        http:
+          port: 80
+          targetPort: 80
+    httpRoute:
+      enabled: true
+      priority: 20                   # catch-all rule, routed last
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi

@@ -1,0 +1,26 @@
+# 09-multi-env-overrides — dev overlay.
+# Apply on top of values-base.yaml: helm install -f values-base.yaml -f values-dev.yaml
+
+commonLabels:
+  environment: dev
+
+# Skip the monitor in dev — the cluster usually has no Prometheus Operator.
+integrations:
+  monitoring:
+    defaults:
+      enabled: false
+
+deployments:
+  api:
+    replicaCount: 1
+    image:
+      tag: dev                       # mutable; pair with Argo CD Image Updater (see 99-kitchen-sink)
+    env:
+      LOG_LEVEL:
+        value: debug
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
