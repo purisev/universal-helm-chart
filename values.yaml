@@ -459,7 +459,9 @@ serviceAccount:
   name: ""
 
 # RBAC — creates a Role and RoleBinding bound to the chart's ServiceAccount.
-# Requires serviceAccount.create: true.
+# Requires serviceAccount.create: true. The chart fails fast at render time if
+# rbac.enabled=true is paired with serviceAccount.create=false (the binding
+# would target a ServiceAccount that the chart isn't managing).
 rbac:
   enabled: false
   rules: []
@@ -1086,12 +1088,27 @@ affinity: {}
 
 priorityClassName: ""
 
+# Default Pod Disruption Budget. Can be overridden per-workload via
+# deployments.<name>.podDisruptionBudget or statefulSets.<name>.podDisruptionBudget.
+#
+# IMPORTANT — per-workload override is an ATOMIC REPLACE, not a merge. If you set
+# even one field on a workload, you must restate every field you want to keep,
+# including `enabled: true`. The chart uses the per-workload block as-is and
+# ignores this root one. Example: writing
+#   deployments.web.podDisruptionBudget: { minAvailable: 2 }
+# will NOT inherit `enabled: true` from here — the PDB renders nothing. Write
+#   deployments.web.podDisruptionBudget: { enabled: true, minAvailable: 2 }
+# instead.
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
 
 # Vertical Pod Autoscaler — requires the VPA CRD (autoscaling.k8s.io/v1).
 # Can be overridden per-workload via deployments.<name>.verticalPodAutoscaler.
+#
+# Same atomic-replace rule as podDisruptionBudget above: a per-workload block
+# replaces this root one wholesale. Restate `enabled: true` on the workload if
+# you want the per-workload override to actually render a VPA.
 verticalPodAutoscaler:
   enabled: false
   # updateMode: Off | Initial | Recreate | InPlaceOrRecreate

@@ -129,3 +129,19 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "additional properties 'progressDeadlineSeconds' not allowed"
+
+  - it: should reject negative httpRoute.priority
+    # The chart sorts per-workload route rules using printf "%09d|..." as a
+    # string sort key. Negative integers print as "-00000001" which ASCII-sorts
+    # ahead of any positive 9-digit number, breaking the documented "lower
+    # priority renders first" contract. Negative priorities are not meaningful
+    # for routes anyway — declare the contract in the schema.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.httpRoute.enabled: true
+      deployments.web.httpRoute.priority: -1
+    asserts:
+      - failedTemplate:
+          errorPattern: "minimum"
