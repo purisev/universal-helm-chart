@@ -21,6 +21,42 @@ tests:
           path: spec.replicas
           value: 1
 
+  - it: should not render replicas when KEDA enabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 3
+      statefulSets.redis.keda.enabled: true
+      statefulSets.redis.keda.minReplicas: 1
+      statefulSets.redis.keda.maxReplicas: 10
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - isNull:
+          path: spec.replicas
+
+  - it: should not render replicas when HPA enabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 3
+      statefulSets.redis.hpa.enabled: true
+      statefulSets.redis.hpa.minReplicas: 1
+      statefulSets.redis.hpa.maxReplicas: 5
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - isNull:
+          path: spec.replicas
+
   - it: should use root strategy for updateStrategy when statefulset has no override
     set:
       image.repository: redis
