@@ -586,6 +586,29 @@ Output at zero indent; caller controls nindent.
 {{- end }}
 
 {{/*
+Renders workload-local initContainers.
+Init containers are a map keyed by container name (sortAlpha render order — prefix
+names with 01-/02- when execution order matters; Kubernetes runs initContainers
+sequentially in declared order).
+Init containers inherit the parent workload's inherit.env / inherit.configMaps /
+inherit.configMapMount settings via inheritOverride, like sidecars.
+volumeMounts.<initContainerName> at root level is NOT inherited (define mounts
+locally, same as sidecars). ConfigMap auto-mounts still apply unless disabled
+via inherit.configMapMount on the parent workload.
+Reloader does not re-trigger init containers — they run only on Pod creation.
+Params: dict "ctx" $ctx "wl" $wl
+Output at zero indent; caller controls nindent.
+*/}}
+{{- define "uhc.initContainersSpec" -}}
+{{- $ctx := .ctx }}
+{{- $wl := .wl }}
+{{- range $name := keys ($wl.initContainers | default dict) | sortAlpha }}
+{{- $spec := index $wl.initContainers $name }}
+{{- include "uhc.containerSpecWithOptions" (dict "ctx" $ctx "wl" $spec "containerName" $name "renderDirectPorts" true "useRootVolumeMounts" false "inheritOverride" $wl.inherit) }}
+{{- end }}
+{{- end }}
+
+{{/*
 Pod-level spec fields: imagePullSecrets, serviceAccountName, priorityClassName, securityContext, hostAliases.
 hostAliases merge order: root + workload + sidecars. Set inheritRootHostAliases: false on a workload to skip root aliases.
 Params: dict "ctx" $ctx "wl" $wl

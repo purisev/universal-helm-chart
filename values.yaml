@@ -1176,6 +1176,36 @@ deployments: {}
 #         ports: {}                         # map keyed by port name (becomes ports[].name)
 #         # Root envSecrets are merged automatically for sidecars.
 #         # volumeMounts.<workload> is NOT inherited by sidecars; define mounts locally.
+#     # initContainers are a map keyed by container name. Map key →
+#     # spec.initContainers[].name. Render order is sortAlpha; Kubernetes runs
+#     # initContainers sequentially in declared order, so prefix names with
+#     # 01-, 02-, … when run order matters (same convention as jobGroups tasks).
+#     # Same env / envFrom / envSecrets / configMap auto-mount and inherit
+#     # semantics as sidecars. Root envSecrets are merged automatically.
+#     # volumeMounts.<initContainerName> is NOT inherited; define mounts locally.
+#     # Reloader does not re-trigger initContainers — they run only on Pod
+#     # creation; rolling the workload triggers a fresh init pass.
+#     # The same shape applies under statefulSets.<name>.initContainers.
+#     initContainers:
+#       01-wait-for-db:
+#         image:
+#           repository: busybox
+#           tag: "1.36"
+#           pullPolicy: IfNotPresent
+#         command: |
+#           until nc -z postgres.example.svc 5432; do sleep 1; done
+#       02-migrate:
+#         image:
+#           repository: myrepo/migrations
+#           tag: v1.2.3
+#         command:
+#           - /bin/migrate
+#           - --config=/etc/config/migrate.yaml
+#         envSecrets:
+#           - db-credentials
+#         volumeMounts: {}                  # map keyed by mount name
+#         resources: {}
+#         securityContext: {}
 #     # Per-workload host aliases (merged with root hostAliases by default).
 #     # Set inheritRootHostAliases: false to use only local aliases.
 #     hostAliases: []

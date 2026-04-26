@@ -262,6 +262,187 @@ tests:
       - isNull:
           path: spec.template.spec.containers[1]
 
+  # --- initContainers ---
+
+  - it: should not render initContainers field when none defined
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.template.spec.initContainers
+
+  - it: should render initContainer when defined
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.initContainers.migrate.image.repository: busybox
+      deployments.web.initContainers.migrate.image.tag: stable
+      deployments.web.initContainers.migrate.command: echo migrating
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: migrate
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: busybox:stable
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: web
+
+  - it: should render initContainers in alphabetical order with prefix-controlled order
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.initContainers.02-seed.image.repository: busybox
+      deployments.web.initContainers.02-seed.image.tag: stable
+      deployments.web.initContainers.02-seed.command: echo seeding
+      deployments.web.initContainers.01-wait.image.repository: busybox
+      deployments.web.initContainers.01-wait.image.tag: stable
+      deployments.web.initContainers.01-wait.command: echo waiting
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: 01-wait
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: 02-seed
+
+  - it: should override image per initContainer
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.initContainers.migrate.image.repository: myrepo/migrations
+      deployments.web.initContainers.migrate.image.tag: v1.2.3
+      deployments.web.initContainers.migrate.command: echo migrating
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: myrepo/migrations:v1.2.3
+      - equal:
+          path: spec.template.spec.containers[0].image
+          value: nginx:latest
+
+  - it: should not inherit root volumeMounts for initContainers
+    set:
+      image:
+        repository: nginx
+        tag: latest
+      volumeMounts:
+        migrate:
+          app-config:
+            mountPath: /etc/config
+      deployments:
+        web:
+          enabled: true
+          replicaCount: 1
+          service:
+            enabled: true
+            port: 80
+            targetPort: 8080
+          initContainers:
+            migrate:
+              command: echo migrating
+              volumeMounts:
+                local-only:
+                  mountPath: /etc/migrate
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].mountPath
+          value: /etc/migrate
+      - isNull:
+          path: spec.template.spec.initContainers[0].volumeMounts[1]
+
+  - it: should auto-mount configMap into initContainers as well
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.initContainers.migrate.command: echo migrating
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].name
+          value: cm-app-config
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].mountPath
+          value: /etc/config
+
+  - it: should propagate inherit.configMapMount false to initContainers
+    set:
+      image.repository: nginx
+      image.tag: latest
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.configMapMount: false
+      deployments.web.initContainers.migrate.command: echo migrating
+    asserts:
+      - isNull:
+          path: spec.template.spec.initContainers[0].volumeMounts
+
+  - it: should propagate inherit.env from workload to its initContainers
+    set:
+      image.repository: nginx
+      image.tag: latest
+      global.env.APP_ENV.value: production
+      env.DEBUG.value: "true"
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.env.global: false
+      deployments.web.inherit.env.root: false
+      deployments.web.initContainers.migrate.command: echo migrating
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: APP_ENV
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: DEBUG
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+
   - it: should inherit all env levels by default
     set:
       image.repository: nginx

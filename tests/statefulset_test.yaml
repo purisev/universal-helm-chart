@@ -201,6 +201,77 @@ tests:
           path: spec.replicas
           value: 1
 
+  # --- initContainers ---
+
+  - it: should render initContainer for StatefulSet when defined
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.initContainers.migrate.image.repository: busybox
+      statefulSets.redis.initContainers.migrate.image.tag: stable
+      statefulSets.redis.initContainers.migrate.command: echo migrating
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: migrate
+      - equal:
+          path: spec.template.spec.initContainers[0].image
+          value: busybox:stable
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: redis
+
+  - it: should render initContainers for StatefulSet in alphabetical order
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.initContainers.02-seed.image.repository: busybox
+      statefulSets.redis.initContainers.02-seed.image.tag: stable
+      statefulSets.redis.initContainers.02-seed.command: echo seeding
+      statefulSets.redis.initContainers.01-wait.image.repository: busybox
+      statefulSets.redis.initContainers.01-wait.image.tag: stable
+      statefulSets.redis.initContainers.01-wait.command: echo waiting
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].name
+          value: 01-wait
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: 02-seed
+
+  - it: should auto-mount configMap into StatefulSet initContainers as well
+    set:
+      image.repository: redis
+      image.tag: alpine
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.initContainers.migrate.command: echo migrating
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].name
+          value: cm-app-config
+      - equal:
+          path: spec.template.spec.initContainers[0].volumeMounts[0].mountPath
+          value: /etc/config
+
   # --- L1: full labels on pod template ---
 
   - it: should not emit helm.sh/chart label and should keep standard app.kubernetes.io/* labels

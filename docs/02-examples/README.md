@@ -33,6 +33,7 @@ Numbering encodes complexity: `01` is the smallest possible deploy, `99` shows e
 | 07  | [`07-external-secrets/`](07-external-secrets/) | ESO `SecretStore` (Vault) + `ExternalSecret` (`data` and `dataFrom`) + Reloader |
 | 08  | [`08-keda-event-driven/`](08-keda-event-driven/) | KEDA `ScaledObject` (Kafka lag trigger) + VPA Initial mode (orthogonal) |
 | 09  | [`09-multi-env-overrides/`](09-multi-env-overrides/) | Base values + per-env overlays + Argo CD `ApplicationSet` + Flux `valuesFrom` |
+| 10  | [`10-init-containers/`](10-init-containers/) | Per-workload `initContainers` map — wait-for-db + schema migration before the main container starts |
 | 99  | [`99-kitchen-sink/`](99-kitchen-sink/) | Everything-on showcase |
 
 ## Picking an example
@@ -46,4 +47,5 @@ Numbering encodes complexity: `01` is the smallest possible deploy, `99` shows e
 - Pulling secrets from Vault / AWS / GCP → `07-external-secrets`.
 - Event-driven worker scaling → `08-keda-event-driven`.
 - Same app in dev / staging / prod → `09-multi-env-overrides`.
+- Init containers for wait-for-X / one-shot bootstrap before the main app → `10-init-containers`.
 - All the bells and whistles → `99-kitchen-sink`.

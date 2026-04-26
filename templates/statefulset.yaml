@@ -61,6 +61,10 @@ spec:
         {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
     spec:
       {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | nindent 6 }}
+      {{- if $wl.initContainers }}
+      initContainers:
+        {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
+      {{- end }}
       containers:
         {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | nindent 8 }}
         {{- include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}

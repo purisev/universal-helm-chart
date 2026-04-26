@@ -26,6 +26,7 @@ Every map-iterating template uses `keys ... | sortAlpha` before `range`. This ap
 - `ingresses`, `httpRoutes`, `grpcRoutes`, `tlsRoutes`, `referenceGrants`
 - `integrations.eso.secretStores`, `integrations.eso.externalSecrets`
 - Tasks-mode `initContainers` inside a Job's `tasks` map — note that Kubernetes runs `initContainers` **sequentially in declared order**, so the alphabetical sort here is not just a rendering convention but the actual run order. Prefix task names with `01-`, `02-`, `03-` etc. whenever ordering matters.
+- Workload-level `deployments.<w>.initContainers` and `statefulSets.<w>.initContainers` — the same constraint applies as for tasks-mode: Kubernetes runs them sequentially in the declared order, so the `01-`, `02-` prefix convention controls actual run order.
 
 ### Rule 2: Special-cased port ordering — http first, metrics last
 

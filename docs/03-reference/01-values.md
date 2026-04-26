@@ -15,6 +15,7 @@ For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). Fo
 | Environment & config | `global.env`, `env`, `envSecrets`, `envConfigMaps`, `configMaps`, `podAnnotations`, `jobPodAnnotations` | [ADR 003](../05-adr/003-layered-inheritance-and-override.md) · [ADR 015](../05-adr/015-eso-data-vs-datafrom.md) |
 | Image & pulls | `image`, `imagePullSecrets`, `jobCompletionImage` | [`02-examples/01-minimal/`](../02-examples/01-minimal/) |
 | Deployments / StatefulSets | `deployments`, `statefulSets`, `strategy`, `statefulSetUpdateStrategy`, `revisionHistoryLimit`, `progressDeadlineSeconds`, `minReadySeconds` | [ADR 002](../05-adr/002-multi-workload-keyed-maps.md) · [`02-examples/03-statefulset-pvc/`](../02-examples/03-statefulset-pvc/) |
+| Per-pod containers | per-workload `initContainers`, `sidecars` | [ADR 002](../05-adr/002-multi-workload-keyed-maps.md) · [ADR 014](../05-adr/014-deterministic-ordering.md) · [`02-examples/10-init-containers/`](../02-examples/10-init-containers/) |
 | Job groups | `jobGroups` | [ADR 005](../05-adr/005-jobgroups-unification.md) · [ADR 012](../05-adr/012-job-spec-hashing-for-idempotency.md) · [`02-examples/05-cronjobs/`](../02-examples/05-cronjobs/) |
 | Networking — Ingress | `ingress`, `ingresses` | [ADR 009](../05-adr/009-dual-networking-stack.md) · [`02-examples/02-web-app-ingress/`](../02-examples/02-web-app-ingress/) |
 | Networking — Gateway API | `httpRoute`, `httpRoutes`, `grpcRoute`, `grpcRoutes`, `tlsRoute`, `tlsRoutes`, `referenceGrant`, `referenceGrants` | [ADR 009](../05-adr/009-dual-networking-stack.md) · [`02-examples/04-gateway-api/`](../02-examples/04-gateway-api/) |
@@ -78,6 +79,10 @@ For each per-job field:
 - When any HPA-class scaler is on, `spec.replicas` is omitted from the rendered manifest so Helm doesn't bounce the count on every apply.
 
 See [ADR 007](../05-adr/007-autoscaler-mutual-exclusion.md).
+
+### Init containers and sidecars share one container shape
+
+`deployments.<name>.initContainers` and `deployments.<name>.sidecars` (same under `statefulSets.<name>`) are maps keyed by container name. Both flow through the same renderer as the main container: `image`, `command`/`args`, `env`, `envSecrets`, `volumeMounts`, `resources`, `securityContext`, `lifecycle`. Both inherit the parent workload's `inherit.env` / `inherit.configMaps` / `inherit.configMapMount` flags. Neither inherits root-level `volumeMounts.<containerName>` — declare local mounts inline. Render order is `sortAlpha`; for `initContainers` Kubernetes runs them sequentially in declared order, so prefix names with `01-`, `02-`, … when run order matters (same convention as `jobGroups[*].tasks`). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs.
 
 ### Chart-owned vs external name resolution
 
