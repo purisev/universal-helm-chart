@@ -1,7 +1,7 @@
 # Reference
 
-> Every file in this section ships as a stub in this PR; full content lands in follow-ups. Until then, the source of truth is [`../../values.yaml`](../../values.yaml) (annotated) and [`../../values.schema.json`](../../values.schema.json) (machine-checked shape).
+The authoritative per-field source is [`values.yaml`](../../values.yaml) (heavily annotated) and [`values.schema.json`](../../values.schema.json) (machine-checkable shape). The pages here add cross-cutting context that those files don't aggregate.
 
-- [`01-values.md`](01-values.md) — annotated reference for every top-level `values.yaml` key.
-- [`02-schema.md`](02-schema.md) — `values.schema.json` layout and IDE setup (yaml-language-server, JetBrains).
-- [`03-compatibility.md`](03-compatibility.md) — supported Kubernetes and CRD versions (Gateway API, ESO, KEDA, Prometheus Operator, VictoriaMetrics Operator).
+- [`01-values.md`](01-values.md) — topical index of every top-level key plus the cross-cutting rules (env merge, label precedence, port ordering, jobGroups merge, autoscaler exclusion, chart-owned vs external resolution).
+- [`02-schema.md`](02-schema.md) — what the schema does and doesn't catch, schema layout, and IDE setup for autocomplete and inline validation (yaml-language-server / Red Hat YAML, JetBrains, `helm lint`, `ajv-cli`).
+- [`03-compatibility.md`](03-compatibility.md) — Helm version, Kubernetes APIs the chart renders, and the CRD groups/versions for each optional integration.
