@@ -36,7 +36,7 @@ Each integration is opt-in; install only the CRDs for the integrations you enabl
 | Prometheus Operator monitors — ServiceMonitor, PodMonitor | `monitoring.coreos.com/v1` |
 | VictoriaMetrics scrapes — VMServiceScrape, VMPodScrape | `operator.victoriametrics.com/v1beta1` |
 | Vertical Pod Autoscaler | `autoscaling.k8s.io/v1` |
-| Argo CD Image Updater | `argoproj.io/v1alpha1` |
+| Argo CD Image Updater | `argocd-image-updater.argoproj.io/v1alpha1` |
 
 Stakater Reloader is annotation-driven — no CRDs to install on its side; just the Reloader controller in the cluster.
 

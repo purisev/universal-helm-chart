@@ -28,7 +28,7 @@ Without explicit rules, two failure modes are easy to hit:
 
 When `commonLabels` (or any per-feature label customisation) declares a key in the `app.kubernetes.io/*` namespace that the chart also computes, the **chart's value wins**. The user's value is silently dropped.
 
-Implementation: `templates/_helpers.tpl:uhc.labels` — chart labels come *last* in the merge, so they overwrite. Documented next to the `commonLabels` / `commonAnnotations` / `labels.standard` blocks in `values.yaml`.
+Implementation: `templates/_labels.tpl:uhc.labels` — chart labels come *last* in the merge, so they overwrite. Documented next to the `commonLabels` / `commonAnnotations` / `labels.standard` blocks in `values.yaml`.
 
 ### Rule 2: Invariant selectors on workloads
 
@@ -36,7 +36,7 @@ Workload resources — Deployment, StatefulSet, Service, Job, CronJob (its Job t
 
 The `labels.standard.*` toggles (`enabled`, `name`, `instance`, `version`, `managedBy`, `partOf`) only apply to **singleton resources** — ServiceAccount, Ingress, *Routes, ReferenceGrant, NetworkPolicy, ImageUpdater, RBAC, top-level ConfigMap. On workloads, `name` and `instance` are forced on; the other three (`partOf`, `version`, `managedBy`) follow their toggles.
 
-Implementation: `templates/_helpers.tpl:uhc.workloadSelectorLabels` always emits `name` + `instance`, called from every workload template's `spec.selector.matchLabels` and pod template `metadata.labels`.
+Implementation: `templates/_labels.tpl:uhc.workloadSelectorLabels` always emits `name` + `instance`, called from every workload template's `spec.selector.matchLabels` and pod template `metadata.labels`.
 
 ## Consequences
 
@@ -85,6 +85,6 @@ Effective on a Deployment workload:
 ## References
 
 - `values.yaml` — narrative for the `commonLabels`, `commonAnnotations` and `labels.standard.*` blocks at the top of the file.
-- `templates/_helpers.tpl` — `uhc.labels`, `uhc.workloadLabels`, `uhc.workloadSelectorLabels`.
+- `templates/_labels.tpl` — `uhc.labels`, `uhc.workloadLabels`, `uhc.workloadSelectorLabels` (also `uhc.name`, `uhc.fullname`).
 - Tests: `tests/integrations_test.yaml`, `tests/fixtures/commonlabels-conflict.yaml`.
 - Related: [ADR 006](006-integrations-namespace.md).

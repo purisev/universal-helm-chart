@@ -34,11 +34,13 @@ Useful when multiple source namespaces or different resource types need separate
 {{- range $grantName := keys ($ctx.Values.referenceGrants | default dict) | sortAlpha }}
 {{- $grant := index $ctx.Values.referenceGrants $grantName }}
 {{- if and (hasKey $grant "enabled") $grant.enabled }}
+{{- $rgFullName := printf "%s-%s" $releaseName $grantName }}
+{{- include "uhc.assertNameLength" (dict "name" $rgFullName "kind" (printf "ReferenceGrant %q" $grantName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
-  name: {{ $releaseName }}-{{ $grantName }}
+  name: {{ $rgFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:

@@ -117,11 +117,13 @@ need separate routes (e.g. different parentRefs or hostnames per route).
 {{- range $routeName := keys ($ctx.Values.httpRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.httpRoutes $routeName }}
 {{- if and (hasKey $route "enabled") $route.enabled }}
+{{- $hrFullName := printf "%s-%s" $releaseName $routeName }}
+{{- include "uhc.assertNameLength" (dict "name" $hrFullName "kind" (printf "HTTPRoute %q" $routeName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ $releaseName }}-{{ $routeName }}
+  name: {{ $hrFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:

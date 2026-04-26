@@ -63,10 +63,12 @@ Params: dict "ctx" $ctx "workloadName" $wlName
 {{- $ctx := .ctx -}}
 {{- $wlName := .workloadName -}}
 {{- $fullName := include "uhc.fullname" $ctx -}}
+{{- $instance := printf "%s-%s" $fullName $wlName -}}
+{{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "label app.kubernetes.io/instance for workload %q" $wlName)) -}}
 {{- $std := $ctx.Values.labels.standard | default dict -}}
 {{- $stdLabels := dict -}}
 {{- $_ := set $stdLabels "app.kubernetes.io/name" $wlName -}}
-{{- $_ := set $stdLabels "app.kubernetes.io/instance" (printf "%s-%s" $fullName $wlName) -}}
+{{- $_ := set $stdLabels "app.kubernetes.io/instance" $instance -}}
 {{- if $std.enabled -}}
   {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" $fullName -}}{{- end -}}
   {{- if and $std.version $ctx.Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" ($ctx.Chart.AppVersion | toString) -}}{{- end -}}
@@ -85,6 +87,33 @@ Params: dict "ctx" $ctx "workloadName" $wlName
 */}}
 {{- define "uhc.workloadSelectorLabels" -}}
 {{- $fullName := include "uhc.fullname" .ctx -}}
+{{- $instance := printf "%s-%s" $fullName .workloadName -}}
+{{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "selector label app.kubernetes.io/instance for workload %q" .workloadName)) -}}
 app.kubernetes.io/name: {{ .workloadName }}
-app.kubernetes.io/instance: {{ printf "%s-%s" $fullName .workloadName }}
+app.kubernetes.io/instance: {{ $instance }}
+{{- end }}
+
+{{/*
+Fail fast when a constructed name or label value would exceed 63 characters.
+Two k8s rules collapse into a single ceiling here: label values are limited
+to 63 chars, and Service object names must be DNS-1123 labels (also 63).
+Other k8s name kinds (ConfigMap, Deployment, …) accept up to 253 chars as
+DNS-1123 subdomains, but the chart constrains *every* constructed name to
+63 so it remains usable as the value of `app.kubernetes.io/instance` (which
+this helper is wired into via uhc.workloadLabels and
+uhc.workloadSelectorLabels). Apply explicitly at name-with-suffix sites
+(`<release>-<wl>-headless`, `-metrics`, `-config`) and at top-level plural
+maps where the chart-singleton labels skip the workload-instance value.
+
+The error message names the kind / context, the offending value, its
+length, and the values keys to shorten (Helm release name,
+.Values.fullnameOverride, or the workload / entry key in values.yaml).
+
+Params: dict "name" "<built-name>" "kind" "<resource-kind-or-context>"
+*/}}
+{{- define "uhc.assertNameLength" -}}
+{{- $name := .name -}}
+{{- if gt (len $name) 63 -}}
+{{- fail (printf "%s value %q exceeds 63 characters (length=%d). The chart enforces a 63-char ceiling on every constructed name so the value remains a valid k8s DNS-1123 label (used in spec.selector.matchLabels and as the app.kubernetes.io/instance label value). Shorten the Helm release name, .Values.fullnameOverride, or the workload / entry key in values.yaml." .kind $name (len $name)) -}}
+{{- end -}}
 {{- end }}

@@ -94,7 +94,7 @@ integrations:
 ## References
 
 - `values.yaml` — the `integrations.argocd.syncWaves` block.
-- `templates/_helpers.tpl` — `uhc.metadataAnnotations` (composes the wave annotation).
+- `templates/_annotations.tpl` — `uhc.metadataAnnotations` (composes the wave annotation), `uhc.syncWaveAnnotation` (resolves the per-kind value).
 - All resource templates — each calls `uhc.metadataAnnotations` for its kind.
 - Argo CD docs: <https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/>.
 - Related: [ADR 005](005-jobgroups-unification.md) (job hook waves), [ADR 006](006-integrations-namespace.md).

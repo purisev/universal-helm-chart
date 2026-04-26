@@ -67,11 +67,13 @@ spec:
 {{- /* Standalone metrics-only Service for deployments without main service */ -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $injectMetricsPort (not (and $wl.service $wl.service.enabled)) }}
 {{- $expose := $exposeJson | fromJson }}
+{{- $metricsSvcName := printf "%s-%s-metrics" $releaseName $wlName }}
+{{- include "uhc.assertNameLength" (dict "name" $metricsSvcName "kind" (printf "standalone metrics Service for workload %q" $wlName)) }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}-metrics
+  name: {{ $metricsSvcName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service") }}
@@ -108,11 +110,15 @@ spec:
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $userServiceAnnots := (($wl.service | default dict).annotations | default dict) }}
 {{- $extra := mergeOverwrite (deepCopy $userServiceAnnots) (($promAnnots | fromYaml) | default dict) }}
+{{- $headlessName := $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
+{{- if not $wl.serviceName }}
+{{- include "uhc.assertNameLength" (dict "name" $headlessName "kind" (printf "headless Service for StatefulSet workload %q" $wlName)) }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
+  name: {{ $headlessName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" $extra) }}

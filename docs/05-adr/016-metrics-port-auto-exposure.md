@@ -93,6 +93,6 @@ Result:
 
 - `values.yaml` — the `integrations.monitoring.defaults.exposeService` block.
 - `templates/service.yaml` — port injection (the metrics port lands last).
-- `templates/_helpers.tpl` — `uhc.metricsExposeService`.
+- `templates/_metrics.tpl` — `uhc.metricsExposeService`.
 - Tests: `tests/service_test.yaml`, `tests/fixtures/service-existing-metrics-port.yaml`.
 - Related: [ADR 006](006-integrations-namespace.md), [ADR 008](008-multi-provider-monitoring.md), [ADR 014](014-deterministic-ordering.md).

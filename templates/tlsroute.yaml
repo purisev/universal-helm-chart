@@ -98,11 +98,13 @@ Useful when multiple hostnames or listeners require separate TLS routes.
 {{- range $routeName := keys ($ctx.Values.tlsRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.tlsRoutes $routeName }}
 {{- if and (hasKey $route "enabled") $route.enabled }}
+{{- $tlsFullName := printf "%s-%s" $releaseName $routeName }}
+{{- include "uhc.assertNameLength" (dict "name" $tlsFullName "kind" (printf "TLSRoute %q" $routeName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: TLSRoute
 metadata:
-  name: {{ $releaseName }}-{{ $routeName }}
+  name: {{ $tlsFullName }}
   {{- $lbls := include "uhc.labels" $ctx }}
   {{- if $lbls }}
   labels:

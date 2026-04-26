@@ -13,7 +13,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "statefulSet" "includeReloader" true) }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "statefulSet" "includeReloader" true "extra" ($wl.metadataAnnotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

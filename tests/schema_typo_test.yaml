@@ -145,3 +145,60 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "minimum"
+
+  - it: should reject parentRefs on per-workload httpRoute (singleton-only field)
+    # The chart's singleton HTTPRoute model: per-workload entries contribute
+    # only `rules` to the merged singleton. parentRefs / hostnames / annotations
+    # / metadataAnnotations come from the root .Values.httpRoute (or from the
+    # named entry in .Values.httpRoutes for the plural-map shape) and are
+    # shared across every merged rule. The per-workload schema must reject
+    # those fields, otherwise the user's value is silently ignored.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.httpRoute.enabled: true
+      deployments.web.httpRoute.parentRefs:
+        - name: my-gateway
+          namespace: gateway-ns
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'parentRefs' not allowed"
+
+  - it: should reject hostnames on per-workload grpcRoute
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.grpcRoute.enabled: true
+      deployments.web.grpcRoute.hostnames:
+        - api.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'hostnames' not allowed"
+
+  - it: should reject metadataAnnotations on per-workload tlsRoute
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.tlsRoute.enabled: true
+      statefulSets.db.tlsRoute.metadataAnnotations:
+        custom: anno
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'metadataAnnotations' not allowed"
+
+  - it: should still accept parentRefs on the root .Values.httpRoute (singleton)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      httpRoute:
+        enabled: true
+        parentRefs:
+          - name: my-gateway
+            namespace: gateway-ns
+        rules: []
+    asserts:
+      - notFailedTemplate: {}

@@ -66,7 +66,7 @@ Off by default (`enabled: false`). Reloader is a useful but optional integration
 ## References
 
 - `values.yaml` — the `integrations.stakater.reloader` block.
-- `templates/_helpers.tpl` — `uhc.reloaderAnnotations`.
+- `templates/_annotations.tpl` — `uhc.reloaderAnnotations`.
 - `templates/deployment.yaml`, `templates/statefulset.yaml`, `templates/configmap.yaml`, `templates/externalsecret.yaml` — annotation injection sites.
 - Stakater Reloader: <https://github.com/stakater/Reloader>.
 - Related: [ADR 006](006-integrations-namespace.md), [ADR 012](012-job-spec-hashing-for-idempotency.md).

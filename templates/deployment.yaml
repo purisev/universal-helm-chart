@@ -9,7 +9,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "deployment" "includeReloader" true) }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "deployment" "includeReloader" true "extra" ($wl.metadataAnnotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

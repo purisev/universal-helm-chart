@@ -41,7 +41,7 @@ The chart computes the rendered name in this order:
 1. **Chart-owned name first.** If the values reference a name that *also* appears as a key in `.Values.configMaps` (or `.Values.integrations.eso.externalSecrets`), the rendered reference points at the chart-managed resource (`<release-fullname>-<name>`).
 2. **External otherwise.** The reference is rendered as the literal name.
 
-Implementation lives in `templates/_helpers.tpl:uhc.containerSpecWithOptions` (the envFrom resolution) and in the schema's `additionalProperties` rules.
+Implementation lives in `templates/_workload.tpl:uhc.containerSpecWithOptions` (the envFrom resolution) and in the schema's `additionalProperties` rules.
 
 The chart documents this explicitly in the `envConfigMaps` block of `values.yaml`:
 > On collision (an external CM and a chart-owned `configMaps.<name>` with the same name) the chart-owned one wins and the external CM is shadowed.
@@ -100,6 +100,6 @@ Result: one ConfigMap (`<release>-app-config`) shadowing nothing because no coll
 
 - `values.yaml` — the `integrations.eso.externalSecrets` block (narrative on `data` vs `dataFrom`) and the `envConfigMaps` block (chart-owned vs external resolution).
 - `templates/externalsecret.yaml` — renders both `data` and `dataFrom`.
-- `templates/_helpers.tpl` — `uhc.containerSpecWithOptions` (envFrom resolution).
+- `templates/_workload.tpl` — `uhc.containerSpecWithOptions` (envFrom resolution).
 - Tests: `tests/externalsecret_test.yaml`; fixtures `es-data.yaml`, `es-mixed.yaml`, `es-datafrom-auto.yaml`, `es-datafrom-overrides.yaml`.
 - Related: [ADR 004](004-maps-over-lists.md), [ADR 006](006-integrations-namespace.md).

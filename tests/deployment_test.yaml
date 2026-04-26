@@ -1362,3 +1362,37 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].envFrom[1].secretRef.name
           value: secret-shared
+
+  - it: should render per-workload metadataAnnotations on the Deployment object
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          metadataAnnotations:
+            example.com/owner: platform-team
+            example.com/cost-center: ABC123
+    asserts:
+      - equal:
+          path: metadata.annotations["example.com/owner"]
+          value: platform-team
+      - equal:
+          path: metadata.annotations["example.com/cost-center"]
+          value: ABC123
+
+  # --- 63-char fail-fast on long workload names ---
+
+  - it: should fail fast when label value exceeds the 63-char k8s limit
+    # The release name "test-release" + chart name "universal-helm-chart" produces
+    # a base of ~32 chars, so a 39-char workload key pushes the
+    # app.kubernetes.io/instance label value past 63 (32+1+39 = 72 > 63).
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        super-long-workload-name-that-overflows: # 39 chars
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "exceeds 63 characters"

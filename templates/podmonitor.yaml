@@ -10,6 +10,8 @@
 {{- $discovery := include "uhc.metricsDiscovery" (dict "ctx" $ctx "wl" $wl) -}}
 {{- $provider := include "uhc.metricsProvider" (dict "ctx" $ctx "wl" $wl) -}}
 {{- if and $metricsEnabled (eq $metricsType "pod") (ne $discovery "annotations") }}
+{{- $pmName := printf "%s-%s-metrics" $releaseName $wlName }}
+{{- include "uhc.assertNameLength" (dict "name" $pmName "kind" (printf "PodMonitor for workload %q" $wlName)) }}
 ---
 {{- if eq $provider "victoriametrics" }}
 apiVersion: operator.victoriametrics.com/v1beta1
@@ -19,7 +21,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 {{- end }}
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}-metrics
+  name: {{ $pmName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "podMonitor") }}
