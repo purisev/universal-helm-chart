@@ -4,6 +4,9 @@
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.keda $wl.keda.enabled }}
+{{- if and $wl.hpa $wl.hpa.enabled }}
+{{- fail (printf "deployments.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -39,6 +42,9 @@ spec:
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.keda $wl.keda.enabled }}
+{{- if and $wl.hpa $wl.hpa.enabled }}
+{{- fail (printf "statefulSets.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject

@@ -4,10 +4,15 @@
 
 # Development tooling
 CLAUDE.md
+.claude/
 
-# CI / test fixtures
+# CI / test fixtures / repo workflows — not part of the chart artifact
 ci/
 tests/
+.github/
+
+# Documentation, examples, ADRs — never shipped in the OCI artifact
+docs/
 
 # OS artifacts
 .DS_Store

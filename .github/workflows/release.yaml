@@ -39,4 +39,4 @@ jobs:
         run: helm package .
 
       - name: Push chart to GHCR
-        run: helm push universal-helm-chart-*.tgz oci://ghcr.io/purisev
+        run: helm push universal-helm-chart-*.tgz oci://ghcr.io/${{ github.repository_owner }}
