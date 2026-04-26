@@ -47,7 +47,7 @@ deployments:
 
 Default values are all `true` — i.e. inherit everything. Opt-out is a deliberate, visible setting in the workload that needs it.
 
-For `jobGroups`, the same rule applies one level deeper: a group → job pair. Per-job fields override group fields with the same map-replace / list-concat semantics. See [ADR 005](005-jobgroups-unification.md).
+For `jobGroups`, an additional override level applies between a group and one of its jobs — distinct from the layer cascade above and with its own merge rules. Job-level fields override group-level fields as follows: scalars take the job value when set, otherwise the group's; lists (`envSecrets`, `envConfigMaps`, `tolerations`) are concatenated group-then-job; nested maps (`env`, `image`, `securityContext`, `podSecurityContext`, `resources`, `nodeSelector`, `affinity`, `inherit`, `hooks.argocd`, `hooks.helm`, `metadataAnnotations`) **deep-merge** with the job winning on key collision; `volumes` and `volumeMounts` (maps keyed by name) replace **whole entries** by name — the chart does not recurse into a single volume/mount, because k8s volume kinds are mutually exclusive (a name is either an `emptyDir` or a `configMap`, never both). See [ADR 005](005-jobgroups-unification.md).
 
 ## Consequences
 
@@ -61,7 +61,7 @@ For `jobGroups`, the same rule applies one level deeper: a group → job pair. P
 
 - The merge rules differ between maps and lists, and contributors must remember which is which. We mitigate this with [ADR 004](004-maps-over-lists.md) — collections become maps unless they truly cannot — and with the documented env-merge-order narrative at the top of `values.yaml`.
 - "Inheritance" is *not* deep merge of arbitrary structures. Volumes, env vars and configMap entries inherit by *whole entity* keyed by name. This is a feature: deep-merging a volume that's `emptyDir` at one layer and `configMap` at another would produce nonsense.
-- Helpers carrying inheritance logic (`uhc.envVars`, `uhc.containerSpecWithOptions`, `uhc.jobGroupSpec`, `uhc.sidecarsSpec` in `templates/_helpers.tpl`) are non-trivial. They are tested aggressively via helm-unittest.
+- Helpers carrying inheritance logic (`uhc.envVars`, `uhc.envFrom`, `uhc.containerSpecWithOptions`, `uhc.sidecarsSpec` in `templates/_env.tpl` and `templates/_workload.tpl`; `uhc.jobGroupSpec` in `templates/_jobs.tpl`) are non-trivial. They are tested aggressively via helm-unittest.
 
 ## Examples
 
@@ -103,5 +103,5 @@ In `deployments.reaper`'s container:
 ## References
 
 - `values.yaml` — the env-merge-order narrative at the top of the file, and the per-workload `inherit` block under each workload entry.
-- `templates/_helpers.tpl` — `uhc.envVars`, `uhc.containerSpecWithOptions`, `uhc.sidecarsSpec`, `uhc.jobGroupSpec`.
+- `templates/_env.tpl` — `uhc.envVars`, `uhc.envFrom`. `templates/_workload.tpl` — `uhc.containerSpecWithOptions`, `uhc.sidecarsSpec`. `templates/_jobs.tpl` — `uhc.jobGroupSpec`.
 - Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 004](004-maps-over-lists.md), [ADR 005](005-jobgroups-unification.md).

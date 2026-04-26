@@ -405,3 +405,29 @@ tests:
       - equal:
           path: spec.template.spec.terminationGracePeriodSeconds
           value: 90
+
+  # --- headlessService.enabled=false fail-fast ---
+
+  - it: should fail fast when headlessService.enabled=false without serviceName
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.headlessService.enabled: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "headlessService.enabled=false requires serviceName"
+
+  - it: should render when headlessService.enabled=false with serviceName provided
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.headlessService.enabled: false
+      statefulSets.redis.serviceName: my-existing-headless
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.serviceName
+          value: my-existing-headless

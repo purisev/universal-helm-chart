@@ -5,6 +5,12 @@ CLAUDE.md
 # Helm packaged chart archives — use OCI registry or chart museum, not git
 *.tgz
 
+# Side-products of `helm template ... | split` workflows that drop one file
+# per Kubernetes kind into the chart root (Deployment.yml, ConfigMap.yml, …).
+# The repo itself uses .yaml everywhere, so a blanket .yml pattern at the
+# chart root is safe.
+/*.yml
+
 # Helm dependency downloads — reproduce with `helm dependency update`
 # Uncomment if you use chart dependencies (Chart.yaml dependencies[]):
 # charts/*.tgz

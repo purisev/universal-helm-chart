@@ -4,6 +4,7 @@
 {{- range $wlName := keys ($ctx.Values.deployments | default dict) | sortAlpha }}
 {{- $wl := index $ctx.Values.deployments $wlName -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -23,7 +24,6 @@ data:
   {{- else }}
   {{ required (printf "deployments.%s.configData is required when createConfigmap is true" $wlName) nil }}
   {{- end }}
----
 {{- end }}
 {{- end }}
 
@@ -50,7 +50,6 @@ data:
   {{- else }}
   {{ required (printf "statefulSets.%s.configData is required when createConfigmap is true" $wlName) nil }}
   {{- end }}
----
 {{- end }}
 {{- end }}
 

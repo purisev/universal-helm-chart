@@ -47,14 +47,16 @@ Templates **must not** call `fail` for things the schema can express. If you fin
 
 **What it costs:**
 
-- The schema is non-trivial (~700 lines for ~1200 lines of values). Maintaining it alongside `values.yaml` is a small ongoing tax.
+- The schema is non-trivial (~1100 lines for ~1250 lines of values). Maintaining it alongside `values.yaml` is a small ongoing tax — the `$defs` layout keeps the cost roughly linear with the number of distinct shapes, not with the number of call sites.
 - Cross-field invariants still need template-side `fail`s. The chart has a small number of these (HPA/KEDA mutual exclusion, jobGroups hash + delete policy guard) and each is documented in its own ADR.
 - The schema uses JSON Schema draft `2020-12`. Older Helm versions may not support every keyword we use; tested with Helm 3.14+.
 
 ## Schema conventions
 
-- **Closed objects use `additionalProperties: false`.** This catches typos at the leaf. Examples: `image`, `labels.standard`, `integrations.monitoring.defaults`.
-- **Open maps use `additionalProperties: <object schema>` with patternProperties on keys.** Example: `deployments` (any DNS-1123 key, value must match the workload object schema).
+- **Closed objects use `additionalProperties: false`.** This catches typos at the leaf. Examples: `image`, `labels.standard`, `integrations.monitoring.defaults`, every chart-defined entry under `deployments.<name>` / `statefulSets.<name>` / `configMaps.<name>` / `jobGroups.<name>.jobs.<job>` / `service.ports.<name>` / per-workload `keda` / `hpa` / `metrics` / `inherit` / `headlessService` / route entries.
+- **Closed shapes go in `$defs` and are referenced by `$ref`.** Reused shapes (container entry, route entry, service-port entry, hpa/keda/pdb/vpa/networkPolicy/inherit/etc.) live as named definitions. `deployments.<name>` and `statefulSets.<name>` are themselves entries in `$defs` and share most of their structure via the same building blocks. Adding a field to a shape costs one line in one place.
+- **K8s-native shapes stay open.** `resources`, `affinity`, `securityContext`, `podSecurityContext`, `volumes.<name>`, `volumeMounts.<container>.<mount>`, `tolerations`, `topologySpreadConstraints` (the array of constraints), `livenessProbe` / `readinessProbe` / `startupProbe`, `lifecycle`, `nodeSelector`, `podAnnotations` — these mirror upstream Kubernetes types whose fields grow each minor release. Closing them would force-fail on values that pass `kubectl apply` on a newer cluster, which is worse than letting a typo through. Treat them as pass-through and rely on the API server to reject malformed shapes at admission time.
+- **Open maps use `additionalProperties: <object schema>` with patternProperties on keys.** Example: `deployments` (any DNS-1123 key, value must match the `deploymentEntry` schema in `$defs`).
 - **Per-feature toggles use `if/then`** to make required fields conditional: e.g. when `integrations.eso.externalSecrets.<name>.dataFrom` is set, `secretStore` becomes required.
 - **Keep regex sane.** Port names: `^[a-z]([-a-z0-9]*[a-z0-9])?$` and `length(name) <= 15`. Hostnames: standard DNS pattern. Anything more elaborate is suspect.
 

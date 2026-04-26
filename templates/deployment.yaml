@@ -48,14 +48,17 @@ spec:
       labels:
         {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
     spec:
-      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | nindent 6 }}
+      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 6 }}
       {{- if $wl.initContainers }}
       initContainers:
-        {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
+        {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 8 }}
       {{- end }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | nindent 8 }}
-        {{- include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | trim | nindent 8 }}
+        {{- $sidecars := include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | trim }}
+        {{- if $sidecars }}
+        {{- $sidecars | nindent 8 }}
+        {{- end }}
       {{- $inheritParentVolumes := ne ($wl.useRootVolumes | toString) "false" }}
       {{- $cmm := include "uhc.resolveConfigMapMount" ($wl.inherit | default dict) | fromJson }}
       {{- $hasAutoVols := "" }}
@@ -75,9 +78,12 @@ spec:
           {{- toYaml (index $wl.volumes $vName) | nindent 10 }}
         {{- end }}
         {{- if $cmm.enabled }}
-        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 8 }}
+        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 8 }}
         {{- end }}
       {{- end }}
-      {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
+      {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | trim }}
+      {{- if $sched }}
+      {{- $sched | nindent 6 }}
+      {{- end }}
 {{- end }}
 {{- end }}

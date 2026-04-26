@@ -24,6 +24,21 @@ metadata:
   {{- end }}
 spec:
   type: {{ $wl.service.type }}
+  {{- with $wl.service.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
+  {{- with $wl.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- with $wl.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  {{- with $wl.service.sessionAffinity }}
+  sessionAffinity: {{ . }}
+  {{- end }}
+  {{- if hasKey ($wl.service | default dict) "publishNotReadyAddresses" }}
+  publishNotReadyAddresses: {{ $wl.service.publishNotReadyAddresses }}
+  {{- end }}
   ports:
     {{- if $wl.service.ports }}
     {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
@@ -82,9 +97,17 @@ spec:
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- $hsEnabled := true -}}
+{{- if and $wl.headlessService (hasKey $wl.headlessService "enabled") -}}
+{{- $hsEnabled = $wl.headlessService.enabled -}}
+{{- end -}}
+{{- if and (hasKey $wl "enabled") $wl.enabled $hsEnabled }}
+{{- if and $wl.service $wl.service.clusterIP (ne $wl.service.clusterIP "None") -}}
+{{- fail (printf "statefulSets.%s.service.clusterIP=%q conflicts with the auto-rendered headless Service (clusterIP: None). The chart's StatefulSet branch always renders a headless Service for stable per-pod DNS — the ClusterIP variant is mutually exclusive. To run a non-headless Service for a StatefulSet workload, set statefulSets.%s.headlessService.enabled=false (and statefulSets.%s.serviceName to your existing Service) and manage the ClusterIP Service separately." $wlName $wl.service.clusterIP $wlName $wlName) -}}
+{{- end -}}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
-{{- $extra := ($promAnnots | fromYaml) | default dict }}
+{{- $userServiceAnnots := (($wl.service | default dict).annotations | default dict) }}
+{{- $extra := mergeOverwrite (deepCopy $userServiceAnnots) (($promAnnots | fromYaml) | default dict) }}
 ---
 apiVersion: v1
 kind: Service
@@ -98,6 +121,20 @@ metadata:
   {{- end }}
 spec:
   clusterIP: None
+  {{- with $wl.service }}
+  {{- with .loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- with .externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  {{- with .sessionAffinity }}
+  sessionAffinity: {{ . }}
+  {{- end }}
+  {{- if hasKey . "publishNotReadyAddresses" }}
+  publishNotReadyAddresses: {{ .publishNotReadyAddresses }}
+  {{- end }}
+  {{- end }}
   ports:
     {{- if and $wl.service $wl.service.enabled }}
     {{- if $wl.service.ports }}
@@ -119,6 +156,69 @@ spec:
       port: 80
       targetPort: 80
       protocol: TCP
+    {{- end }}
+    {{- if $injectMetricsPort }}
+    {{- $expose := $exposeJson | fromJson }}
+    - name: metrics
+      port: {{ $expose.port }}
+      targetPort: {{ $expose.targetPort }}
+      protocol: TCP
+    {{- end }}
+  selector:
+    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- end }}
+{{- /* Non-headless ClusterIP Service for StatefulSet workloads that opt out of
+     the auto headless rendering. The user manages the headless externally
+     (referenced by spec.serviceName for stable per-pod DNS); this Service is
+     for client traffic. Same shape as the Deployment Service — five
+     pass-through fields, ports map or singleton, metrics port appended via
+     metrics.exposeService when configured. Name pattern matches Deployment:
+     "<release>-<wlName>" (no -headless suffix). */ -}}
+{{- if and (hasKey $wl "enabled") $wl.enabled (not $hsEnabled) $wl.service $wl.service.enabled }}
+{{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
+{{- $extra := mergeOverwrite (deepCopy ($wl.service.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" $extra) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  type: {{ $wl.service.type | default "ClusterIP" }}
+  {{- with $wl.service.clusterIP }}
+  clusterIP: {{ . }}
+  {{- end }}
+  {{- with $wl.service.loadBalancerIP }}
+  loadBalancerIP: {{ . }}
+  {{- end }}
+  {{- with $wl.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ . }}
+  {{- end }}
+  {{- with $wl.service.sessionAffinity }}
+  sessionAffinity: {{ . }}
+  {{- end }}
+  {{- if hasKey ($wl.service | default dict) "publishNotReadyAddresses" }}
+  publishNotReadyAddresses: {{ $wl.service.publishNotReadyAddresses }}
+  {{- end }}
+  ports:
+    {{- if $wl.service.ports }}
+    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
+    {{- $p := index $wl.service.ports $pName }}
+    - name: {{ $pName }}
+      port: {{ $p.port }}
+      targetPort: {{ $p.targetPort }}
+      protocol: {{ $p.protocol | default "TCP" }}
+    {{- end }}
+    {{- else }}
+    - port: {{ $wl.service.port }}
+      targetPort: {{ $wl.service.targetPort }}
+      protocol: TCP
+      name: http
     {{- end }}
     {{- if $injectMetricsPort }}
     {{- $expose := $exposeJson | fromJson }}

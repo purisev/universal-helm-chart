@@ -43,11 +43,11 @@ spec:
       labels:
         {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
     spec:
-      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | nindent 6 }}
+      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | trim | nindent 6 }}
       restartPolicy: {{ default "Never" $merged.restartPolicy }}
       {{- if $merged.tasks }}
       initContainers:
-        {{- include "uhc.jobTasksContainers" (dict "ctx" $ctx "wl" $merged) | nindent 8 }}
+        {{- include "uhc.jobTasksContainers" (dict "ctx" $ctx "wl" $merged) | trim | nindent 8 }}
       containers:
         - name: job-completed
           image: {{ default (default "alpine:3.21" $ctx.Values.jobCompletionImage) $merged.completionImage | quote }}
@@ -65,7 +65,7 @@ spec:
               memory: 16Mi
       {{- else }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | nindent 8 }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | trim | nindent 8 }}
       {{- end }}
       {{- $useRootVolumes := ne ($merged.useRootVolumes | toString) "false" }}
       {{- $cmm := include "uhc.resolveConfigMapMount" ($merged.inherit | default dict) | fromJson }}
@@ -86,10 +86,13 @@ spec:
           {{- toYaml (index $merged.volumes $vName) | nindent 10 }}
         {{- end }}
         {{- if $cmm.enabled }}
-        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 8 }}
+        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 8 }}
         {{- end }}
       {{- end }}
-      {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
+      {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | trim }}
+      {{- if $sched }}
+      {{- $sched | nindent 6 }}
+      {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

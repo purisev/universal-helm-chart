@@ -1,5 +1,7 @@
 # 09 — Base values + per-env overrides (dev / staging / prod)
 
+> **Note — different shape than other examples.** Every other folder under `docs/02-examples/` ships a single `values.yaml` and follows the fixed `NN-name/{values.yaml,argocd/,flux/,helm/}` layout. This example deliberately departs from that — there is no `values.yaml`. Tooling that iterates `docs/02-examples/*/values.yaml` will skip this folder, which is intentional. Use `values-base.yaml` together with one of the `values-<env>.yaml` overlays.
+
 One chart, one app — three environments. The values are split into a `values-base.yaml` carrying the invariant configuration and three thin `values-<env>.yaml` overlays that adjust replica counts, resource sizing, image tags and a few env vars.
 
 This shows how the chart's keyed-map structure ([ADR 002](../../05-adr/002-multi-workload-keyed-maps.md)) and `global.env` cascade ([ADR 003](../../05-adr/003-layered-inheritance-and-override.md)) make per-environment overlays minimal — typically 10-20 lines each.
