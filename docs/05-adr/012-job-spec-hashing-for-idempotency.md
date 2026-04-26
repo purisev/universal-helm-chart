@@ -61,7 +61,7 @@ where `sha8` is the first 8 hex characters of `sha256` over a deterministic JSON
 
 **What it costs:**
 
-- **Mutable image tags break idempotency.** If `image.tag` is `dev` and a new image is pushed under the same tag, the rendered string is unchanged → hash is unchanged → no re-run, even though the binary changed. Workarounds documented in `values.yaml:595–622`:
+- **Mutable image tags break idempotency.** If `image.tag` is `dev` and a new image is pushed under the same tag, the rendered string is unchanged → hash is unchanged → no re-run, even though the binary changed. Workarounds (also documented inline in the `jobGroups` block of `values.yaml`):
   1. Argo CD Image Updater with `update-strategy: digest` — rewrites `image.tag` to `dev@sha256:…`. The digest enters the hash.
   2. Immutable tags (semver, git-sha) — every release is its own tag; the hash naturally changes.
   3. Opt out of idempotency on the affected groups (`hashSuffix: false` + `BeforeHookCreation` delete policy). Job runs every sync.
@@ -73,7 +73,9 @@ where `sha8` is the first 8 hex characters of `sha256` over a deterministic JSON
 ```yaml
 jobGroups:
   db:
-    image: { repository: my/migrator, tag: v1 }
+    image:
+      repository: my/migrator
+      tag: v1
     jobs:
       migrate:
         command: ./migrate.sh
@@ -90,9 +92,8 @@ Renders Job `myrelease-db-migrate-3f9a1b2c`. Bump tag to `v2`: Job becomes `myre
 
 ## References
 
-- `values.yaml:575–622` — narrative on Job idempotency, mutable tags, recommended setups
-- `values.yaml:668–669` — `hashSuffix` and `hashIncludePodAnnotations` toggles
-- `templates/_helpers.tpl` — `uhc.jobGroupHash`, `uhc.jobGroupSpec` (assembles the spec input)
-- `templates/job-groups.yaml`, `templates/cronjob-groups.yaml` — fail-fast guard
-- Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`
+- `values.yaml` — the `jobGroups` block carries the narrative on Job idempotency, mutable tags, recommended setups, and the `hashSuffix` / `hashIncludePodAnnotations` toggles.
+- `templates/_helpers.tpl` — `uhc.jobGroupHash`, `uhc.jobGroupSpec` (assembles the spec input).
+- `templates/job-groups.yaml`, `templates/cronjob-groups.yaml` — fail-fast guard.
+- Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`.
 - Related: [ADR 005](005-jobgroups-unification.md)

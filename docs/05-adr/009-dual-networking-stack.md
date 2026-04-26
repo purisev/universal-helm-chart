@@ -57,24 +57,40 @@ Support **both** Ingress and Gateway API, with **both** singleton and multi-reso
 httpRoute:
   enabled: true
   parentRefs:
-    - { name: my-gateway, namespace: gateway-system }
-  hostnames: ["app.example.com"]
+    - name: my-gateway
+      namespace: gateway-system
+  hostnames:
+    - app.example.com
 
 deployments:
   api:
-    service: { ports: { http: { port: 80, targetPort: 8080 } } }
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
     httpRoute:
       enabled: true
       priority: 10
       rules:
-        - matches: [{ path: { type: PathPrefix, value: /api } }]
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /api
   web:
-    service: { ports: { http: { port: 80, targetPort: 80 } } }
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 80
     httpRoute:
       enabled: true
       priority: 20
       rules:
-        - matches: [{ path: { type: PathPrefix, value: / } }]
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
 ```
 
 Renders one HTTPRoute with two merged rules: API first, web second. `serviceName` defaults to `<release-fullname>-api` / `-web`; `servicePort` defaults to the workload's `service.port`.
@@ -88,7 +104,7 @@ Renders one HTTPRoute with two merged rules: API first, web second. `serviceName
 
 ## References
 
-- `values.yaml:704–1044` — Ingress + Gateway API blocks
-- `templates/ingress.yaml`, `templates/httproute.yaml`, `templates/grpcroute.yaml`, `templates/tlsroute.yaml`, `templates/referencegrant.yaml`
-- Tests: `tests/ingress_test.yaml`, `tests/httproute_test.yaml`, `tests/grpcroute_test.yaml`, `tests/tlsroute_test.yaml`, `tests/referencegrant_test.yaml`
-- Related: [ADR 014](014-deterministic-ordering.md)
+- `values.yaml` — the `ingress` / `ingresses` and Gateway API (`httpRoute` / `httpRoutes` / `grpcRoute` / `grpcRoutes` / `tlsRoute` / `tlsRoutes` / `referenceGrant` / `referenceGrants`) blocks.
+- `templates/ingress.yaml`, `templates/httproute.yaml`, `templates/grpcroute.yaml`, `templates/tlsroute.yaml`, `templates/referencegrant.yaml`.
+- Tests: `tests/ingress_test.yaml`, `tests/httproute_test.yaml`, `tests/grpcroute_test.yaml`, `tests/tlsroute_test.yaml`, `tests/referencegrant_test.yaml`.
+- Related: [ADR 014](014-deterministic-ordering.md).

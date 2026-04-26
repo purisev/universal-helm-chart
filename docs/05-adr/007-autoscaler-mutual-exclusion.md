@@ -19,7 +19,7 @@ The chart exposes per-workload knobs for all three. Without explicit constraints
 - **VPA is orthogonal** to both. VPA touches `resources.requests`; HPA / KEDA touch `replicas`. They can co-exist on the same workload, though running VPA in `Auto` mode together with HPA on CPU/memory targets is rarely a good idea.
 - **`spec.replicas` is omitted from the rendered workload when HPA or KEDA is enabled.** This prevents the per-deploy fight described above. Without an autoscaler, the chart writes the user-supplied (or default) replica count.
 
-The check lives at `templates/hpa.yaml:7–8` (HPA suppression when KEDA is on) and at the Deployment / StatefulSet templates' `spec.replicas` rendering (omitted when an HPA-class scaler is active).
+The check lives in `templates/hpa.yaml` (HPA suppression when KEDA is on) and in the `spec.replicas` rendering of `templates/deployment.yaml` and `templates/statefulset.yaml` (omitted when an HPA-class scaler is active).
 
 ## Consequences
 
@@ -46,7 +46,7 @@ All three are off by default. This is per-workload too — `hpa.enabled`, `keda.
 
 ## References
 
-- `values.yaml:1069–1083` — VPA defaults
-- `templates/hpa.yaml`, `templates/scaledobject.yaml`, `templates/verticalpodautoscaler.yaml`
-- `templates/deployment.yaml:19–23`, `templates/statefulset.yaml` (replicas omission when scaling enabled)
-- `tests/deployment_test.yaml` — replica-omission cases; `tests/scaledobject_test.yaml` — KEDA exclusion check
+- `values.yaml` — the `verticalPodAutoscaler` block (chart-wide VPA defaults) and per-workload `hpa` / `keda` / `verticalPodAutoscaler` entries.
+- `templates/hpa.yaml`, `templates/scaledobject.yaml`, `templates/verticalpodautoscaler.yaml`.
+- `templates/deployment.yaml`, `templates/statefulset.yaml` — `spec.replicas` is omitted when an HPA-class scaler is enabled.
+- `tests/deployment_test.yaml` — replica-omission cases; `tests/scaledobject_test.yaml` — KEDA exclusion check.

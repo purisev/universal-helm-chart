@@ -1,6 +1,6 @@
 # 005 — `jobGroups` unifying Job and CronJob
 
-- **Status:** Accepted (replaces previous separate `jobs` / `cronJobs` blocks; commit `d715dd4`)
+- **Status:** Accepted (replaces previous separate `jobs` / `cronJobs` blocks)
 - **Date:** 2025-04-25
 
 ## Context
@@ -22,11 +22,13 @@ Unify under a single top-level map: `jobGroups`. Each group has:
 - shared configuration — image, env, envSecrets, envConfigMaps, hooks, volumes, volumeMounts, tolerations, security context, resources, etc.;
 - a nested `jobs:` map where each entry becomes one Job/CronJob resource and may override any group-level field.
 
-The merge between group and per-job follows the same rules as ADR 003: **maps replace per key, lists concat.** This is documented next to the `jobGroups` example in `values.yaml` (lines 575–702) and implemented in `templates/_helpers.tpl:uhc.jobGroupSpec`.
+The merge between group and per-job follows the same rules as ADR 003: **maps replace per key, lists concat.** This is documented next to the `jobGroups` example in `values.yaml` and implemented in `templates/_helpers.tpl:uhc.jobGroupSpec`.
 
 Resource name: `<release-fullname>-<group[:8]>-<job>[-<sha8>]`. The `sha8` suffix is governed by [ADR 012](012-job-spec-hashing-for-idempotency.md).
 
 `tasks` (a map of initContainers) is mutually exclusive with single-container mode (`command` / `args`). The schema enforces this — a job with both is rejected.
+
+**Task naming convention.** Kubernetes runs `initContainers` **sequentially in the order they appear in `spec.initContainers[]`**. The chart sorts the `tasks` map alphabetically before emitting (see [ADR 014](014-deterministic-ordering.md)), so **the alphabetical order of task names is the order in which they actually run**. When the order matters, prefix task names with `01-`, `02-`, `03-` etc. — that's the convention used in the worked example below and in [`02-examples/05-cronjobs/`](../02-examples/05-cronjobs/).
 
 ## Consequences
 
@@ -50,29 +52,44 @@ Resource name: `<release-fullname>-<group[:8]>-<job>[-<sha8>]`. The `sha8` suffi
 jobGroups:
   db:
     kind: Job
-    image: { repository: my/migrator, tag: v1 }
-    env: { LOG_LEVEL: info }
-    envSecrets: [db-creds]
+    image:
+      repository: my/migrator
+      tag: v1
+    env:
+      LOG_LEVEL:
+        value: info
+    envSecrets:
+      - db-creds
     hooks:
-      argocd: { hook: PreSync, syncWave: "-2" }
+      argocd:
+        hook: PreSync
+        syncWave: "-2"
     jobs:
       migrate:
-        # tasks-mode: each task becomes an initContainer; sortAlpha ordering
+        # tasks-mode: each task becomes an initContainer.
+        # Tasks run in the alphabetical order of their map keys — prefix names
+        # with 01-, 02-, ... when ordering matters (Kubernetes runs initContainers
+        # sequentially).
         tasks:
-          schema:
+          01-schema:
             command: |
               psql -c "CREATE TABLE IF NOT EXISTS ..."
-          seed:
-            args: ["seed", "--rows=100"]
+          02-seed:
+            args:
+              - seed
+              - --rows=100
       smoke-check:
         # single-container mode: one shot
         command: wget -q -O- http://api/health || exit 1
         backoffLimit: 1
         hooks:
-          argocd: { syncWave: "3" }   # overrides group default
+          argocd:
+            syncWave: "3"   # overrides group default
   nightly:
     kind: CronJob
-    image: { repository: my/cleaner, tag: v1 }
+    image:
+      repository: my/cleaner
+      tag: v1
     jobs:
       cleanup:
         schedule: "0 2 * * *"
@@ -88,9 +105,8 @@ jobGroups:
 
 ## References
 
-- Commit `d715dd4` — "refactor(jobs): unify Job/CronJob templates into jobGroups"
-- `values.yaml:575–702` — narrative + example
-- `templates/_helpers.tpl` — `uhc.jobGroupSpec`, `uhc.jobGroupHash`, `uhc.jobGroupHookAnnotations`
-- `templates/job-groups.yaml`, `templates/cronjob-groups.yaml`
-- Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`
-- Related: [ADR 003](003-layered-inheritance-and-override.md), [ADR 012](012-job-spec-hashing-for-idempotency.md)
+- `values.yaml` — the `jobGroups` block (narrative + worked example).
+- `templates/_helpers.tpl` — `uhc.jobGroupSpec`, `uhc.jobGroupHash`, `uhc.jobGroupHookAnnotations`.
+- `templates/job-groups.yaml`, `templates/cronjob-groups.yaml`.
+- Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`.
+- Related: [ADR 003](003-layered-inheritance-and-override.md), [ADR 012](012-job-spec-hashing-for-idempotency.md).

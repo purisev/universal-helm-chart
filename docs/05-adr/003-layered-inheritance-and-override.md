@@ -59,7 +59,7 @@ For `jobGroups`, the same rule applies one level deeper: a group → job pair. P
 
 **What it costs:**
 
-- The merge rules differ between maps and lists, and contributors must remember which is which. We mitigate this with [ADR 004](004-maps-over-lists.md) — collections become maps unless they truly cannot — and with documented merge tables in `values.yaml` (see lines 11–16 for env merge order).
+- The merge rules differ between maps and lists, and contributors must remember which is which. We mitigate this with [ADR 004](004-maps-over-lists.md) — collections become maps unless they truly cannot — and with the documented env-merge-order narrative at the top of `values.yaml`.
 - "Inheritance" is *not* deep merge of arbitrary structures. Volumes, env vars and configMap entries inherit by *whole entity* keyed by name. This is a feature: deep-merging a volume that's `emptyDir` at one layer and `configMap` at another would produce nonsense.
 - Helpers carrying inheritance logic (`uhc.envVars`, `uhc.containerSpecWithOptions`, `uhc.jobGroupSpec`, `uhc.sidecarsSpec` in `templates/_helpers.tpl`) are non-trivial. They are tested aggressively via helm-unittest.
 
@@ -98,10 +98,10 @@ In `deployments.reaper`'s container:
 
 - **No inheritance — each workload restates everything.** Rejected: defeats the universal chart goal and re-creates copy-paste drift inside one chart.
 - **Deep merge with strategic-merge-patch semantics.** Rejected: surprising behaviour around list merging (replace vs append vs merge-by-key); would require us to re-implement a substantial subset of `kubectl apply` semantics in templates.
-- **Producer-side opt-out** (`global.env: { OTEL_..., excludeFromWorkloads: [reaper] }`). Rejected: scatters per-workload knowledge into ancestor configuration; harder to read.
+- **Producer-side opt-out** — env vars at `global.env` carrying their own per-workload exclusion list. Rejected: scatters per-workload knowledge into ancestor configuration; harder to read.
 
 ## References
 
-- `values.yaml:1–16` (env merge order narrative), `:1128–1137` (per-workload `inherit` block)
-- `templates/_helpers.tpl` — `uhc.envVars`, `uhc.containerSpecWithOptions`, `uhc.sidecarsSpec`, `uhc.jobGroupSpec`
-- Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 004](004-maps-over-lists.md), [ADR 005](005-jobgroups-unification.md)
+- `values.yaml` — the env-merge-order narrative at the top of the file, and the per-workload `inherit` block under each workload entry.
+- `templates/_helpers.tpl` — `uhc.envVars`, `uhc.containerSpecWithOptions`, `uhc.sidecarsSpec`, `uhc.jobGroupSpec`.
+- Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 004](004-maps-over-lists.md), [ADR 005](005-jobgroups-unification.md).

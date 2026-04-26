@@ -93,8 +93,8 @@ integrations:
 
 ## References
 
-- `values.yaml:62–98` — `integrations.argocd.syncWaves` block
-- `templates/_helpers.tpl` — `uhc.metadataAnnotations` (which composes the wave annotation)
-- All resource templates — each calls `uhc.metadataAnnotations` for its kind
-- Argo CD docs: https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/
-- Related: [ADR 005](005-jobgroups-unification.md) (job hook waves), [ADR 006](006-integrations-namespace.md)
+- `values.yaml` — the `integrations.argocd.syncWaves` block.
+- `templates/_helpers.tpl` — `uhc.metadataAnnotations` (composes the wave annotation).
+- All resource templates — each calls `uhc.metadataAnnotations` for its kind.
+- Argo CD docs: <https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/>.
+- Related: [ADR 005](005-jobgroups-unification.md) (job hook waves), [ADR 006](006-integrations-namespace.md).

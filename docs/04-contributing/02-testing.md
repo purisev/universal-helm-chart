@@ -46,15 +46,38 @@ helm unittest .
 
 ## The asserts you'll need
 
-| Use case | Assert |
-|----------|--------|
-| Verify the rendered kind | `isKind: { of: Deployment }` |
-| Exact field value | `equal: { path: spec.replicas, value: 3 }` |
-| Field shape match | `matchRegex: { path: spec.template.spec.containers[0].image, pattern: nginx:.+ }` |
-| Field absent | `notExists: { path: spec.replicas }` or `isNull: { path: spec.replicas }` |
-| Field present | `isNotNull: { path: spec.metrics }` |
-| Document count in multi-doc render | `hasDocuments: { count: 2 }` |
-| Negative test (template should fail) | `expectFail` (top-level on the test case) |
+```yaml
+# Verify the rendered kind
+- isKind:
+    of: Deployment
+
+# Exact field value
+- equal:
+    path: spec.replicas
+    value: 3
+
+# Field shape match
+- matchRegex:
+    path: spec.template.spec.containers[0].image
+    pattern: nginx:.+
+
+# Field absent
+- notExists:
+    path: spec.replicas
+# (or its synonym for null fields)
+- isNull:
+    path: spec.replicas
+
+# Field present
+- isNotNull:
+    path: spec.metrics
+
+# Document count in multi-doc render
+- hasDocuments:
+    count: 2
+```
+
+For a negative test — i.e. one that asserts the template should fail — set `expectFail: true` at the top level of the test case (not inside the `asserts:` list).
 
 ## Add a test in three steps
 

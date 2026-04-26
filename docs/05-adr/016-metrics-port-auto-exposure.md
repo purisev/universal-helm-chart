@@ -43,7 +43,7 @@ targetPort: 9090      # containerPort
 
 **What it costs:**
 
-- When a user declares `service.ports.metrics` explicitly, they may not realise they've disabled the auto-exposure feature (the chart doesn't emit two ports). The skipping rule is documented in `values.yaml:362–366`.
+- When a user declares `service.ports.metrics` explicitly, they may not realise they've disabled the auto-exposure feature (the chart doesn't emit two ports). The skipping rule is documented next to the `integrations.monitoring.defaults.exposeService` block in `values.yaml`.
 - The dedicated metrics-only Service for service-less workloads adds an object that an inattentive operator might miss. We accept this — it matches the intuition that "every scrape target has a Service."
 - The fixed port name `metrics` is a chart convention. Users with idiosyncratic monitor configs that target other names must declare the port manually in `service.ports` instead.
 
@@ -54,13 +54,18 @@ integrations:
   monitoring:
     defaults:
       enabled: true
-      exposeService: { enabled: true, port: 9090, targetPort: 9090 }
+      exposeService:
+        enabled: true
+        port: 9090
+        targetPort: 9090
 
 deployments:
   api:
     service:
       ports:
-        http: { port: 80, targetPort: 8080 }
+        http:
+          port: 80
+          targetPort: 8080
     # No explicit metrics port; auto-injection adds one
     metrics:
       enabled: true
@@ -86,8 +91,8 @@ Result:
 
 ## References
 
-- `values.yaml:360–370` — `exposeService` block
-- `templates/service.yaml:42–48` — port injection
-- `templates/_helpers.tpl` — `uhc.metricsExposeService`
-- Tests: `tests/service_test.yaml`, `tests/fixtures/service-existing-metrics-port.yaml`
-- Related: [ADR 008](008-multi-provider-monitoring.md), [ADR 014](014-deterministic-ordering.md), [ADR 006](006-integrations-namespace.md)
+- `values.yaml` — the `integrations.monitoring.defaults.exposeService` block.
+- `templates/service.yaml` — port injection (the metrics port lands last).
+- `templates/_helpers.tpl` — `uhc.metricsExposeService`.
+- Tests: `tests/service_test.yaml`, `tests/fixtures/service-existing-metrics-port.yaml`.
+- Related: [ADR 006](006-integrations-namespace.md), [ADR 008](008-multi-provider-monitoring.md), [ADR 014](014-deterministic-ordering.md).

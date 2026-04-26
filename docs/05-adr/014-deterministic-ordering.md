@@ -25,7 +25,7 @@ Every map-iterating template uses `keys ... | sortAlpha` before `range`. This ap
 - `volumes`, `volumeMounts`, `configMaps`, `sidecars`
 - `ingresses`, `httpRoutes`, `grpcRoutes`, `tlsRoutes`, `referenceGrants`
 - `integrations.eso.secretStores`, `integrations.eso.externalSecrets`
-- Tasks-mode `initContainers` inside a Job's `tasks` map
+- Tasks-mode `initContainers` inside a Job's `tasks` map — note that Kubernetes runs `initContainers` **sequentially in declared order**, so the alphabetical sort here is not just a rendering convention but the actual run order. Prefix task names with `01-`, `02-`, `03-` etc. whenever ordering matters.
 
 ### Rule 2: Special-cased port ordering — http first, metrics last
 
@@ -64,10 +64,18 @@ deployments:
   api:
     service:
       ports:
-        admin:   { port: 8081, targetPort: 8081 }
-        http:    { port: 80,   targetPort: 8080 }
-        metrics: { port: 9090, targetPort: 9090 }
-        rpc:     { port: 9000, targetPort: 9000 }
+        admin:
+          port: 8081
+          targetPort: 8081
+        http:
+          port: 80
+          targetPort: 8080
+        metrics:
+          port: 9090
+          targetPort: 9090
+        rpc:
+          port: 9000
+          targetPort: 9000
 ```
 
 Rendered Service `ports[]` order:
@@ -75,12 +83,24 @@ Rendered Service `ports[]` order:
 http, admin, rpc, metrics
 ```
 
-Gateway API rule merge:
+Gateway API rule merge — three workloads, two with explicit `priority`, one without:
+
 ```yaml
 deployments:
-  z-api: { httpRoute: { enabled: true, priority: 10, rules: [...] } }
-  api:   { httpRoute: { enabled: true, priority: 20, rules: [...] } }
-  web:   { httpRoute: { enabled: true,                  rules: [...] } }
+  z-api:
+    httpRoute:
+      enabled: true
+      priority: 10
+      rules: [...]
+  api:
+    httpRoute:
+      enabled: true
+      priority: 20
+      rules: [...]
+  web:
+    httpRoute:
+      enabled: true
+      rules: [...]
 ```
 
 Order in merged HTTPRoute `rules[]`: `z-api` (priority 10), `api` (priority 20), `web` (no priority, alphabetised among unprioritised — only one here, but if `home` also had no priority it would precede `web`).

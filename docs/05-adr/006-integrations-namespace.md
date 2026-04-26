@@ -1,6 +1,6 @@
 # 006 — `integrations` namespace for ecosystem knobs
 
-- **Status:** Accepted (introduced by commit `43873b1`)
+- **Status:** Accepted
 - **Date:** 2025-04-25
 
 ## Context
@@ -16,16 +16,20 @@ Group all ecosystem knobs under a single top-level `integrations:` block, with o
 ```yaml
 integrations:
   argocd:
-    syncWaves: { enabled: true, ... }       # see ADR 010
-    imageUpdater: { enabled: false, ... }   # see values.yaml:99–208
+    syncWaves:
+      enabled: true                       # see ADR 010 for the default wave map
+    imageUpdater:
+      enabled: false                      # see values.yaml for full Image Updater config
   stakater:
-    reloader: { enabled: false, ... }       # see ADR 017
+    reloader:
+      enabled: false                      # see ADR 017
   eso:
     enabled: true
-    secretStores: {}                        # map; see ADR 015
-    externalSecrets: {}                     # map; see ADR 015
+    secretStores: {}                      # map; see ADR 015
+    externalSecrets: {}                   # map; see ADR 015
   monitoring:
-    defaults: { ... }                       # see ADR 008, ADR 016
+    defaults:
+      enabled: false                      # see ADR 008 / ADR 016
 ```
 
 The `customize.labels` and `customize.annotations` sub-blocks under each integration's resources allow users to inject extra metadata onto the resources that integration owns (e.g. add a Reloader strategy annotation onto a ConfigMap). This is the same shape across integrations.
@@ -35,24 +39,23 @@ The `customize.labels` and `customize.annotations` sub-blocks under each integra
 **What this enables:**
 
 - **Discoverability.** A reader scanning `values.yaml` sees one block listing every external system the chart knows about. Anything outside this block is "core Kubernetes only".
-- **Uniform on/off semantics.** `integrations.eso.enabled: false` short-circuits all ESO rendering even if `secretStores` or `externalSecrets` entries are declared — useful for "park the configuration" in environments where ESO is not installed (`values.yaml:236`).
+- **Uniform on/off semantics.** `integrations.eso.enabled: false` short-circuits all ESO rendering even if `secretStores` or `externalSecrets` entries are declared — useful for "park the configuration" in environments where ESO is not installed.
 - **Adding a new integration is a contained change.** A new sub-section under `integrations` plus the templates that consume it; no top-level churn.
 - **Schema clarity.** Each integration's schema is one named object — easy to validate strictly. See [ADR 013](013-schema-driven-validation.md).
 
 **What it costs:**
 
 - The values paths are deeper: `integrations.monitoring.defaults.provider` instead of `monitoringProvider`. Overlay values verbose ratio goes up. We accept this in exchange for the discoverability benefit.
-- Renaming was a 2.0.0 breaking change (commit `43873b1`). Pre-2.0.0 paths do not work. This is captured in the chart version bump.
+- Renaming was a 2.0.0 breaking change. Pre-2.0.0 paths do not work; this is captured in the chart version bump.
 
 ## Alternatives considered
 
 - **Top-level keys per integration (`reloader: …`, `eso: …`, `monitoring: …`).** Rejected: pre-2.0.0 status quo. Top-level becomes noisy and there's no obvious place for new integrations.
-- **A single `enabled: { eso: true, reloader: false }` block plus separate config blocks.** Rejected: separates the on/off switch from the config, making it possible to enable an integration with no config and vice versa.
+- **A single top-level `enabled` block listing per-integration toggles, with each integration's config under a separate top-level key.** Rejected: separates the on/off switch from the config, making it possible to enable an integration with no config and vice versa.
 - **Integration-specific sub-charts.** Rejected: would re-create the dependency-graph fragility we avoid by having one chart ([ADR 001](001-universal-chart-scope.md)).
 
 ## References
 
-- Commit `43873b1` — "refactor(integrations): unify ecosystem knobs and customize labels/annotations"
-- `values.yaml:52–447` — `integrations:` block
-- `values.schema.json` — the `integrations` object definition
-- Related: [ADR 008](008-multi-provider-monitoring.md), [ADR 010](010-argocd-sync-waves.md), [ADR 015](015-eso-data-vs-datafrom.md), [ADR 016](016-metrics-port-auto-exposure.md), [ADR 017](017-reloader-annotation-injection.md)
+- `values.yaml` — the `integrations:` block.
+- `values.schema.json` — the `integrations` object definition.
+- Related: [ADR 008](008-multi-provider-monitoring.md), [ADR 010](010-argocd-sync-waves.md), [ADR 015](015-eso-data-vs-datafrom.md), [ADR 016](016-metrics-port-auto-exposure.md), [ADR 017](017-reloader-annotation-injection.md).

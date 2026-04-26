@@ -406,12 +406,14 @@ jobGroups:
     jobs:
       schema:
         enabled: true
+        # Tasks run in the alphabetical order of their map keys (Kubernetes runs
+        # initContainers sequentially); prefix names with 01-, 02- to make ordering explicit.
         tasks:
-          structure:
+          01-structure:
             enabled: true
             command: |
               psql -c "CREATE TABLE IF NOT EXISTS ..."
-          seed:
+          02-seed:
             enabled: true
             args:
               - "seed"

@@ -56,5 +56,5 @@ What this enables, what it costs, what it forecloses. Migration notes if it repl
 Brief — one or two lines each.
 
 ## References
-Commit SHAs, value paths, helper names, related ADRs.
+Value paths (e.g. `integrations.monitoring.defaults.exposeService`), helper names, named blocks in `values.yaml`, related ADRs. **Avoid line numbers** in any file reference — they rot the moment someone reformats the file. Avoid commit SHAs for the same reason — git history is the authoritative timeline.
 ```

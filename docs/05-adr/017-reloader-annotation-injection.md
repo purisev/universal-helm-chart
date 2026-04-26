@@ -27,7 +27,7 @@ A single switch at `integrations.stakater.reloader.enabled: true` injects the Re
 
 **What annotation lands:**
 
-- When `integrations.stakater.reloader.annotations` is empty (the default), the chart applies `{ "reloader.stakater.com/auto": "true" }`.
+- When `integrations.stakater.reloader.annotations` is empty (the default), the chart applies the single annotation `reloader.stakater.com/auto` with value `"true"`.
 - When `integrations.stakater.reloader.annotations` is non-empty, that map **fully replaces** the default. There is no merge. This is intentional — Reloader's annotation set is mutually exclusive (`auto` vs `match`-based discovery; `cm-only` vs `secret-only`) and a partial merge would produce confusing combinations.
 
 ## Consequences
@@ -49,7 +49,7 @@ A single switch at `integrations.stakater.reloader.enabled: true` injects the Re
 
 **What it costs:**
 
-- The "no merge with user annotations" rule is unusual elsewhere in the chart (most other annotation sets do merge with user-supplied entries). Documented in `values.yaml:218–229`. The choice keeps Reloader's strategy unambiguous.
+- The "no merge with user annotations" rule is unusual elsewhere in the chart (most other annotation sets do merge with user-supplied entries). Documented next to the `integrations.stakater.reloader` block in `values.yaml`. The choice keeps Reloader's strategy unambiguous.
 - The annotation is not added to Job / CronJob templates — Reloader doesn't restart Jobs (they're one-shot), and re-creating a finished Job to "pick up" a Secret change isn't useful. Job recreation is governed by the spec hash ([ADR 012](012-job-spec-hashing-for-idempotency.md)) instead.
 - Reloader must be installed in the cluster. The chart doesn't check; if the controller isn't there, the annotation is inert.
 
@@ -65,8 +65,8 @@ Off by default (`enabled: false`). Reloader is a useful but optional integration
 
 ## References
 
-- `values.yaml:210–229` — Reloader block, narrative
-- `templates/_helpers.tpl` — `uhc.reloaderAnnotations`
-- `templates/deployment.yaml`, `templates/statefulset.yaml`, `templates/configmap.yaml`, `templates/externalsecret.yaml` — annotation injection sites
-- Stakater Reloader: https://github.com/stakater/Reloader
-- Related: [ADR 006](006-integrations-namespace.md), [ADR 012](012-job-spec-hashing-for-idempotency.md)
+- `values.yaml` — the `integrations.stakater.reloader` block.
+- `templates/_helpers.tpl` — `uhc.reloaderAnnotations`.
+- `templates/deployment.yaml`, `templates/statefulset.yaml`, `templates/configmap.yaml`, `templates/externalsecret.yaml` — annotation injection sites.
+- Stakater Reloader: <https://github.com/stakater/Reloader>.
+- Related: [ADR 006](006-integrations-namespace.md), [ADR 012](012-job-spec-hashing-for-idempotency.md).

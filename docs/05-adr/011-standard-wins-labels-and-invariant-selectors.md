@@ -28,7 +28,7 @@ Without explicit rules, two failure modes are easy to hit:
 
 When `commonLabels` (or any per-feature label customisation) declares a key in the `app.kubernetes.io/*` namespace that the chart also computes, the **chart's value wins**. The user's value is silently dropped.
 
-Implementation: `templates/_helpers.tpl:uhc.labels` — chart labels come *last* in the merge, so they overwrite. Documented in `values.yaml:18–28`.
+Implementation: `templates/_helpers.tpl:uhc.labels` — chart labels come *last* in the merge, so they overwrite. Documented next to the `commonLabels` / `commonAnnotations` / `labels.standard` blocks in `values.yaml`.
 
 ### Rule 2: Invariant selectors on workloads
 
@@ -84,7 +84,7 @@ Effective on a Deployment workload:
 
 ## References
 
-- `values.yaml:18–50` — narrative for `commonLabels`, `commonAnnotations`, `labels.standard.*`
-- `templates/_helpers.tpl` — `uhc.labels`, `uhc.workloadLabels`, `uhc.workloadSelectorLabels`
-- Tests: `tests/integrations_test.yaml`, `tests/fixtures/commonlabels-conflict.yaml`
-- Related: [ADR 006](006-integrations-namespace.md)
+- `values.yaml` — narrative for the `commonLabels`, `commonAnnotations` and `labels.standard.*` blocks at the top of the file.
+- `templates/_helpers.tpl` — `uhc.labels`, `uhc.workloadLabels`, `uhc.workloadSelectorLabels`.
+- Tests: `tests/integrations_test.yaml`, `tests/fixtures/commonlabels-conflict.yaml`.
+- Related: [ADR 006](006-integrations-namespace.md).

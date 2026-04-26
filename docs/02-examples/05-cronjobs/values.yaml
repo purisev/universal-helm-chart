@@ -22,7 +22,10 @@ jobGroups:
     jobs:
       schema:
         enabled: true
-        # Tasks mode — two ordered initContainers inside one Job. SortAlpha order.
+        # Tasks mode — each task becomes an initContainer in the rendered Job pod.
+        # Kubernetes runs initContainers sequentially in declared order, and the
+        # chart sorts the tasks map alphabetically; the 01-/02- prefix locks the
+        # run order to "structure first, then seed".
         tasks:
           01-structure:
             enabled: true

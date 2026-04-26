@@ -5,8 +5,12 @@
 #
 #   apiVersion: source.toolkit.fluxcd.io/v1
 #   kind: HelmRepository
-#   metadata: { name: my-repo, namespace: flux-system }
-#   spec: { interval: 10m, url: https://example.com/charts }
+#   metadata:
+#     name: my-repo
+#     namespace: flux-system
+#   spec:
+#     interval: 10m
+#     url: https://example.com/charts
 #
 # Apply with:
 #   kubectl apply -f flux/helmrelease.yaml

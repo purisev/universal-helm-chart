@@ -1,6 +1,6 @@
 # 008 — Multi-provider monitoring matrix
 
-- **Status:** Accepted (introduced by commit `bf668bc`)
+- **Status:** Accepted
 - **Date:** 2025-04-25
 
 ## Context
@@ -49,7 +49,7 @@ Auxiliary fields (`port`, `path`, `scheme`, `interval`, `scrapeTimeout`, `relabe
 
 **What it costs:**
 
-- Annotation-mode discovery requires `prometheus.io/port` to be **numeric** (the annotation contract). Setting `metrics.port` to a port name (which `crd` mode requires) is rejected by the schema in annotations mode. The chart applies a fallback: if `metrics.port` is unset in annotations mode, it uses `service.targetPort` or omits the annotation entirely. See `values.yaml:329–340` for the full narrative.
+- Annotation-mode discovery requires `prometheus.io/port` to be **numeric** (the annotation contract). Setting `metrics.port` to a port name (which `crd` mode requires) is rejected by the schema in annotations mode. The chart applies a fallback: if `metrics.port` is unset in annotations mode, it uses `service.targetPort` or omits the annotation entirely. See the `integrations.monitoring.defaults.discovery` comment in `values.yaml` for the full narrative.
 - The CRD-mode `port` field expects a port **name**, not a number. Users hitting this for the first time get a CRD validation error; the schema documents the constraint at `values.schema.json` (search for `discovery`).
 - Two CRD groups must be tracked for compatibility (`monitoring.coreos.com` and `operator.victoriametrics.com`). [03-reference/03-compatibility.md](../03-reference/03-compatibility.md) lists the tested versions.
 
@@ -62,8 +62,12 @@ deployments:
   api:
     service:
       ports:
-        http: { port: 80, targetPort: 8080 }
-        metrics: { port: 9090, targetPort: 9090 }
+        http:
+          port: 80
+          targetPort: 8080
+        metrics:
+          port: 9090
+          targetPort: 9090
     metrics:
       enabled: true
       port: metrics       # name from service.ports above
@@ -77,9 +81,8 @@ deployments:
 
 ## References
 
-- Commit `bf668bc` — "feat(monitoring): multi-provider scrape support (2.0.0)"
-- `values.yaml:318–379` — `integrations.monitoring.defaults`
-- `templates/servicemonitor.yaml`, `templates/podmonitor.yaml`
-- `templates/_helpers.tpl` — `uhc.metricsProvider`, `uhc.metricsDiscovery`, `uhc.metricsTargetType`, `uhc.metricsExposeService`
-- Tests: `tests/servicemonitor_test.yaml`, `tests/podmonitor_test.yaml`, `tests/metrics_annotations_test.yaml`
-- Related: [ADR 006](006-integrations-namespace.md), [ADR 016](016-metrics-port-auto-exposure.md)
+- `values.yaml` — the `integrations.monitoring.defaults` block.
+- `templates/servicemonitor.yaml`, `templates/podmonitor.yaml`.
+- `templates/_helpers.tpl` — `uhc.metricsProvider`, `uhc.metricsDiscovery`, `uhc.metricsTargetType`, `uhc.metricsExposeService`.
+- Tests: `tests/servicemonitor_test.yaml`, `tests/podmonitor_test.yaml`, `tests/metrics_annotations_test.yaml`.
+- Related: [ADR 006](006-integrations-namespace.md), [ADR 016](016-metrics-port-auto-exposure.md).

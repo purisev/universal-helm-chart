@@ -2,13 +2,13 @@
 
 Two `jobGroups` in one release:
 
-- `migrations` — `kind: Job`, runs as a `PreSync` hook on every Argo CD sync. Tasks-mode: two ordered initContainers (`schema` then `seed`) inside one Job.
+- `migrations` — `kind: Job`, runs as a `PreSync` hook on every Argo CD sync. Tasks-mode: two ordered initContainers (`01-structure` then `02-seed`) inside one Job.
 - `nightly` — `kind: CronJob` with two scheduled jobs sharing image and env: `cleanup` at 02:00 UTC and `report` at 06:00 UTC.
 
 ## What this shows
 
 - Group-level config (`image`, `envSecrets`, `hooks`) cascades into every job in `jobs:`. Per-job fields override.
-- **Tasks mode**: a job whose work is split across multiple ordered initContainers, then a tiny "completed" container marks the Job successful. Useful for migration → seed pipelines where step ordering matters.
+- **Tasks mode**: a job whose work is split across multiple ordered initContainers, then a tiny "completed" container marks the Job successful. Useful for migration → seed pipelines where step ordering matters. Kubernetes runs `initContainers` sequentially in their declared order, and the chart emits the `tasks` map sorted alphabetically — so when ordering matters, prefix task names with `01-`, `02-`, `03-` etc. to make the run order explicit. (See [ADR 014](../../05-adr/014-deterministic-ordering.md).)
 - Single-container mode (`command` / `args` directly on the job) for the CronJob members.
 - **Hash-suffixed Job names** (`<release>-migrations-schema-<sha8>`) — the Job re-runs only when its rendered spec changes (image bump, env change, command edit). Argo CD on a 1-minute sync interval is harmless. ([ADR 012](../../05-adr/012-job-spec-hashing-for-idempotency.md))
 - Argo CD hook annotations on the migrations group → Argo CD treats those Jobs as PreSync hooks; the user-visible workloads continue applying once the hook completes.

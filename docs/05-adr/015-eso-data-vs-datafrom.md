@@ -12,7 +12,7 @@ External Secrets Operator (ESO) gives two ways to extract values from a backend 
 
 Both have legitimate uses. The chart needs to support both without making the values shape ambiguous.
 
-A second disambiguation problem: the chart manages its own `configMaps` (under `.Values.configMaps`) and reads external `envConfigMaps` (a list of names). When a user lists `envConfigMaps: [app-config]` and also defines `configMaps.app-config: {data: {…}}`, which `app-config` is mounted? The chart-managed one (named `<release-fullname>-app-config`) or some external one called literally `app-config`?
+A second disambiguation problem: the chart manages its own `configMaps` (under `.Values.configMaps`) and reads external `envConfigMaps` (a list of names). When a user lists `app-config` under `envConfigMaps` and also defines a `configMaps.app-config` block with its own `data`, which `app-config` is mounted? The chart-managed one (named `<release-fullname>-app-config`) or some external one called literally `app-config`?
 
 The same problem exists for ExternalSecret targets: a `targetName` collision with a chart-owned ConfigMap or a user-supplied Secret name.
 
@@ -43,7 +43,7 @@ The chart computes the rendered name in this order:
 
 Implementation lives in `templates/_helpers.tpl:uhc.containerSpecWithOptions` (the envFrom resolution) and in the schema's `additionalProperties` rules.
 
-The chart documents this explicitly in `values.yaml:430–443`:
+The chart documents this explicitly in the `envConfigMaps` block of `values.yaml`:
 > On collision (an external CM and a chart-owned `configMaps.<name>` with the same name) the chart-owned one wins and the external CM is shadowed.
 
 ## Consequences
@@ -56,7 +56,7 @@ The chart documents this explicitly in `values.yaml:430–443`:
 
 **What it costs:**
 
-- "Chart-owned wins" is silent. A user who *intended* to reference an external `app-config` and happens to have a `configMaps.app-config` block in their values will get the chart-owned one. The chart's defence is that having both is itself a code smell — pick distinct names if you need both. Documented in `values.yaml:432–435`.
+- "Chart-owned wins" is silent. A user who *intended* to reference an external `app-config` and happens to have a `configMaps.app-config` block in their values will get the chart-owned one. The chart's defence is that having both is itself a code smell — pick distinct names if you need both. Documented in the `envConfigMaps` block of `values.yaml`.
 - `dataFrom` doesn't dedupe on collision with explicit `data` in the chart layer; ESO does the dedupe on the backend at apply time. We accept this inconsistency because dedupe in the chart would require knowing each backend's per-field mapping, which we don't.
 
 ## Worked example
@@ -98,9 +98,8 @@ Result: one ConfigMap (`<release>-app-config`) shadowing nothing because no coll
 
 ## References
 
-- `values.yaml:286–316` — narrative on `data` vs `dataFrom`
-- `values.yaml:428–443` — chart-owned vs external ConfigMap resolution
-- `templates/externalsecret.yaml` — renders both
-- `templates/_helpers.tpl` — `uhc.containerSpecWithOptions` (envFrom resolution)
-- Tests: `tests/externalsecret_test.yaml`, fixtures `es-data.yaml`, `es-mixed.yaml`, `es-datafrom-auto.yaml`, `es-datafrom-overrides.yaml`
-- Related: [ADR 004](004-maps-over-lists.md), [ADR 006](006-integrations-namespace.md)
+- `values.yaml` — the `integrations.eso.externalSecrets` block (narrative on `data` vs `dataFrom`) and the `envConfigMaps` block (chart-owned vs external resolution).
+- `templates/externalsecret.yaml` — renders both `data` and `dataFrom`.
+- `templates/_helpers.tpl` — `uhc.containerSpecWithOptions` (envFrom resolution).
+- Tests: `tests/externalsecret_test.yaml`; fixtures `es-data.yaml`, `es-mixed.yaml`, `es-datafrom-auto.yaml`, `es-datafrom-overrides.yaml`.
+- Related: [ADR 004](004-maps-over-lists.md), [ADR 006](006-integrations-namespace.md).

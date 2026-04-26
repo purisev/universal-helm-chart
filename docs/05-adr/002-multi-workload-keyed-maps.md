@@ -15,9 +15,9 @@ Workloads of the same kind are declared as **keyed maps** in `values.yaml`. The 
 
 The three workload maps are:
 
-- `deployments` — one Deployment + Service per key (`values.yaml:1099`).
-- `statefulSets` — one StatefulSet + headless Service per key (`values.yaml:1188`).
-- `jobGroups` — one Job-or-CronJob *group* per key, see [ADR 005](005-jobgroups-unification.md) (`values.yaml:626`).
+- `deployments` — one Deployment + Service per key.
+- `statefulSets` — one StatefulSet + headless Service per key.
+- `jobGroups` — one Job-or-CronJob *group* per key. See [ADR 005](005-jobgroups-unification.md).
 
 The same shape is applied to per-workload sub-collections (e.g. `service.ports`, `volumes`, `volumeMounts`, `sidecars`) — see [ADR 004](004-maps-over-lists.md) for the broader rule.
 
@@ -44,6 +44,6 @@ The same shape is applied to per-workload sub-collections (e.g. `service.ports`,
 
 ## References
 
-- `values.yaml:626` (`jobGroups`), `:1099` (`deployments`), `:1188` (`statefulSets`)
+- `values.yaml` — the `jobGroups`, `deployments` and `statefulSets` top-level blocks.
 - `templates/deployment.yaml`, `templates/statefulset.yaml`, `templates/job-groups.yaml`, `templates/cronjob-groups.yaml` — all iterate via `range $name, $cfg := .Values.<map>` after `keys ... | sortAlpha`.
-- Related: [ADR 004](004-maps-over-lists.md), [ADR 014](014-deterministic-ordering.md)
+- Related: [ADR 004](004-maps-over-lists.md), [ADR 014](014-deterministic-ordering.md).

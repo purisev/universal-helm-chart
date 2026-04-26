@@ -34,7 +34,7 @@ Everything is opt-in via `values.yaml`. A release that only fills in `deployment
 
 **What this enables:**
 
-- One place to centralise security defaults (`podSecurityContext`, `securityContext`, `automountServiceAccountToken: false`) — see lines 485–504 in `values.yaml`.
+- One place to centralise security defaults — `podSecurityContext`, `securityContext`, `automountServiceAccountToken: false` and friends, all defined as top-level blocks in `values.yaml`.
 - Multiple workloads in a single release co-exist and share `global.env`, common labels, common annotations, and inherited config — see [ADR 003](003-layered-inheritance-and-override.md).
 - Bug fixes and feature additions land once and cover every consumer on next chart upgrade.
 - A consistent label / selector contract across all services in a fleet — see [ADR 011](011-standard-wins-labels-and-invariant-selectors.md).
@@ -63,6 +63,6 @@ This list is the contract. Adding a new workload kind is an ADR-worthy decision,
 
 ## References
 
-- `Chart.yaml` (chart name, version)
-- `values.yaml` lines 1–50, 485–504 (chart-wide defaults)
-- Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 003](003-layered-inheritance-and-override.md), [ADR 006](006-integrations-namespace.md)
+- `Chart.yaml` — chart name and version.
+- `values.yaml` — the env / labels narrative at the top of the file and the security/scheduling defaults blocks (`podSecurityContext`, `securityContext`, `terminationGracePeriodSeconds`, `automountServiceAccountToken`, …).
+- Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 003](003-layered-inheritance-and-override.md), [ADR 006](006-integrations-namespace.md).
