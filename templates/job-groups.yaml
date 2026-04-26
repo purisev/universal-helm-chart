@@ -26,7 +26,11 @@ metadata:
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:
-  backoffLimit: {{ default 3 $merged.backoffLimit }}
+  {{- $backoffLimit := 3 }}
+  {{- if hasKey $merged "backoffLimit" }}
+  {{- $backoffLimit = $merged.backoffLimit }}
+  {{- end }}
+  backoffLimit: {{ $backoffLimit }}
   {{- with $merged.ttlSecondsAfterFinished }}
   ttlSecondsAfterFinished: {{ . | int }}
   {{- end }}

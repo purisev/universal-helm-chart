@@ -152,6 +152,31 @@ tests:
           path: spec.idleReplicaCount
           value: 0
 
+  - it: should render minReplicaCount=0 (canonical scale-to-zero pair with idleReplicaCount=0)
+    # `default 1 $wl.keda.minReplicas` would have collapsed 0 to 1, leaving KEDA
+    # unable to scale below 1 even when idleReplicaCount=0 is also set. The
+    # hasKey-pattern preserves the explicit zero so KEDA can drive replicas to 0.
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.minReplicas: 0
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.idleReplicaCount: 0
+      deployments.worker.keda.triggers[0].type: kafka
+      deployments.worker.keda.triggers[0].metadata.bootstrapServers: kafka:9092
+      deployments.worker.keda.triggers[0].metadata.consumerGroup: workers
+      deployments.worker.keda.triggers[0].metadata.topic: tasks
+      deployments.worker.keda.triggers[0].metadata.lagThreshold: "5"
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.idleReplicaCount
+          value: 0
+
   - it: should render cooldownPeriod=0 (no cooldown wait)
     # cooldownPeriod: 0 is a valid KEDA value meaning "scale down immediately
     # when triggers fall below the threshold". A truthiness gate would drop

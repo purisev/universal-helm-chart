@@ -42,7 +42,11 @@ spec:
   {{- end }}
   jobTemplate:
     spec:
-      backoffLimit: {{ default 3 $merged.backoffLimit }}
+      {{- $backoffLimit := 3 }}
+      {{- if hasKey $merged "backoffLimit" }}
+      {{- $backoffLimit = $merged.backoffLimit }}
+      {{- end }}
+      backoffLimit: {{ $backoffLimit }}
       {{- with $merged.ttlSecondsAfterFinished }}
       ttlSecondsAfterFinished: {{ . | int }}
       {{- end }}

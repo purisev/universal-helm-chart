@@ -65,14 +65,25 @@ tests:
           path: spec.parentRefs[0].sectionName
           value: tls-passthrough
 
-  - it: should omit parentRefs when not set
+  - it: should fail fast when tlsRoute is enabled without parentRefs
     set:
       tlsRoute.enabled: true
-      tlsRoute.hostnames[0]: secure.example.com
+      tlsRoute.hostnames:
+        - tls.example.com
       tlsRoute.rules[0].serviceName: my-svc
     asserts:
-      - isNull:
-          path: spec.parentRefs
+      - failedTemplate:
+          errorPattern: "tlsRoute is enabled .* but .Values.tlsRoute.parentRefs is empty"
+
+  - it: should fail fast when tlsRoute is enabled without hostnames
+    set:
+      tlsRoute.enabled: true
+      tlsRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoute.rules[0].serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: "tlsRoute is enabled .* but .Values.tlsRoute.hostnames is empty"
 
   # --- hostnames ---
 
@@ -113,6 +124,10 @@ tests:
   - it: should default serviceName to fullname when not specified
     set:
       tlsRoute.enabled: true
+      tlsRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoute.hostnames:
+        - tls.example.com
       tlsRoute.hostnames[0]: secure.example.com
       tlsRoute.rules:
         - {}
@@ -124,6 +139,10 @@ tests:
   - it: should default servicePort to 443 when not specified
     set:
       tlsRoute.enabled: true
+      tlsRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoute.hostnames:
+        - tls.example.com
       tlsRoute.hostnames[0]: secure.example.com
       tlsRoute.rules:
         - {}
@@ -144,9 +163,17 @@ tests:
   - it: should render multiple TLSRoutes from tlsRoutes map
     set:
       tlsRoutes.ext.enabled: true
+      tlsRoutes.ext.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoutes.ext.hostnames:
+        - ext.example.com
       tlsRoutes.ext.hostnames[0]: secure.example.com
       tlsRoutes.ext.rules[0].serviceName: my-release-web
       tlsRoutes.int.enabled: true
+      tlsRoutes.int.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoutes.int.hostnames:
+        - int.example.com
       tlsRoutes.int.hostnames[0]: internal.example.com
       tlsRoutes.int.rules[0].serviceName: my-release-api
     asserts:
@@ -157,6 +184,10 @@ tests:
     set:
       fullnameOverride: test-release
       tlsRoutes.ext.enabled: true
+      tlsRoutes.ext.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoutes.ext.hostnames:
+        - ext.example.com
       tlsRoutes.ext.hostnames[0]: secure.example.com
       tlsRoutes.ext.rules[0].serviceName: my-svc
     asserts:
@@ -167,6 +198,10 @@ tests:
   - it: should render hostnames in multi-route
     set:
       tlsRoutes.ext.enabled: true
+      tlsRoutes.ext.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoutes.ext.hostnames:
+        - ext.example.com
       tlsRoutes.ext.hostnames[0]: secure.example.com
       tlsRoutes.ext.rules[0].serviceName: my-svc
     asserts:

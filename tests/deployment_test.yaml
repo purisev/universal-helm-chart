@@ -1383,6 +1383,20 @@ tests:
 
   # --- 63-char fail-fast on long workload names ---
 
+  - it: should respect replicaCount=0 (scale-to-zero on maintenance / blue-green)
+    # `default 1 $wl.replicaCount` would have collapsed 0 to 1, breaking the
+    # "scale to zero, keep manifest" use case. The hasKey-pattern preserves the
+    # explicit zero.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0
+
   - it: should fail fast when label value exceeds the 63-char k8s limit
     # The release name "test-release" + chart name "universal-helm-chart" produces
     # a base of ~32 chars, so a 39-char workload key pushes the

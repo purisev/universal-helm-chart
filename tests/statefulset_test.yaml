@@ -432,6 +432,17 @@ tests:
           path: spec.serviceName
           value: my-existing-headless
 
+  - it: should respect replicaCount=0 on StatefulSet (scale-to-zero)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.replicaCount: 0
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 0
+
   # --- per-workload metadataAnnotations ---
 
   - it: should render per-workload metadataAnnotations on the StatefulSet object
