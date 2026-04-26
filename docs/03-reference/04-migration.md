@@ -60,7 +60,11 @@ The chart now fails fast at `helm template` time with a precise error naming the
 - `.Values.fullnameOverride` — overrides `<release>-<chart>` with whatever you set.
 - The workload key under `deployments` / `statefulSets` / `configMaps` / `jobGroups` / `httpRoutes` / etc.
 
-The chart enforces 63 across **every** constructed name (not only Service names — even ConfigMap and Deployment names, which Kubernetes allows up to 253 chars) so the value remains usable as the `app.kubernetes.io/instance` label on the same workload.
+Coverage is every workload-labelled resource (Deployment, StatefulSet, Service, HPA, PDB, VPA, ScaledObject, NetworkPolicy, ServiceMonitor, PodMonitor, ESO `SecretStore` / `ExternalSecret`) plus every plural-map entry whose name the chart exposes as a label value (configMaps, ingresses, httpRoutes / grpcRoutes / tlsRoutes, referenceGrants, the `-config` / `-headless` / `-metrics` suffixed names). Names supplied verbatim by the user (`integrations.argocd.imageUpdater.name`, `serviceAccount.name`, ESO `target.name`) are **not** asserted — that's the user's contract with the cluster's own DNS-1123 subdomain limit, and the chart doesn't reuse those names as label values.
+
+### `metadataAnnotations` dropped from `httpRoute` / `grpcRoute` / `tlsRoute`
+
+Both the singleton (`.Values.httpRoute.metadataAnnotations`) and the plural-map entries (`.Values.httpRoutes.<key>.metadataAnnotations`, and the gRPC / TLS equivalents) accepted a `metadataAnnotations` block that no template ever read. Every route callsite passes `$route.annotations` to the rendered Route's `metadata.annotations`, never `$route.metadataAnnotations`. The schema now rejects the field with `additional properties 'metadataAnnotations' not allowed` — move any values you had under it to the existing `annotations` field (which is the field the rendered Route picks up).
 
 ### Other tightenings worth knowing about
 
