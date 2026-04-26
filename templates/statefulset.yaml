@@ -21,7 +21,9 @@ spec:
   podManagementPolicy: {{ . }}
   {{- end }}
   {{- if not (and $wl.keda $wl.keda.enabled) }}
+  {{- if not (and $wl.hpa $wl.hpa.enabled) }}
   replicas: {{ $wl.replicaCount | default 1 }}
+  {{- end }}
   {{- end }}
   revisionHistoryLimit: {{ default 10 $ctx.Values.revisionHistoryLimit }}
   {{- $minReady := int ($wl.minReadySeconds | default $ctx.Values.minReadySeconds | default 0) }}
