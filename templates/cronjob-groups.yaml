@@ -59,11 +59,11 @@ spec:
           labels:
             {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 12 }}
         spec:
-          {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | nindent 10 }}
+          {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | trim | nindent 10 }}
           restartPolicy: {{ default "Never" $merged.restartPolicy }}
           {{- if $merged.tasks }}
           initContainers:
-            {{- include "uhc.jobTasksContainers" (dict "ctx" $ctx "wl" $merged) | nindent 12 }}
+            {{- include "uhc.jobTasksContainers" (dict "ctx" $ctx "wl" $merged) | trim | nindent 12 }}
           containers:
             - name: job-completed
               image: {{ default (default "alpine:3.21" $ctx.Values.jobCompletionImage) $merged.completionImage | quote }}
@@ -81,7 +81,7 @@ spec:
                   memory: 16Mi
           {{- else }}
           containers:
-            {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | nindent 12 }}
+            {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | trim | nindent 12 }}
           {{- end }}
           {{- $useRootVolumes := ne ($merged.useRootVolumes | toString) "false" }}
           {{- $cmm := include "uhc.resolveConfigMapMount" ($merged.inherit | default dict) | fromJson }}
@@ -102,10 +102,13 @@ spec:
               {{- toYaml (index $merged.volumes $vName) | nindent 14 }}
             {{- end }}
             {{- if $cmm.enabled }}
-            {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 12 }}
+            {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | nindent 10 }}
+          {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | trim }}
+          {{- if $sched }}
+          {{- $sched | nindent 10 }}
+          {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

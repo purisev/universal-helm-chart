@@ -1,0 +1,131 @@
+suite: test schema rejects common typos
+templates:
+  - deployment.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+# Helm runs values-vs-schema validation on render. helm-unittest captures the
+# resulting failure via failedTemplate.errorPattern, which is a regex over the
+# error string. Each test below intentionally introduces a typo and expects the
+# JSON Schema validator to reject it. If a typo silently passes, the test fails.
+tests:
+  - it: should reject hpa.maxReplica (missing 's') under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplica: 5
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'maxReplica' not allowed"
+
+  - it: should reject service.targetProt (typo of targetPort) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetProt: 80
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'targetProt' not allowed"
+
+  - it: should reject inherit.configmapMount (lowercase 'm' typo) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.inherit.configmapMount: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'configmapMount' not allowed"
+
+  - it: should reject containerPorts (typo of ports) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.containerPorts:
+        http:
+          containerPort: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'containerPorts' not allowed"
+
+  - it: should reject inherit.env.globall (typo) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.inherit.env.globall: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'globall' not allowed"
+
+  - it: should reject metrics.exposeService.targetPort string (must be integer)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.targetPort: "9090"
+    asserts:
+      - failedTemplate:
+          errorPattern: "metrics/exposeService/targetPort"
+
+  - it: should reject jobGroups.<group>.jobs.<job> with unknown field
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      jobGroups:
+        db:
+          kind: Job
+          jobs:
+            migrate:
+              backoffLimit: 1
+              schedulle: "* * * * *"
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'schedulle' not allowed"
+
+  - it: should reject statefulSets.<name>.maxReplica (typo of maxReplicas via hpa)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.hpa.enabled: true
+      statefulSets.db.hpa.maxReplica: 3
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'maxReplica' not allowed"
+
+  - it: should reject configMaps.<name> with unknown field
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      configMaps.app:
+        enabled: true
+        mountPath: /etc/app
+        contents:
+          foo.conf: bar
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'contents' not allowed"
+
+  - it: should reject statefulSets.<name>.progressDeadlineSeconds (Deployment-only field)
+    # progressDeadlineSeconds is a Deployment.spec field; the k8s StatefulSet API
+    # has no such field, and templates/statefulset.yaml does not render it. The
+    # schema must reflect that — accepting it would be a silent no-op.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.progressDeadlineSeconds: 999
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'progressDeadlineSeconds' not allowed"

@@ -4,6 +4,10 @@
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName }}
 {{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- $hsOptedOut := and $wl.headlessService (hasKey $wl.headlessService "enabled") (not $wl.headlessService.enabled) -}}
+{{- if and $hsOptedOut (not $wl.serviceName) -}}
+{{- fail (printf "statefulSets.%s: headlessService.enabled=false requires serviceName to point at an existing headless Service. Kubernetes rejects a StatefulSet whose spec.serviceName resolves to no Service. Set statefulSets.%s.serviceName to the name of the externally managed Service that provides stable per-pod DNS for these pods." $wlName $wlName) -}}
+{{- end -}}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -60,14 +64,17 @@ spec:
       labels:
         {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
     spec:
-      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | nindent 6 }}
+      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 6 }}
       {{- if $wl.initContainers }}
       initContainers:
-        {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
+        {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 8 }}
       {{- end }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | nindent 8 }}
-        {{- include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | trim | nindent 8 }}
+        {{- $sidecars := include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | trim }}
+        {{- if $sidecars }}
+        {{- $sidecars | nindent 8 }}
+        {{- end }}
       {{- $inheritParentVolumes := ne ($wl.useRootVolumes | toString) "false" }}
       {{- $cmm := include "uhc.resolveConfigMapMount" ($wl.inherit | default dict) | fromJson }}
       {{- $hasAutoVols := "" }}
@@ -87,10 +94,13 @@ spec:
           {{- toYaml (index $wl.volumes $vName) | nindent 10 }}
         {{- end }}
         {{- if $cmm.enabled }}
-        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | nindent 8 }}
+        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 8 }}
         {{- end }}
       {{- end }}
-      {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
+      {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | trim }}
+      {{- if $sched }}
+      {{- $sched | nindent 6 }}
+      {{- end }}
   {{- with $wl.volumeClaimTemplates }}
   volumeClaimTemplates:
     {{- toYaml . | nindent 4 }}

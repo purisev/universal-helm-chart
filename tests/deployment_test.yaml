@@ -1300,3 +1300,65 @@ tests:
       - equal:
           path: spec.template.spec.volumes[1].name
           value: local
+
+  - it: should deduplicate envFrom secretRef when name appears in both root and workload
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      envSecrets:
+        - shared-secret
+      envConfigMaps:
+        - shared-cm
+      deployments:
+        web:
+          enabled: true
+          envSecrets:
+            - shared-secret
+            - workload-only-secret
+          envConfigMaps:
+            - shared-cm
+            - workload-only-cm
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].envFrom
+          count: 4
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: shared-secret
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].secretRef.name
+          value: workload-only-secret
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[2].configMapRef.name
+          value: shared-cm
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[3].configMapRef.name
+          value: workload-only-cm
+
+  - it: envFrom dedup pins ordering as [root, workload-distinct] when workload re-mentions a root entry after a fresh one
+    # Edge case: root=[A], workload=[shared, A]. Without dedup the rendered list
+    # is [A, shared, A] and k8s last-wins per-key resolves overlapping keys to
+    # A. After dedup the list is [A, shared] (first-occurrence wins) and
+    # overlapping keys resolve to shared. This test pins that semantic so a
+    # future refactor doesn't silently flip it.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      envSecrets:
+        - secret-a
+      deployments:
+        web:
+          enabled: true
+          envSecrets:
+            - secret-shared
+            - secret-a
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].envFrom
+          count: 2
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: secret-a
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[1].secretRef.name
+          value: secret-shared

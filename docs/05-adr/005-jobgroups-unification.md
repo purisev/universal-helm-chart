@@ -22,7 +22,18 @@ Unify under a single top-level map: `jobGroups`. Each group has:
 - shared configuration — image, env, envSecrets, envConfigMaps, hooks, volumes, volumeMounts, tolerations, security context, resources, etc.;
 - a nested `jobs:` map where each entry becomes one Job/CronJob resource and may override any group-level field.
 
-The merge between group and per-job follows the same rules as ADR 003: **maps replace per key, lists concat.** This is documented next to the `jobGroups` example in `values.yaml` and implemented in `templates/_helpers.tpl:uhc.jobGroupSpec`.
+The merge between group and per-job is one level deeper than the layer cascade in [ADR 003](003-layered-inheritance-and-override.md), and the rules are field-shape specific:
+
+| Field shape | Examples | Merge rule |
+|-------------|----------|------------|
+| Atomic / replace-whole | `backoffLimit`, `schedule`, `restartPolicy`, `command` (string-or-array), `args`, `tasks` (whole map), `ttlSecondsAfterFinished`, `concurrencyPolicy` | Job value wins when set; otherwise the group value (and otherwise nothing). Composite values like `command` and `tasks` are treated as opaque — the job's value replaces the group's wholesale, no recursion |
+| List | `envSecrets`, `envConfigMaps`, `tolerations` | Concat group entries first, then job entries |
+| Nested map | `env`, `image`, `securityContext`, `podSecurityContext`, `resources`, `nodeSelector`, `affinity`, `inherit`, `metadataAnnotations`, `hooks.argocd`, `hooks.helm` | **Deep-merge**: keys present in the job replace the group's value at that key, keys present only on the group are preserved |
+| Name-keyed map | `volumes`, `volumeMounts` | Per-entry replace by name: a job's `volumes.data` replaces the group's `volumes.data` whole; non-colliding keys from both layers coexist. The chart does **not** deep-merge into a single volume/mount because k8s volume kinds are mutually exclusive (a name is either `emptyDir` or `configMap`, never both) |
+| `kind` | `Job` / `CronJob` | Group only — per-job override is intentionally rejected |
+| `podAnnotations` | — | Effective merge of root → root.jobPodAnnotations → group → job (last wins) |
+
+This is implemented in `templates/_jobs.tpl:uhc.jobGroupSpec` and documented in the worked example next to the `jobGroups` block in `values.yaml`.
 
 Resource name: `<release-fullname>-<group[:8]>-<job>[-<sha8>]`. The `sha8` suffix is governed by [ADR 012](012-job-spec-hashing-for-idempotency.md).
 
@@ -106,7 +117,7 @@ jobGroups:
 ## References
 
 - `values.yaml` — the `jobGroups` block (narrative + worked example).
-- `templates/_helpers.tpl` — `uhc.jobGroupSpec`, `uhc.jobGroupHash`, `uhc.jobGroupHookAnnotations`.
+- `templates/_jobs.tpl` — `uhc.jobGroupSpec`, `uhc.jobGroupHash`, `uhc.jobGroupHookAnnotations`.
 - `templates/job-groups.yaml`, `templates/cronjob-groups.yaml`.
 - Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`.
 - Related: [ADR 003](003-layered-inheritance-and-override.md), [ADR 012](012-job-spec-hashing-for-idempotency.md).

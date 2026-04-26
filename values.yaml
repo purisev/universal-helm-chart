@@ -1145,6 +1145,17 @@ deployments: {}
 #         metrics:
 #           port: 9090
 #           targetPort: 9090
+#       # Optional pass-through to k8s Service spec. All five fields render
+#       # only when set; the chart imposes no defaults.
+#       # clusterIP: None                   # special "None" → headless Deployment Service
+#       # loadBalancerIP: 192.0.2.1         # type: LoadBalancer; pin static external IP
+#       # externalTrafficPolicy: Local      # preserve client source IP on LB/NodePort
+#       # sessionAffinity: ClientIP         # sticky sessions for stateful HTTP
+#       # publishNotReadyAddresses: true    # include not-ready pods in DNS — peer
+#                                            # discovery for Cassandra/Kafka/etcd/etc.
+#                                            # On StatefulSet headless this is the
+#                                            # common case; on Deployment use only
+#                                            # if your service has the same need.
 #     # Direct container ports (used by sidecars or workloads without a Service).
 #     # Map key → spec.containers[].ports[].name (k8s Pod). Same render order as
 #     # service.ports: "http" first, "metrics" last, others alphabetically between.
@@ -1238,8 +1249,18 @@ deployments: {}
 #       rules:
 #         - {}                    # no matches for TLSRoute — routing is SNI-based via root hostnames
 
-# Map of StatefulSet workloads. Each key becomes a separate StatefulSet + headless Service.
+# Map of StatefulSet workloads. Each key becomes a separate StatefulSet plus a
+# headless Service (clusterIP: None) for stable per-pod DNS — this is required by
+# k8s for StatefulSet pod identity and is rendered regardless of service.enabled.
 # Map key → metadata.name suffix (k8s StatefulSet): "<release-fullname>-<key>".
+# Set headlessService.enabled: false to opt out — only do that when something else
+# (a separately managed Service, ExternalName, or split-horizon DNS) already gives
+# pods stable network identity. **When you opt out, you MUST also set serviceName
+# to the existing Service.** k8s rejects a StatefulSet whose spec.serviceName
+# resolves to no Service; the chart's default serviceName is the auto-generated
+# `<release-fullname>-<key>-headless`, which won't exist if you've turned off the
+# auto rendering. The chart fails fast at render time when this combination is
+# misconfigured. Most workloads should leave headlessService on the default.
 statefulSets: {}
 # Override image per StatefulSet:
 #   image:
@@ -1247,4 +1268,38 @@ statefulSets: {}
 #     tag: v1.0
 #     pullPolicy: IfNotPresent
 # Optional: volumeClaimTemplates. Update strategy uses the same strategy key as Deployments.
+# Optional: opt out of the auto-generated headless Service. Pair with serviceName.
+#   headlessService:
+#     enabled: false
+#   serviceName: my-existing-headless-service
+# Optional pass-through to k8s Service spec on the headless Service. All five
+# fields render only when set. publishNotReadyAddresses: true is the canonical
+# use case here — peer discovery for clustered StatefulSet workloads (Cassandra,
+# Kafka, Elasticsearch, Cockroach, etcd, Zookeeper), where peers must resolve
+# each other via DNS before they reach Ready.
+#   service:
+#     enabled: true
+#     port: 9042
+#     targetPort: 9042
+#     publishNotReadyAddresses: true     # peer discovery — recommended for clustered StatefulSets
+#     # loadBalancerIP / externalTrafficPolicy / sessionAffinity also pass through.
+#     # clusterIP must be "None" or unset — the chart hardcodes None on the
+#     # headless Service, and any other value fails fast at render time
+#     # (mutually exclusive with stable per-pod DNS).
+#
+# When headlessService.enabled: false AND service.enabled: true the chart
+# renders a *separate* non-headless ClusterIP Service named "<release>-<key>"
+# (same pattern as Deployment Services) for client traffic. The user's
+# externally-managed headless Service (referenced by serviceName) provides
+# stable per-pod DNS; the chart's non-headless Service is for clients that
+# just need a stable VIP. Independent knobs.
+#   headlessService:
+#     enabled: false
+#   serviceName: my-external-headless    # required: spec.serviceName must point at an existing Service
+#   service:
+#     enabled: true
+#     type: ClusterIP
+#     port: 6379
+#     targetPort: 6379
+#     # all five pass-through fields apply here too
 

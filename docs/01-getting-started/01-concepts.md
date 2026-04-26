@@ -41,7 +41,7 @@ deployments:
 
 ### 2. `jobGroups` for both Job and CronJob
 
-A `jobGroup` has a `kind` (`Job` | `CronJob`) and a `jobs:` map. Group-level fields cascade into per-job fields with documented merge semantics: maps replace per key, lists concat. The same shape covers schema migrations, nightly cleanups, smoke checks. ([ADR 005](../05-adr/005-jobgroups-unification.md))
+A `jobGroup` has a `kind` (`Job` | `CronJob`) and a `jobs:` map. Per-job fields override group-level fields with shape-specific rules — scalars take the job's value or fall back to the group's; lists concat group-then-job; nested maps (`env`, `image`, `resources`, `securityContext`, `inherit`, `hooks.*`, etc.) deep-merge with the job winning on key collision; name-keyed maps (`volumes`, `volumeMounts`) replace whole entries by name. The same shape covers schema migrations, nightly cleanups, smoke checks. ([ADR 005](../05-adr/005-jobgroups-unification.md))
 
 Crucially: every Job's name carries an **8-char hash of its rendered spec**. Same spec → same name → Argo CD/Flux see "no change" and skip. Spec changes → new name → new Job runs once. Old Jobs are GC'd by `ttlSecondsAfterFinished`. **Migrations never re-run on every sync.** ([ADR 012](../05-adr/012-job-spec-hashing-for-idempotency.md))
 
