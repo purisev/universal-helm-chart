@@ -130,3 +130,45 @@ tests:
       - equal:
           path: spec.scaleTargetRef.envSourceContainerName
           value: worker
+
+  - it: should render idleReplicaCount=0 (canonical scale-to-zero signal)
+    # KEDA reads idleReplicaCount: 0 as "scale to zero when no triggers fire".
+    # A truthiness gate would silently drop the field and KEDA would scale to
+    # minReplicaCount (≥1) instead of 0 — losing the entire idle-cost saving.
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.idleReplicaCount: 0
+      deployments.worker.keda.triggers[0].type: kafka
+      deployments.worker.keda.triggers[0].metadata.bootstrapServers: kafka:9092
+      deployments.worker.keda.triggers[0].metadata.consumerGroup: workers
+      deployments.worker.keda.triggers[0].metadata.topic: tasks
+      deployments.worker.keda.triggers[0].metadata.lagThreshold: "5"
+    asserts:
+      - equal:
+          path: spec.idleReplicaCount
+          value: 0
+
+  - it: should render cooldownPeriod=0 (no cooldown wait)
+    # cooldownPeriod: 0 is a valid KEDA value meaning "scale down immediately
+    # when triggers fall below the threshold". A truthiness gate would drop
+    # the field and KEDA would fall back to its 300s default.
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.cooldownPeriod: 0
+      deployments.worker.keda.triggers[0].type: kafka
+      deployments.worker.keda.triggers[0].metadata.bootstrapServers: kafka:9092
+      deployments.worker.keda.triggers[0].metadata.consumerGroup: workers
+      deployments.worker.keda.triggers[0].metadata.topic: tasks
+      deployments.worker.keda.triggers[0].metadata.lagThreshold: "5"
+    asserts:
+      - equal:
+          path: spec.cooldownPeriod
+          value: 0

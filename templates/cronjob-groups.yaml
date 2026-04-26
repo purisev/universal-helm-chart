@@ -83,7 +83,10 @@ spec:
           containers:
             {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | trim | nindent 12 }}
           {{- end }}
-          {{- $useRootVolumes := ne ($merged.useRootVolumes | toString) "false" }}
+          {{- $useRootVolumes := true }}
+          {{- if hasKey $merged "useRootVolumes" }}
+          {{- $useRootVolumes = $merged.useRootVolumes }}
+          {{- end }}
           {{- $cmm := include "uhc.resolveConfigMapMount" ($merged.inherit | default dict) | fromJson }}
           {{- $hasAutoVols := "" }}
           {{- if $cmm.enabled }}

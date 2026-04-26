@@ -14,7 +14,10 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should not render when serviceAccount.create is false
+  - it: should fail fast when rbac.enabled without serviceAccount.create
+    # Pre-2.0.0 polish this combination silently produced zero documents.
+    # Now the chart aborts with a clear message: the binding can't bind to a
+    # ServiceAccount the chart doesn't own.
     set:
       serviceAccount.create: false
       rbac.enabled: true
@@ -22,6 +25,14 @@ tests:
         - apiGroups: [""]
           resources: ["configmaps"]
           verbs: ["get"]
+    asserts:
+      - failedTemplate:
+          errorPattern: "rbac.enabled requires serviceAccount.create=true"
+
+  - it: should not render when both rbac.enabled and serviceAccount.create are false
+    set:
+      serviceAccount.create: false
+      rbac.enabled: false
     asserts:
       - hasDocuments:
           count: 0

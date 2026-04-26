@@ -30,10 +30,10 @@ spec:
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
-  {{- if $wl.keda.cooldownPeriod }}
+  {{- if hasKey $wl.keda "cooldownPeriod" }}
   cooldownPeriod: {{ $wl.keda.cooldownPeriod }}
   {{- end }}
-  {{- if $wl.keda.idleReplicaCount }}
+  {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
   {{- end }}
 {{- end }}
@@ -68,10 +68,10 @@ spec:
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
-  {{- if $wl.keda.cooldownPeriod }}
+  {{- if hasKey $wl.keda "cooldownPeriod" }}
   cooldownPeriod: {{ $wl.keda.cooldownPeriod }}
   {{- end }}
-  {{- if $wl.keda.idleReplicaCount }}
+  {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
   {{- end }}
 {{- end }}

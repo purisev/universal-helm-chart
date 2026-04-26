@@ -238,9 +238,12 @@ Output at zero indent; caller controls nindent.
   resources:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- $inheritParentMounts := ne ($wl.useRootVolumeMounts | toString) "false" }}
+  {{- $inheritParentMounts := true }}
+  {{- if hasKey $wl "useRootVolumeMounts" }}
+  {{- $inheritParentMounts = $wl.useRootVolumeMounts }}
+  {{- end }}
   {{- if hasKey . "useRootVolumeMounts" }}
-  {{- $inheritParentMounts = ne (.useRootVolumeMounts | toString) "false" }}
+  {{- $inheritParentMounts = .useRootVolumeMounts }}
   {{- end }}
   {{- $mountsKey := $wlName }}
   {{- if hasKey . "rootVolumeMountsKey" }}

@@ -75,7 +75,10 @@ spec:
         {{- if $sidecars }}
         {{- $sidecars | nindent 8 }}
         {{- end }}
-      {{- $inheritParentVolumes := ne ($wl.useRootVolumes | toString) "false" }}
+      {{- $inheritParentVolumes := true }}
+      {{- if hasKey $wl "useRootVolumes" }}
+      {{- $inheritParentVolumes = $wl.useRootVolumes }}
+      {{- end }}
       {{- $cmm := include "uhc.resolveConfigMapMount" ($wl.inherit | default dict) | fromJson }}
       {{- $hasAutoVols := "" }}
       {{- if $cmm.enabled }}
