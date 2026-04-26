@@ -27,7 +27,7 @@ Use **`helm-unittest`** as the chart's primary test framework. Tests live in `te
 - **Prefer assertion tests over snapshots.** Assertions are descriptive (`isKind: Deployment`, `equal: spec.replicas: 3`); they survive harmless renames in unrelated parts of the manifest. Snapshots are byte-for-byte and break loudly on any whitespace change. We use snapshots only where the rendered output is a complex multi-document YAML and asserting field-by-field would be tedious — currently no snapshot fixtures exist (`tests/__snapshot__/` is empty).
 - **Fixtures for non-trivial inputs.** A test asserting that `service.ports` renders in http-first / metrics-last order (see [ADR 014](014-deterministic-ordering.md)) reads a `set:` block from `tests/fixtures/service-multiport.yaml` rather than inlining 30 lines of YAML. Each fixture has a focused purpose; the file name describes it (`es-datafrom-auto.yaml`, `commonlabels-conflict.yaml`).
 - **Test against the schema too.** `helm-unittest` runs Helm's schema validation as part of rendering. A test case that violates `values.schema.json` fails the suite — this catches schema regressions.
-- **Negative tests are valuable.** "This combination should fail" asserts via `expectFail` confirm fail-fast guards (HPA + KEDA, jobGroups hash + delete policy) actually fire.
+- **Negative tests are valuable.** "This combination should fail" asserts via `failedTemplate` confirm fail-fast guards (HPA + KEDA, jobGroups hash + delete policy) actually fire.
 
 The CI workflow at `.github/workflows/ci.yaml` runs `helm lint` then `helm unittest .`. The release workflow at `.github/workflows/release.yaml` runs the same checks before pushing the OCI artifact.
 

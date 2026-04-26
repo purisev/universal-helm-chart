@@ -75,9 +75,11 @@ helm unittest .
 # Document count in multi-doc render
 - hasDocuments:
     count: 2
-```
 
-For a negative test — i.e. one that asserts the template should fail — set `expectFail: true` at the top level of the test case (not inside the `asserts:` list).
+# Negative test — assert the template fails with a specific message
+- failedTemplate:
+    errorMessage: "deployments.web: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one."
+```
 
 ## Add a test in three steps
 
