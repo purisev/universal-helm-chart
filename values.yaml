@@ -1185,6 +1185,10 @@ deployments: {}
 #     # volumeMounts.<initContainerName> is NOT inherited; define mounts locally.
 #     # Reloader does not re-trigger initContainers — they run only on Pod
 #     # creation; rolling the workload triggers a fresh init pass.
+#     # Probes (readinessProbe / livenessProbe / startupProbe) and lifecycle
+#     # are NOT allowed on standard init containers — Kubernetes rejects
+#     # them at admission. The chart fail-fasts at template render if any
+#     # of these are set on an initContainers entry.
 #     # The same shape applies under statefulSets.<name>.initContainers.
 #     initContainers:
 #       01-wait-for-db:
@@ -1203,9 +1207,6 @@ deployments: {}
 #           - --config=/etc/config/migrate.yaml
 #         envSecrets:
 #           - db-credentials
-#         volumeMounts: {}                  # map keyed by mount name
-#         resources: {}
-#         securityContext: {}
 #     # Per-workload host aliases (merged with root hostAliases by default).
 #     # Set inheritRootHostAliases: false to use only local aliases.
 #     hostAliases: []

@@ -493,6 +493,10 @@ Output at zero indent; caller controls nindent.
       protocol: TCP
     {{- end }}
   {{- end }}
+  {{- if and .excludeProbesAndLifecycle $wl.probesEnabled }}
+  {{- fail (printf "%s.%s: probes are not supported on standard init containers (Kubernetes only allows probes on native sidecar-init with restartPolicy: Always — not yet exposed by the chart). Remove probesEnabled / readinessProbe / livenessProbe / startupProbe from this entry." (.pathPrefix | default "container") $wlName) }}
+  {{- end }}
+  {{- if not .excludeProbesAndLifecycle }}
   {{- if $wl.probesEnabled }}
   {{- with $wl.readinessProbe }}
   readinessProbe:
@@ -507,9 +511,15 @@ Output at zero indent; caller controls nindent.
     {{- toYaml . | nindent 4 }}
   {{- end }}
   {{- end }}
+  {{- end }}
+  {{- if and .excludeProbesAndLifecycle $wl.lifecycle }}
+  {{- fail (printf "%s.%s: lifecycle is not supported on standard init containers. Remove the lifecycle block from this entry." (.pathPrefix | default "container") $wlName) }}
+  {{- end }}
+  {{- if not .excludeProbesAndLifecycle }}
   {{- with $wl.lifecycle }}
   lifecycle:
     {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- end }}
   {{- $resolvedSecCtx := $wl.securityContext | default $ctx.Values.securityContext }}
   {{- with $resolvedSecCtx }}
@@ -604,7 +614,7 @@ Output at zero indent; caller controls nindent.
 {{- $wl := .wl }}
 {{- range $name := keys ($wl.initContainers | default dict) | sortAlpha }}
 {{- $spec := index $wl.initContainers $name }}
-{{- include "uhc.containerSpecWithOptions" (dict "ctx" $ctx "wl" $spec "containerName" $name "renderDirectPorts" true "useRootVolumeMounts" false "inheritOverride" $wl.inherit) }}
+{{- include "uhc.containerSpecWithOptions" (dict "ctx" $ctx "wl" $spec "containerName" $name "renderDirectPorts" true "useRootVolumeMounts" false "inheritOverride" $wl.inherit "excludeProbesAndLifecycle" true "pathPrefix" "initContainers") }}
 {{- end }}
 {{- end }}
 

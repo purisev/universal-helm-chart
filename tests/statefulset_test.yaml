@@ -272,6 +272,55 @@ tests:
           path: spec.template.spec.initContainers[0].volumeMounts[0].mountPath
           value: /etc/config
 
+  - it: should propagate inherit.configMapMount false to StatefulSet initContainers
+    set:
+      image.repository: redis
+      image.tag: alpine
+      configMaps.app-config.enabled: true
+      configMaps.app-config.mountPath: /etc/config
+      configMaps.app-config.data.key: value
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.inherit.configMapMount: false
+      statefulSets.redis.initContainers.migrate.command: echo migrating
+    asserts:
+      - isNull:
+          path: spec.template.spec.initContainers[0].volumeMounts
+
+  - it: should propagate inherit.env from StatefulSet workload to its initContainers
+    set:
+      image.repository: redis
+      image.tag: alpine
+      global.env.APP_ENV.value: production
+      env.DEBUG.value: "true"
+      statefulSets.redis.enabled: true
+      statefulSets.redis.replicaCount: 1
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.inherit.env.global: false
+      statefulSets.redis.inherit.env.root: false
+      statefulSets.redis.initContainers.migrate.command: echo migrating
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: APP_ENV
+      - notContains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: DEBUG
+      - contains:
+          path: spec.template.spec.initContainers[0].env
+          content:
+            name: NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+
   # --- L1: full labels on pod template ---
 
   - it: should not emit helm.sh/chart label and should keep standard app.kubernetes.io/* labels

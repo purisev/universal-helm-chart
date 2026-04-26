@@ -443,6 +443,39 @@ tests:
               fieldRef:
                 fieldPath: metadata.namespace
 
+  - it: should fail when probesEnabled is set on initContainer
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.initContainers.migrate.command: echo migrating
+      deployments.web.initContainers.migrate.probesEnabled: true
+      deployments.web.initContainers.migrate.readinessProbe.httpGet.path: /health
+      deployments.web.initContainers.migrate.readinessProbe.httpGet.port: 8080
+    asserts:
+      - failedTemplate:
+          errorMessage: "initContainers.migrate: probes are not supported on standard init containers (Kubernetes only allows probes on native sidecar-init with restartPolicy: Always — not yet exposed by the chart). Remove probesEnabled / readinessProbe / livenessProbe / startupProbe from this entry."
+
+  - it: should fail when lifecycle is set on initContainer
+    set:
+      image.repository: nginx
+      image.tag: latest
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.initContainers.migrate.command: echo migrating
+      deployments.web.initContainers.migrate.lifecycle.preStop.exec.command[0]: /bin/sleep
+      deployments.web.initContainers.migrate.lifecycle.preStop.exec.command[1]: "5"
+    asserts:
+      - failedTemplate:
+          errorMessage: "initContainers.migrate: lifecycle is not supported on standard init containers. Remove the lifecycle block from this entry."
+
   - it: should inherit all env levels by default
     set:
       image.repository: nginx
