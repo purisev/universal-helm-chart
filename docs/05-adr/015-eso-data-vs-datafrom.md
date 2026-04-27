@@ -7,7 +7,7 @@
 
 External Secrets Operator (ESO) gives two ways to extract values from a backend (Vault, AWS, GCP, etc.) into a Kubernetes Secret:
 
-- **`data[]`** — explicit per-field mapping. Each entry says: "fetch this `remoteKey`+`property` and put it in the resulting Secret under this `secretKey`." Granular, predictable, type-checked.
+- **`data[]`** — explicit per-field mapping. Each entry says: "fetch this `remoteKey` (and optionally a specific `property` within it) and put it in the resulting Secret under this `secretKey`." `property` selects a sub-field for backends that store structured values (Vault KV-v2, JSON-shaped AWS SecretsManager); for plain-string secrets (AWS `SecretString`, simple GCP values) it is omitted and ESO returns the whole stored value. Granular, predictable, type-checked.
 - **`dataFrom[]`** — bulk extraction. "Fetch the whole `remoteKey` and merge all its fields into the resulting Secret." Saves typing when the remote secret is already shaped right; obscures which fields end up in K8s.
 
 Both have legitimate uses. The chart needs to support both without making the values shape ambiguous.
