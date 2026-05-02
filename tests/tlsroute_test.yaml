@@ -127,8 +127,7 @@ tests:
       tlsRoute.parentRefs:
         - {name: my-gw, namespace: gateway-ns}
       tlsRoute.hostnames:
-        - tls.example.com
-      tlsRoute.hostnames[0]: secure.example.com
+        - secure.example.com
       tlsRoute.rules:
         - {}
     asserts:
@@ -142,8 +141,7 @@ tests:
       tlsRoute.parentRefs:
         - {name: my-gw, namespace: gateway-ns}
       tlsRoute.hostnames:
-        - tls.example.com
-      tlsRoute.hostnames[0]: secure.example.com
+        - secure.example.com
       tlsRoute.rules:
         - {}
     asserts:
@@ -166,15 +164,13 @@ tests:
       tlsRoutes.ext.parentRefs:
         - {name: my-gw, namespace: gateway-ns}
       tlsRoutes.ext.hostnames:
-        - ext.example.com
-      tlsRoutes.ext.hostnames[0]: secure.example.com
+        - secure.example.com
       tlsRoutes.ext.rules[0].serviceName: my-release-web
       tlsRoutes.int.enabled: true
       tlsRoutes.int.parentRefs:
         - {name: my-gw, namespace: gateway-ns}
       tlsRoutes.int.hostnames:
-        - int.example.com
-      tlsRoutes.int.hostnames[0]: internal.example.com
+        - internal.example.com
       tlsRoutes.int.rules[0].serviceName: my-release-api
     asserts:
       - hasDocuments:
@@ -187,8 +183,7 @@ tests:
       tlsRoutes.ext.parentRefs:
         - {name: my-gw, namespace: gateway-ns}
       tlsRoutes.ext.hostnames:
-        - ext.example.com
-      tlsRoutes.ext.hostnames[0]: secure.example.com
+        - secure.example.com
       tlsRoutes.ext.rules[0].serviceName: my-svc
     asserts:
       - matchRegex:
@@ -201,8 +196,7 @@ tests:
       tlsRoutes.ext.parentRefs:
         - {name: my-gw, namespace: gateway-ns}
       tlsRoutes.ext.hostnames:
-        - ext.example.com
-      tlsRoutes.ext.hostnames[0]: secure.example.com
+        - secure.example.com
       tlsRoutes.ext.rules[0].serviceName: my-svc
     asserts:
       - equal:
