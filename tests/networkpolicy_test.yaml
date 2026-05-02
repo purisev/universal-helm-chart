@@ -9,7 +9,7 @@ tests:
   - it: should not render when no workloads have networkPolicy enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
     asserts:
       - hasDocuments:
@@ -18,7 +18,7 @@ tests:
   - it: should render NetworkPolicy for Deployment when enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
     asserts:
@@ -47,7 +47,7 @@ tests:
   - it: should use default policyTypes Ingress when not set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
     asserts:
@@ -58,7 +58,7 @@ tests:
   - it: should render custom policyTypes
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
       deployments.web.networkPolicy.policyTypes:
@@ -75,7 +75,7 @@ tests:
   - it: should render ingress rules when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
       deployments.web.networkPolicy.ingress:
@@ -92,7 +92,7 @@ tests:
   - it: should render egress rules when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
       deployments.web.networkPolicy.policyTypes:
@@ -109,7 +109,7 @@ tests:
   - it: should set podSelector matching workload selector labels
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
     asserts:
@@ -121,7 +121,7 @@ tests:
   - it: should render NetworkPolicy for both Deployment and StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.networkPolicy.enabled: true
       statefulSets.db.enabled: true

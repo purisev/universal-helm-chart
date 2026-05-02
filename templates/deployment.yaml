@@ -3,7 +3,7 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if ne (index $wl "enabled") false }}
 ---
 apiVersion: apps/v1
 kind: Deployment

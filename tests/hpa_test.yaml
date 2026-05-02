@@ -14,7 +14,7 @@ tests:
   - it: should not render when hpa disabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: false
       deployments.web.hpa.maxReplicas: 5
@@ -25,7 +25,7 @@ tests:
   - it: should fail when both hpa and keda are enabled on the same workload
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -38,7 +38,7 @@ tests:
   - it: should render HPA when enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -52,7 +52,7 @@ tests:
   - it: should have correct name
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -64,7 +64,7 @@ tests:
   - it: should default minReplicas to 1
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -76,7 +76,7 @@ tests:
   - it: should set custom minReplicas and maxReplicas
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.minReplicas: 2
@@ -92,7 +92,7 @@ tests:
   - it: should reference correct deployment in scaleTargetRef
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -107,7 +107,7 @@ tests:
   - it: should have argocd sync-wave annotation
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -128,7 +128,7 @@ tests:
   - it: should render two HPAs for two deployments
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.alpha.enabled: true
       deployments.alpha.hpa.enabled: true
       deployments.alpha.hpa.maxReplicas: 5
@@ -175,7 +175,7 @@ tests:
   - it: should render HPAs for both a Deployment and a StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5

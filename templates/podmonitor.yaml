@@ -11,7 +11,7 @@
 {{- $provider := include "uhc.metricsProvider" (dict "ctx" $ctx "wl" $wl) -}}
 {{- if and $metricsEnabled (eq $metricsType "pod") (ne $discovery "annotations") }}
 {{- $pmName := printf "%s-%s-metrics" $releaseName $wlName }}
-{{- include "uhc.assertNameLength" (dict "name" $pmName "kind" (printf "PodMonitor for workload %q" $wlName)) }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $pmName "kind" (printf "PodMonitor for workload %q" $wlName)) }}
 ---
 {{- if eq $provider "victoriametrics" }}
 apiVersion: operator.victoriametrics.com/v1beta1

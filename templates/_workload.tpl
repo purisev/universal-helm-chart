@@ -136,6 +136,9 @@ Output at zero indent; caller controls nindent.
   {{- $resolvedRepo := required "image.repository is required (set image.repository or per-workload image.repository)" (default $ctx.Values.image.repository $imageOverride.repository) }}
   {{- $resolvedTag := required "image.tag is required (set image.tag or per-workload image.tag)" (default $ctx.Values.image.tag $imageOverride.tag) }}
   {{- $resolvedPullPolicy := default $ctx.Values.image.pullPolicy $imageOverride.pullPolicy }}
+  {{- if and (eq $resolvedTag "latest") (eq $resolvedPullPolicy "IfNotPresent") }}
+  {{- fail (printf "container %q: imagePullPolicy: IfNotPresent combined with tag 'latest' is unsafe — nodes that already have the image cached will not pull updates. Set imagePullPolicy: Always or use a specific image tag." $wlName) }}
+  {{- end }}
   image: "{{ $resolvedRepo }}:{{ $resolvedTag }}"
   imagePullPolicy: {{ $resolvedPullPolicy }}
   {{- if $wl.command }}
@@ -234,7 +237,8 @@ Output at zero indent; caller controls nindent.
   securityContext:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with $wl.resources }}
+  {{- $resolvedResources := $wl.resources | default $ctx.Values.resources }}
+  {{- with $resolvedResources }}
   resources:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -386,71 +390,31 @@ Output at zero indent; caller controls nindent.
 {{- $wl := .wl }}
 {{- $releaseName := .releaseName }}
 {{- $wlName := .wlName }}
-{{- with $ctx.Values.nodeSelector }}
+{{- $ns := $wl.nodeSelector | default $ctx.Values.nodeSelector }}
+{{- with $ns }}
 nodeSelector:
   {{- toYaml . | nindent 2 }}
 {{- end }}
-{{- $schedInherit := $wl.inheritRootSchedParams | default dict }}
-{{- $useParentAffinity := not (eq (index $schedInherit "affinity") false) }}
-{{- $useParentTolerations := not (eq (index $schedInherit "tolerations") false) }}
-{{- $useParentTSC := not (eq (index $schedInherit "tsc") false) }}
-{{- if $useParentAffinity }}
-{{- if or $wl.affinity $ctx.Values.affinity }}
+{{- $affinity := $wl.affinity | default $ctx.Values.affinity }}
+{{- with $affinity }}
 affinity:
-  {{- toYaml ($wl.affinity | default $ctx.Values.affinity) | nindent 2 }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
-{{- else if $wl.affinity }}
-affinity:
-  {{- toYaml $wl.affinity | nindent 2 }}
+{{- $tolerations := $ctx.Values.tolerations | default list }}
+{{- if hasKey $wl "tolerations" }}
+  {{- $tolerations = $wl.tolerations | default list }}
 {{- end }}
-{{- $rootTolerations := $ctx.Values.tolerations | default list }}
-{{- $localTolerations := $wl.tolerations | default list }}
-{{- if $useParentTolerations }}
-{{- if or $rootTolerations $localTolerations }}
+{{- with $tolerations }}
 tolerations:
-  {{- if $rootTolerations }}
-  {{- toYaml $rootTolerations | nindent 2 }}
-  {{- end }}
-  {{- if $localTolerations }}
-  {{- toYaml $localTolerations | nindent 2 }}
-  {{- end }}
+  {{- toYaml . | nindent 2 }}
 {{- end }}
-{{- else if $localTolerations }}
-tolerations:
-  {{- toYaml $localTolerations | nindent 2 }}
-{{- end }}
-{{- $parentTSC := index $ctx.Values "topologySpreadConstraints" | default dict }}
-{{- $useRootTSC := $useParentTSC }}
-{{- $tscActive := false }}
-{{- if $useRootTSC }}
+{{- $tsc := $ctx.Values.topologySpreadConstraints | default list }}
 {{- if hasKey $wl "topologySpreadConstraints" }}
-  {{- if hasKey $wl.topologySpreadConstraints "enabled" }}
-    {{- $tscActive = $wl.topologySpreadConstraints.enabled }}
-  {{- else if (index $wl.topologySpreadConstraints "constraints") }}
-    {{- $tscActive = true }}
-  {{- else }}
-    {{- $tscActive = index $parentTSC "enabled" }}
-  {{- end }}
-{{- else }}
-  {{- $tscActive = index $parentTSC "enabled" }}
+  {{- $tsc = $wl.topologySpreadConstraints | default list }}
 {{- end }}
-{{- else if hasKey $wl "topologySpreadConstraints" }}
-  {{- if hasKey $wl.topologySpreadConstraints "enabled" }}
-    {{- $tscActive = $wl.topologySpreadConstraints.enabled }}
-  {{- else if (index $wl.topologySpreadConstraints "constraints") }}
-    {{- $tscActive = true }}
-  {{- end }}
-{{- end }}
-{{- if $tscActive }}
-{{- $tscRules := list }}
-{{- if $useRootTSC }}
-  {{- $tscRules = (index $wl "topologySpreadConstraints" | default dict).constraints | default (index $parentTSC "constraints") | default list }}
-{{- else }}
-  {{- $tscRules = (index $wl "topologySpreadConstraints" | default dict).constraints | default list }}
-{{- end }}
-{{- if $tscRules }}
+{{- if $tsc }}
 topologySpreadConstraints:
-  {{- range $tscRules }}
+  {{- range $tsc }}
   - maxSkew: {{ .maxSkew }}
     topologyKey: {{ .topologyKey }}
     whenUnsatisfiable: {{ .whenUnsatisfiable }}
@@ -466,6 +430,5 @@ topologySpreadConstraints:
       {{- toYaml .matchLabelKeys | nindent 6 }}
     {{- end }}
   {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}

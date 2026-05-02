@@ -28,11 +28,9 @@ jobGroups:
         # run order to "structure first, then seed".
         tasks:
           01-structure:
-            enabled: true
             command: |
               psql -c "CREATE TABLE IF NOT EXISTS schema_version (id SERIAL PRIMARY KEY)"
           02-seed:
-            enabled: true
             args:
               - "seed"
               - "--rows=100"

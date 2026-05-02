@@ -21,9 +21,9 @@ ingress:
           serviceName: webapp-web   # <release>-web — release name "webapp" assumed
           servicePort: 80
   tls:
-    web-example-tls:
-      hosts:
+    - hosts:
         - web.example.com
+      secretName: web-example-tls
 
 deployments:
   web:

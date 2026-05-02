@@ -37,7 +37,7 @@ This is implemented in `templates/_jobs.tpl:uhc.jobGroupSpec` and documented in 
 
 Resource name: `<release-fullname>-<group[:8]>-<job>[-<sha8>]`. The `sha8` suffix is governed by [ADR 012](012-job-spec-hashing-for-idempotency.md).
 
-`tasks` (a map of initContainers) is mutually exclusive with single-container mode (`command` / `args`). The schema enforces this — a job with both is rejected.
+`tasks` (a map of initContainers) is mutually exclusive with single-container mode (`command` / `args`). The schema enforces this — a job with both is rejected. Task entries have no `enabled` flag — every key present in the `tasks` map is rendered as an initContainer.
 
 **Task naming convention.** Kubernetes runs `initContainers` **sequentially in the order they appear in `spec.initContainers[]`**. The chart sorts the `tasks` map alphabetically before emitting (see [ADR 014](014-deterministic-ordering.md)), so **the alphabetical order of task names is the order in which they actually run**. When the order matters, prefix task names with `01-`, `02-`, `03-` etc. — that's the convention used in the worked example below and in [`02-examples/05-cronjobs/`](../02-examples/05-cronjobs/).
 
@@ -84,7 +84,7 @@ jobGroups:
         tasks:
           01-schema:
             command: |
-              psql -c "CREATE TABLE IF NOT EXISTS ..."
+              psql -c "CREATE TABLE IF NOT EXISTS schema_version (id SERIAL PRIMARY KEY)"
           02-seed:
             args:
               - seed
@@ -116,8 +116,8 @@ jobGroups:
 
 ## References
 
-- `values.yaml` — the `jobGroups` block (narrative + worked example).
 - `templates/_jobs.tpl` — `uhc.jobGroupSpec`, `uhc.jobGroupHash`, `uhc.jobGroupHookAnnotations`.
+- [`docs/02-examples/05-cronjobs/`](../02-examples/05-cronjobs/) — worked example.
 - `templates/job-groups.yaml`, `templates/cronjob-groups.yaml`.
 - Tests: `tests/job_groups_test.yaml`, `tests/cronjob_groups_test.yaml`.
 - Related: [ADR 003](003-layered-inheritance-and-override.md), [ADR 012](012-job-spec-hashing-for-idempotency.md).

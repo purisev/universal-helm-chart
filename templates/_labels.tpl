@@ -117,3 +117,16 @@ Params: dict "name" "<built-name>" "kind" "<resource-kind-or-context>"
 {{- fail (printf "%s value %q exceeds 63 characters (length=%d). The chart enforces a 63-char ceiling on every constructed name so the value remains a valid k8s DNS-1123 label (used in spec.selector.matchLabels and as the app.kubernetes.io/instance label value). Shorten the Helm release name, .Values.fullnameOverride, or the workload / entry key in values.yaml." .kind $name (len $name)) -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Fail fast when a constructed name would exceed 253 characters (DNS-1123 subdomain limit).
+Used for resource kinds that are not constrained to the stricter 63-char DNS label limit:
+ConfigMap, Ingress, HTTPRoute, GRPCRoute, TLSRoute, ReferenceGrant, ServiceMonitor, PodMonitor.
+Params: dict "name" "<built-name>" "kind" "<resource-kind-or-context>"
+*/}}
+{{- define "uhc.assertSubdomainLength" -}}
+{{- $name := .name -}}
+{{- if gt (len $name) 253 -}}
+{{- fail (printf "%s name %q exceeds 253 characters (length=%d). Kubernetes enforces a 253-char ceiling on DNS-1123 subdomain names. Shorten the Helm release name, .Values.fullnameOverride, or the entry key in values.yaml." .kind $name (len $name)) -}}
+{{- end -}}
+{{- end }}

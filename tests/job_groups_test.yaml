@@ -14,7 +14,7 @@ tests:
   - it: should render nothing when group is disabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: false
       jobGroups.db.jobs.migrate.enabled: true
       jobGroups.db.jobs.migrate.command: "true"
@@ -25,7 +25,7 @@ tests:
   - it: should render nothing when group has no jobs
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs: {}
     asserts:
@@ -35,7 +35,7 @@ tests:
   - it: should skip disabled jobs in an enabled group
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.skipped.enabled: false
       jobGroups.db.jobs.skipped.command: "true"
@@ -51,7 +51,7 @@ tests:
   - it: should skip CronJob-kind groups (handled by cronjob-groups.yaml)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -65,7 +65,7 @@ tests:
   - it: should render one Job per enabled job in group
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.batch.enabled: true
       jobGroups.batch.jobs.a.enabled: true
       jobGroups.batch.jobs.a.command: "true"
@@ -80,7 +80,7 @@ tests:
   - it: should render one Job per enabled job across multiple groups
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.g1.enabled: true
       jobGroups.g1.jobs.x.enabled: true
       jobGroups.g1.jobs.x.command: "true"
@@ -95,7 +95,7 @@ tests:
   - it: should produce metadata.name with sha8 suffix by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
       jobGroups.db.jobs.migrate.command: "true"
@@ -109,7 +109,7 @@ tests:
   - it: should drop hash when hashSuffix is false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hashSuffix: false
       jobGroups.db.jobs.migrate.enabled: true
@@ -122,7 +122,7 @@ tests:
   - it: should truncate group name to 8 chars but keep job name verbatim
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.verylonggroupname.enabled: true
       jobGroups.verylonggroupname.jobs.verylongjobname.enabled: true
       jobGroups.verylonggroupname.jobs.verylongjobname.command: "true"
@@ -135,7 +135,7 @@ tests:
   - it: should keep long job name verbatim alongside truncated group
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hashSuffix: false
       jobGroups.db.jobs.cleanup-orphaned-rows.enabled: true
@@ -152,7 +152,7 @@ tests:
   - it: should render single-container with jobName when no tasks
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.notify.enabled: true
       jobGroups.db.jobs.notify.command: "echo done"
@@ -166,12 +166,10 @@ tests:
   - it: should render initContainers and job-completed when tasks present
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
-      jobGroups.db.jobs.migrate.tasks.seed.enabled: true
       jobGroups.db.jobs.migrate.tasks.seed.command: "true"
     asserts:
       - lengthEqual:
@@ -196,10 +194,9 @@ tests:
   - it: should override completionImage when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
       jobGroups.db.jobs.migrate.completionImage: busybox:1.36
     asserts:
@@ -210,33 +207,27 @@ tests:
   - it: should fail when both tasks and command are set on a job
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.bad.enabled: true
       jobGroups.db.jobs.bad.command: "echo hi"
-      jobGroups.db.jobs.bad.tasks.x.enabled: true
       jobGroups.db.jobs.bad.tasks.x.command: "true"
     asserts:
       - failedTemplate:
           errorMessage: "jobGroups.db.jobs.bad: cannot set both 'tasks' and 'command/args'"
 
-  - it: should skip disabled tasks in initContainers
+  - it: should render all tasks as initContainers
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.on.enabled: true
-      jobGroups.db.jobs.migrate.tasks.on.command: "true"
-      jobGroups.db.jobs.migrate.tasks.off.enabled: false
-      jobGroups.db.jobs.migrate.tasks.off.command: "true"
+      jobGroups.db.jobs.migrate.tasks.alpha.command: "true"
+      jobGroups.db.jobs.migrate.tasks.beta.command: "true"
     asserts:
       - lengthEqual:
           path: spec.template.spec.initContainers
-          count: 1
-      - equal:
-          path: spec.template.spec.initContainers[0].name
-          value: "on"
+          count: 2
 
   # ---------- image fallback chain ----------
   - it: should fall back to root image when group/job have none
@@ -285,7 +276,7 @@ tests:
   - it: should render no hook annotations when hooks block is absent
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
       jobGroups.db.jobs.task.command: "true"
@@ -296,7 +287,7 @@ tests:
   - it: should render argocd hook annotations when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hashSuffix: false
       jobGroups.db.hooks.argocd.hook: Sync
@@ -320,7 +311,7 @@ tests:
   - it: should render helm hook annotations when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hashSuffix: false
       jobGroups.db.hooks.helm.hook: pre-install,pre-upgrade
@@ -344,7 +335,7 @@ tests:
   - it: should fail when hashSuffix=true and argocd deletePolicy is HookSucceeded
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hooks.argocd.hook: Sync
       jobGroups.db.hooks.argocd.deletePolicy: HookSucceeded
@@ -357,7 +348,7 @@ tests:
   - it: should fail when hashSuffix=true and helm deletePolicy is hook-succeeded
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hooks.helm.hook: post-install
       jobGroups.db.hooks.helm.deletePolicy: hook-succeeded
@@ -370,7 +361,7 @@ tests:
   - it: should allow argocd HookSucceeded together with hashSuffix=false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hashSuffix: false
       jobGroups.db.hooks.argocd.hook: Sync
@@ -385,7 +376,7 @@ tests:
   - it: should render both argocd and helm hook annotations together
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hooks.argocd.hook: Sync
       jobGroups.db.hooks.helm.hook: pre-install
@@ -402,7 +393,7 @@ tests:
   - it: should let job override group hooks
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hooks.argocd.hook: Sync
       jobGroups.db.hooks.argocd.syncWave: "2"
@@ -421,7 +412,7 @@ tests:
   - it: should merge root, group and job env (job wins on conflict)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       env.ROOT_VAR.value: from-root
       env.SHARED.value: root
       jobGroups.db.enabled: true
@@ -457,7 +448,7 @@ tests:
   - it: should default backoffLimit to 3 when neither group nor job set it
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
       jobGroups.db.jobs.task.command: "true"
@@ -469,7 +460,7 @@ tests:
   - it: should let job override group backoffLimit
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.backoffLimit: 5
       jobGroups.db.jobs.task.enabled: true
@@ -483,7 +474,7 @@ tests:
   - it: should default restartPolicy to Never
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
       jobGroups.db.jobs.task.command: "true"
@@ -495,7 +486,7 @@ tests:
   - it: should omit ttlSecondsAfterFinished when null
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
       jobGroups.db.jobs.task.command: "true"
@@ -506,7 +497,7 @@ tests:
   - it: should render ttlSecondsAfterFinished when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.ttlSecondsAfterFinished: 600
       jobGroups.db.jobs.task.enabled: true
@@ -519,7 +510,7 @@ tests:
   - it: should render activeDeadlineSeconds when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
       jobGroups.db.jobs.task.command: "true"
@@ -533,7 +524,7 @@ tests:
   - it: should label resource with truncated group-job name
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
       jobGroups.db.jobs.migrate.command: "true"
@@ -546,7 +537,7 @@ tests:
   - it: should use group-level serviceAccountName when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.serviceAccountName: my-job-sa
       jobGroups.db.jobs.task.enabled: true
@@ -559,7 +550,7 @@ tests:
   - it: should let job-level serviceAccountName override group-level
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.serviceAccountName: group-sa
       jobGroups.db.jobs.task.enabled: true
@@ -574,7 +565,7 @@ tests:
   - it: should add cm volume to pod when configMap with mountPath exists (single-container mode)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-cfg.enabled: true
       configMaps.app-cfg.mountPath: /etc/app
       configMaps.app-cfg.data.foo: bar
@@ -598,13 +589,12 @@ tests:
   - it: should add cm mounts to tasks-mode initContainers and pod volume
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-cfg.enabled: true
       configMaps.app-cfg.mountPath: /etc/app
       configMaps.app-cfg.data.foo: bar
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
     asserts:
       - contains:
@@ -623,14 +613,13 @@ tests:
   - it: should skip cm auto-mounts when inherit.configMapMount is false (tasks)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-cfg.enabled: true
       configMaps.app-cfg.mountPath: /etc/app
       configMaps.app-cfg.data.foo: bar
       jobGroups.db.enabled: true
       jobGroups.db.inherit.configMapMount: false
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
     asserts:
       - isNull:
@@ -642,11 +631,10 @@ tests:
   - it: should use root jobCompletionImage when no per-group override
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobCompletionImage: my-mirror.example.com/alpine:3.20
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
     asserts:
       - equal:
@@ -659,12 +647,11 @@ tests:
   - it: should let per-job completionImage override root jobCompletionImage
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobCompletionImage: my-mirror.example.com/alpine:3.20
       jobGroups.db.enabled: true
       jobGroups.db.jobs.migrate.enabled: true
       jobGroups.db.jobs.migrate.completionImage: busybox:1.36
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
     asserts:
       - equal:
@@ -675,7 +662,7 @@ tests:
   - it: should still produce sha8 suffix when podAnnotations are added (default behavior)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
       jobGroups.db.jobs.task.command: "true"
@@ -691,7 +678,7 @@ tests:
   - it: should keep hash stable across podAnnotations changes when hashIncludePodAnnotations=false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.hashIncludePodAnnotations: false
       jobGroups.db.podAnnotations.foo: a
@@ -708,7 +695,7 @@ tests:
   - it: should propagate root jobPodAnnotations into pod template via merged spec
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobPodAnnotations.foo: from-root
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
@@ -721,7 +708,7 @@ tests:
   - it: should let group/job podAnnotations override root jobPodAnnotations
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobPodAnnotations.shared: from-root
       jobGroups.db.enabled: true
       jobGroups.db.podAnnotations.shared: from-group
@@ -736,7 +723,7 @@ tests:
   - it: should respect granular configMapMount disable in single-container mode
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.cfg-a.enabled: true
       configMaps.cfg-a.mountPath: /a
       configMaps.cfg-a.data.x: "1"
@@ -776,7 +763,7 @@ tests:
   - it: should respect granular configMapMount disable in tasks-mode
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.cfg-a.enabled: true
       configMaps.cfg-a.mountPath: /a
       configMaps.cfg-a.data.x: "1"
@@ -786,7 +773,6 @@ tests:
       jobGroups.db.enabled: true
       jobGroups.db.inherit.configMapMount.cfg-a: false
       jobGroups.db.jobs.migrate.enabled: true
-      jobGroups.db.jobs.migrate.tasks.schema.enabled: true
       jobGroups.db.jobs.migrate.tasks.schema.command: "true"
     asserts:
       - notContains:
@@ -818,7 +804,7 @@ tests:
   - it: should fail when legacy dbJob key is present
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       dbJob.enabled: false
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
@@ -830,7 +816,7 @@ tests:
   - it: should fail when legacy initJob key is present
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       initJob.enabled: false
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
@@ -842,7 +828,7 @@ tests:
   - it: should fail when legacy postSync key is present
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       postSync.enabled: false
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
@@ -854,7 +840,7 @@ tests:
   - it: should fail when legacy cronJobs key is present
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       cronJobs.something.enabled: false
       jobGroups.db.enabled: true
       jobGroups.db.jobs.task.enabled: true
@@ -866,7 +852,7 @@ tests:
   - it: should let job-level volume override group-level on name collision
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups:
         db:
           enabled: true
@@ -900,7 +886,7 @@ tests:
     # the canonical 'no retry' use case for migrations where retry is dangerous.
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.kind: Job
       jobGroups.db.jobs.migrate.enabled: true

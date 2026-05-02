@@ -10,6 +10,6 @@ ingress:
           pathType: Prefix
           servicePort: 8080
   tls:
-    myapp-tls:
+    - secretName: myapp-tls
       hosts:
         - myapp.example.com

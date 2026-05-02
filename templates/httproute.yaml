@@ -10,12 +10,12 @@ parentRefs and hostnames come from root httpRoute and are shared by all merged r
 */}}
 {{- $wlState := dict "has" false }}
 {{- range $wlName, $wl := .Values.deployments }}
-  {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+  {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
     {{- $_ := set $wlState "has" true }}
   {{- end }}
 {{- end }}
 {{- range $wlName, $wl := .Values.statefulSets }}
-  {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+  {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
     {{- $_ := set $wlState "has" true }}
   {{- end }}
 {{- end }}
@@ -70,13 +70,13 @@ spec:
   {{- /* Per-workload rules: sorted by priority (asc) then alphabetically by workload name */}}
   {{- $sortKeys := list }}
   {{- range $wlName, $wl := $ctx.Values.deployments }}
-    {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+    {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
       {{- $priority := int ($wl.httpRoute.priority | default 999999999) }}
       {{- $sortKeys = append $sortKeys (printf "%09d|d|%s" $priority $wlName) }}
     {{- end }}
   {{- end }}
   {{- range $wlName, $wl := $ctx.Values.statefulSets }}
-    {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+    {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
       {{- $priority := int ($wl.httpRoute.priority | default 999999999) }}
       {{- $sortKeys = append $sortKeys (printf "%09d|s|%s" $priority $wlName) }}
     {{- end }}
@@ -119,12 +119,12 @@ need separate routes (e.g. different parentRefs or hostnames per route).
 */}}
 {{- range $routeName := keys ($ctx.Values.httpRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.httpRoutes $routeName }}
-{{- if and (hasKey $route "enabled") $route.enabled }}
+{{- if ne (index $route "enabled") false }}
 {{- if not $route.parentRefs -}}
 {{- fail (printf "httpRoutes.%s is enabled but parentRefs is empty. Each plural-map HTTPRoute carries its own parentRefs — without a parentRef the rendered HTTPRoute attaches to no Gateway and routes no traffic. Set httpRoutes.%s.parentRefs to the Gateway(s) the route should bind to." $routeName $routeName) -}}
 {{- end -}}
 {{- $hrFullName := printf "%s-%s" $releaseName $routeName }}
-{{- include "uhc.assertNameLength" (dict "name" $hrFullName "kind" (printf "HTTPRoute %q" $routeName)) }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $hrFullName "kind" (printf "HTTPRoute %q" $routeName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

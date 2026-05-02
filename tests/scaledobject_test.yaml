@@ -9,7 +9,7 @@ tests:
   - it: should not render when no keda enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
     asserts:
       - hasDocuments:
@@ -18,7 +18,7 @@ tests:
   - it: should fail when both hpa and keda are enabled on the same workload
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -73,7 +73,7 @@ tests:
   - it: should default minReplicaCount to 1
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.keda.enabled: true
       deployments.web.keda.maxReplicas: 5
@@ -137,7 +137,7 @@ tests:
     # minReplicaCount (≥1) instead of 0 — losing the entire idle-cost saving.
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.worker.enabled: true
       deployments.worker.keda.enabled: true
       deployments.worker.keda.maxReplicas: 5
@@ -158,7 +158,7 @@ tests:
     # hasKey-pattern preserves the explicit zero so KEDA can drive replicas to 0.
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.worker.enabled: true
       deployments.worker.keda.enabled: true
       deployments.worker.keda.minReplicas: 0
@@ -183,7 +183,7 @@ tests:
     # the field and KEDA would fall back to its 300s default.
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.worker.enabled: true
       deployments.worker.keda.enabled: true
       deployments.worker.keda.maxReplicas: 5

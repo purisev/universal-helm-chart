@@ -47,7 +47,7 @@ Templates **must not** call `fail` for things the schema can express. If you fin
 
 **What it costs:**
 
-- The schema is non-trivial (~1100 lines for ~1250 lines of values). Maintaining it alongside `values.yaml` is a small ongoing tax — the `$defs` layout keeps the cost roughly linear with the number of distinct shapes, not with the number of call sites.
+- The schema is non-trivial (~1100 lines, compared to ~240 lines in `values.yaml` which carries no inline comments). Maintaining it is a small ongoing tax — the `$defs` layout keeps the cost roughly linear with the number of distinct shapes, not with the number of call sites.
 - Cross-field invariants still need template-side `fail`s. The chart has a small number of these (HPA/KEDA mutual exclusion, jobGroups hash + delete policy guard) and each is documented in its own ADR.
 - The schema uses JSON Schema draft `2020-12`. Older Helm versions may not support every keyword we use; tested with Helm 3.14+.
 

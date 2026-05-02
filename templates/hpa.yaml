@@ -3,9 +3,9 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
-{{- if and $wl.hpa $wl.hpa.enabled }}
-{{- if and $wl.keda $wl.keda.enabled }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.hpa (ne (index $wl.hpa "enabled") false) }}
+{{- if and $wl.keda (ne (index $wl.keda "enabled") false) }}
 {{- fail (printf "deployments.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
 {{- end }}
 ---
@@ -40,9 +40,9 @@ spec:
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
-{{- if and $wl.hpa $wl.hpa.enabled }}
-{{- if and $wl.keda $wl.keda.enabled }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.hpa (ne (index $wl.hpa "enabled") false) }}
+{{- if and $wl.keda (ne (index $wl.keda "enabled") false) }}
 {{- fail (printf "statefulSets.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
 {{- end }}
 ---

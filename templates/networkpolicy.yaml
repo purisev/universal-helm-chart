@@ -2,8 +2,8 @@
 {{- $releaseName := include "uhc.fullname" . -}}
 {{- range $wlName := keys $ctx.Values.deployments | sortAlpha }}
 {{- $wl := index $ctx.Values.deployments $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
-{{- if and $wl.networkPolicy $wl.networkPolicy.enabled }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.networkPolicy (ne (index $wl.networkPolicy "enabled") false) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -34,8 +34,8 @@ spec:
 {{- end }}
 {{- range $wlName := keys ($ctx.Values.statefulSets | default dict) | sortAlpha }}
 {{- $wl := index $ctx.Values.statefulSets $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
-{{- if and $wl.networkPolicy $wl.networkPolicy.enabled }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.networkPolicy (ne (index $wl.networkPolicy "enabled") false) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

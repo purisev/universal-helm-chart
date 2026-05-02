@@ -8,7 +8,7 @@
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.service $wl.service.enabled }}
+{{- if and (ne (index $wl "enabled") false) $wl.service (ne (index $wl.service "enabled") false) }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($wl.service.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 ---
@@ -23,7 +23,7 @@ metadata:
   {{- $annots | nindent 2 }}
   {{- end }}
 spec:
-  type: {{ $wl.service.type }}
+  type: {{ $wl.service.type | default "ClusterIP" }}
   {{- with $wl.service.clusterIP }}
   clusterIP: {{ . }}
   {{- end }}
@@ -65,7 +65,7 @@ spec:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 {{- end }}
 {{- /* Standalone metrics-only Service for deployments without main service */ -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $injectMetricsPort (not (and $wl.service $wl.service.enabled)) }}
+{{- if and (ne (index $wl "enabled") false) $injectMetricsPort (not (and $wl.service (ne (index $wl.service "enabled") false))) }}
 {{- $expose := $exposeJson | fromJson }}
 {{- $metricsSvcName := printf "%s-%s-metrics" $releaseName $wlName }}
 {{- include "uhc.assertNameLength" (dict "name" $metricsSvcName "kind" (printf "standalone metrics Service for workload %q" $wlName)) }}
@@ -99,10 +99,7 @@ spec:
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
-{{- $hsEnabled := true -}}
-{{- if and $wl.headlessService (hasKey $wl.headlessService "enabled") -}}
-{{- $hsEnabled = $wl.headlessService.enabled -}}
-{{- end -}}
+{{- $hsEnabled := ne (index ($wl.headlessService | default dict) "enabled") false -}}
 {{- if and (hasKey $wl "enabled") $wl.enabled $hsEnabled }}
 {{- if and $wl.service $wl.service.clusterIP (ne $wl.service.clusterIP "None") -}}
 {{- fail (printf "statefulSets.%s.service.clusterIP=%q conflicts with the auto-rendered headless Service (clusterIP: None). The chart's StatefulSet branch always renders a headless Service for stable per-pod DNS — the ClusterIP variant is mutually exclusive. To run a non-headless Service for a StatefulSet workload, set statefulSets.%s.headlessService.enabled=false (and statefulSets.%s.serviceName to your existing Service) and manage the ClusterIP Service separately." $wlName $wl.service.clusterIP $wlName $wlName) -}}
@@ -180,7 +177,7 @@ spec:
      pass-through fields, ports map or singleton, metrics port appended via
      metrics.exposeService when configured. Name pattern matches Deployment:
      "<release>-<wlName>" (no -headless suffix). */ -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled (not $hsEnabled) $wl.service $wl.service.enabled }}
+{{- if and (ne (index $wl "enabled") false) (not $hsEnabled) $wl.service (ne (index $wl.service "enabled") false) }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($wl.service.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 ---

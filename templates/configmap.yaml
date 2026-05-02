@@ -3,10 +3,10 @@
 
 {{- range $wlName := keys ($ctx.Values.deployments | default dict) | sortAlpha }}
 {{- $wl := index $ctx.Values.deployments $wlName -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
+{{- if and (ne (index $wl "enabled") false) $wl.createConfigmap }}
 ---
 {{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
-{{- include "uhc.assertNameLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -31,10 +31,10 @@ data:
 
 {{- range $wlName := keys ($ctx.Values.statefulSets | default dict) | sortAlpha }}
 {{- $wl := index $ctx.Values.statefulSets $wlName -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
+{{- if and (ne (index $wl "enabled") false) $wl.createConfigmap }}
 ---
 {{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
-{{- include "uhc.assertNameLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -59,10 +59,10 @@ data:
 
 {{- range $cmName := keys ($ctx.Values.configMaps | default dict) | sortAlpha }}
 {{- $cm := index $ctx.Values.configMaps $cmName }}
-{{- if and (hasKey $cm "enabled") $cm.enabled }}
+{{- if ne (index $cm "enabled") false }}
 ---
 {{- $cmFullName := printf "%s-%s" $releaseName $cmName }}
-{{- include "uhc.assertNameLength" (dict "name" $cmFullName "kind" (printf "ConfigMap %q" $cmName)) }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap %q" $cmName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -62,15 +62,6 @@
         }
       }
     },
-    "inheritRootSchedParamsShape": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "affinity": {"type": "boolean"},
-        "tolerations": {"type": "boolean"},
-        "tsc": {"type": "boolean"}
-      }
-    },
     "headlessServiceShape": {
       "type": "object",
       "additionalProperties": false,
@@ -191,20 +182,11 @@
         }
       }
     },
-    "tscShape": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "enabled": {"type": "boolean"},
-        "constraints": {"type": "array"}
-      }
-    },
     "routeEntry": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
-        "priority": {"type": "integer", "minimum": 0},
         "annotations": {"type": "object"},
         "parentRefs": {"type": "array"},
         "hostnames": {
@@ -361,8 +343,23 @@
           "additionalProperties": {"type": "object"}
         },
         "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "hosts": {"type": "array", "items": {"type": "string"}},
+              "secretName": {"type": "string"}
+            }
+          }
+        },
+        "defaultBackend": {
           "type": "object",
-          "additionalProperties": {"type": "object"}
+          "additionalProperties": false,
+          "properties": {
+            "serviceName": {"type": "string"},
+            "servicePort": {"type": "integer", "minimum": 1, "maximum": 65535}
+          }
         }
       }
     },
@@ -402,7 +399,6 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean"},
         "image": {"$ref": "#/$defs/imageShape"},
         "command": {
           "oneOf": [
@@ -459,7 +455,6 @@
         "envSecrets": {"type": "array", "items": {"type": "string"}},
         "envConfigMaps": {"type": "array", "items": {"type": "string"}},
         "inherit": {"$ref": "#/$defs/inheritShape"},
-        "inheritRootSchedParams": {"$ref": "#/$defs/inheritRootSchedParamsShape"},
         "inheritRootHostAliases": {"type": "boolean"},
         "service": {"$ref": "#/$defs/serviceShape"},
         "ports": {
@@ -492,10 +487,7 @@
         },
         "volumeMounts": {
           "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": {"type": "object"}
-          }
+          "additionalProperties": {"type": "object"}
         },
         "securityContext": {"type": "object"},
         "podSecurityContext": {"type": "object"},
@@ -505,7 +497,7 @@
         "nodeSelector": {"type": "object"},
         "affinity": {"type": "object"},
         "tolerations": {"type": "array"},
-        "topologySpreadConstraints": {"$ref": "#/$defs/tscShape"},
+        "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
         "hostAliases": {"type": "array"},
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
@@ -543,7 +535,6 @@
         "envSecrets": {"type": "array", "items": {"type": "string"}},
         "envConfigMaps": {"type": "array", "items": {"type": "string"}},
         "inherit": {"$ref": "#/$defs/inheritShape"},
-        "inheritRootSchedParams": {"$ref": "#/$defs/inheritRootSchedParamsShape"},
         "inheritRootHostAliases": {"type": "boolean"},
         "service": {"$ref": "#/$defs/serviceShape"},
         "headlessService": {"$ref": "#/$defs/headlessServiceShape"},
@@ -565,7 +556,7 @@
         "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
         "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
-        "volumeClaimTemplates": {"type": "object"},
+        "volumeClaimTemplates": {"type": "array"},
         "minReadySeconds": {"type": "integer", "minimum": 0},
         "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0},
         "automountServiceAccountToken": {"type": "boolean"},
@@ -579,10 +570,7 @@
         },
         "volumeMounts": {
           "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": {"type": "object"}
-          }
+          "additionalProperties": {"type": "object"}
         },
         "securityContext": {"type": "object"},
         "podSecurityContext": {"type": "object"},
@@ -592,7 +580,7 @@
         "nodeSelector": {"type": "object"},
         "affinity": {"type": "object"},
         "tolerations": {"type": "array"},
-        "topologySpreadConstraints": {"$ref": "#/$defs/tscShape"},
+        "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
         "hostAliases": {"type": "array"},
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
@@ -650,7 +638,6 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "enabled": {"type": "boolean"},
           "command": {
             "oneOf": [
               {"type": "string"},
@@ -663,6 +650,64 @@
           }
         }
       }
+    },
+    "jobGroupEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "kind": {"type": "string", "enum": ["Job", "CronJob"]},
+        "hooks": {"$ref": "#/$defs/hooksShape"},
+        "image": {"$ref": "#/$defs/imageShape"},
+        "command": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}}
+          ]
+        },
+        "args": {
+          "type": "array",
+          "items": {"type": ["string", "integer", "number"]}
+        },
+        "tasks": {"$ref": "#/$defs/tasksShape"},
+        "env": {"type": "object"},
+        "envSecrets": {"type": "array", "items": {"type": "string"}},
+        "envConfigMaps": {"type": "array", "items": {"type": "string"}},
+        "inherit": {"$ref": "#/$defs/inheritShape"},
+        "schedule": {"type": "string"},
+        "timeZone": {"type": "string"},
+        "concurrencyPolicy": {"type": "string", "enum": ["Allow", "Forbid", "Replace"]},
+        "successfulJobsHistoryLimit": {"type": "integer", "minimum": 0},
+        "failedJobsHistoryLimit": {"type": "integer", "minimum": 0},
+        "startingDeadlineSeconds": {"type": ["integer", "null"], "minimum": 0},
+        "backoffLimit": {"type": "integer", "minimum": 0},
+        "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
+        "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
+        "restartPolicy": {"type": "string", "enum": ["Never", "OnFailure"]},
+        "completionImage": {"type": "string"},
+        "podSecurityContext": {"type": "object"},
+        "securityContext": {"type": "object"},
+        "resources": {"type": "object"},
+        "serviceAccountName": {"type": "string"},
+        "automountServiceAccountToken": {"type": ["boolean", "null"]},
+        "terminationGracePeriodSeconds": {"type": ["integer", "null"], "minimum": 0},
+        "volumes": {"type": "object", "additionalProperties": {"type": "object"}},
+        "volumeMounts": {"type": "object", "additionalProperties": {"type": "object"}},
+        "useRootVolumes": {"type": "boolean"},
+        "useRootVolumeMounts": {"type": "boolean"},
+        "nodeSelector": {"type": "object"},
+        "affinity": {"type": "object"},
+        "tolerations": {"type": "array"},
+        "metadataAnnotations": {"type": "object"},
+        "podAnnotations": {"type": "object"},
+        "hashSuffix": {"type": "boolean"},
+        "hashIncludePodAnnotations": {"type": "boolean"},
+        "jobs": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/jobEntry"}
+        }
+      },
+      "required": ["jobs"]
     },
     "jobEntry": {
       "type": "object",
@@ -786,6 +831,9 @@
         "type": "string"
       }
     },
+    "resources": {
+      "type": "object"
+    },
     "volumes": {
       "type": "object",
       "additionalProperties": {
@@ -847,9 +895,18 @@
         "enabled": {
           "type": "boolean"
         },
+        "clusterScoped": {
+          "type": "boolean"
+        },
         "rules": {
           "type": "array"
         }
+      }
+    },
+    "global": {
+      "type": "object",
+      "properties": {
+        "env": {"type": "object"}
       }
     },
     "env": {
@@ -866,66 +923,9 @@
     "verticalPodAutoscaler": {"$ref": "#/$defs/vpaShape"},
     "jobGroups": {
       "type": "object",
-      "additionalProperties": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "enabled": {"type": "boolean"},
-          "kind": {"type": "string", "enum": ["Job", "CronJob"]},
-          "hooks": {"$ref": "#/$defs/hooksShape"},
-          "image": {"$ref": "#/$defs/imageShape"},
-          "command": {
-            "oneOf": [
-              {"type": "string"},
-              {"type": "array", "items": {"type": "string"}}
-            ]
-          },
-          "args": {
-            "type": "array",
-            "items": {"type": ["string", "integer", "number"]}
-          },
-          "tasks": {"$ref": "#/$defs/tasksShape"},
-          "env": {"type": "object"},
-          "envSecrets": {"type": "array", "items": {"type": "string"}},
-          "envConfigMaps": {"type": "array", "items": {"type": "string"}},
-          "inherit": {"$ref": "#/$defs/inheritShape"},
-          "schedule": {"type": "string"},
-          "timeZone": {"type": "string"},
-          "concurrencyPolicy": {"type": "string", "enum": ["Allow", "Forbid", "Replace"]},
-          "successfulJobsHistoryLimit": {"type": "integer", "minimum": 0},
-          "failedJobsHistoryLimit": {"type": "integer", "minimum": 0},
-          "startingDeadlineSeconds": {"type": ["integer", "null"], "minimum": 0},
-          "backoffLimit": {"type": "integer", "minimum": 0},
-          "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
-          "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
-          "restartPolicy": {"type": "string", "enum": ["Never", "OnFailure"]},
-          "completionImage": {"type": "string"},
-          "podSecurityContext": {"type": "object"},
-          "securityContext": {"type": "object"},
-          "resources": {"type": "object"},
-          "serviceAccountName": {"type": "string"},
-          "automountServiceAccountToken": {"type": ["boolean", "null"]},
-          "terminationGracePeriodSeconds": {"type": ["integer", "null"], "minimum": 0},
-          "volumes": {"type": "object", "additionalProperties": {"type": "object"}},
-          "volumeMounts": {"type": "object", "additionalProperties": {"type": "object"}},
-          "useRootVolumes": {"type": "boolean"},
-          "useRootVolumeMounts": {"type": "boolean"},
-          "nodeSelector": {"type": "object"},
-          "affinity": {"type": "object"},
-          "tolerations": {"type": "array"},
-          "metadataAnnotations": {"type": "object"},
-          "podAnnotations": {"type": "object"},
-          "hashSuffix": {"type": "boolean"},
-          "hashIncludePodAnnotations": {"type": "boolean"},
-          "jobs": {
-            "type": "object",
-            "additionalProperties": {"$ref": "#/$defs/jobEntry"}
-          }
-        },
-        "required": ["jobs"]
-      }
+      "additionalProperties": {"$ref": "#/$defs/jobGroupEntry"}
     },
-    "topologySpreadConstraints": {"$ref": "#/$defs/tscShape"},
+    "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
     "httpRoute": {"$ref": "#/$defs/routeEntry"},
     "httpRoutes": {
       "type": "object",
@@ -1076,7 +1076,7 @@
                   "type": "string",
                   "enum": ["service", "pod"]
                 },
-                "port": { "type": "string" },
+                "port": { "type": ["string", "integer"] },
                 "path": { "type": "string" },
                 "scheme": {
                   "type": "string",

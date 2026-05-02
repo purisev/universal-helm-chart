@@ -9,7 +9,7 @@ tests:
   - it: should not render when vpa disabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
     asserts:
       - hasDocuments:
@@ -18,7 +18,7 @@ tests:
   - it: should render VPA for Deployment when global vpa enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: true
     asserts:
@@ -31,7 +31,7 @@ tests:
   - it: should have correct name
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: true
     asserts:
@@ -42,7 +42,7 @@ tests:
   - it: should target Deployment kind
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: true
     asserts:
@@ -56,7 +56,7 @@ tests:
   - it: should default updateMode to Initial
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: true
     asserts:
@@ -67,7 +67,7 @@ tests:
   - it: should use custom updateMode
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: true
       verticalPodAutoscaler.updateMode: "Off"
@@ -79,7 +79,7 @@ tests:
   - it: should render VPA for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       verticalPodAutoscaler.enabled: true
     asserts:
@@ -95,7 +95,7 @@ tests:
   - it: should use per-workload vpa override
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: false
       deployments.web.verticalPodAutoscaler.enabled: true
@@ -110,7 +110,7 @@ tests:
   - it: should have argocd sync-wave annotation
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       verticalPodAutoscaler.enabled: true
     asserts:
@@ -120,7 +120,7 @@ tests:
   - it: should render VPA for both Deployment and StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       statefulSets.db.enabled: true
       verticalPodAutoscaler.enabled: true
