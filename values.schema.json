@@ -487,10 +487,7 @@
         },
         "volumeMounts": {
           "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": {"type": "object"}
-          }
+          "additionalProperties": {"type": "object"}
         },
         "securityContext": {"type": "object"},
         "podSecurityContext": {"type": "object"},
@@ -573,10 +570,7 @@
         },
         "volumeMounts": {
           "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "additionalProperties": {"type": "object"}
-          }
+          "additionalProperties": {"type": "object"}
         },
         "securityContext": {"type": "object"},
         "podSecurityContext": {"type": "object"},
