@@ -1407,6 +1407,56 @@ tests:
           path: spec.replicas
           value: 0
 
+  # ---------- podAnnotations merge ----------
+  - it: should render root podAnnotations on pod template
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      podAnnotations.injected: "true"
+      deployments.web.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.injected
+          value: "true"
+
+  - it: should render per-workload podAnnotations on pod template
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.podAnnotations.custom-annotation: my-value
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.custom-annotation
+          value: my-value
+
+  - it: per-workload podAnnotations should override root on collision
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      podAnnotations.shared: from-root
+      deployments.web.enabled: true
+      deployments.web.podAnnotations.shared: from-workload
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.shared
+          value: from-workload
+
+  - it: per-workload podAnnotations should merge with root (non-colliding keys both present)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      podAnnotations.root-key: root-value
+      deployments.web.enabled: true
+      deployments.web.podAnnotations.workload-key: workload-value
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.root-key
+          value: root-value
+      - equal:
+          path: spec.template.metadata.annotations.workload-key
+          value: workload-value
+
   - it: should fail fast when label value exceeds the 63-char k8s limit
     # The release name "test-release" + chart name "universal-helm-chart" produces
     # a base of ~32 chars, so a 39-char workload key pushes the

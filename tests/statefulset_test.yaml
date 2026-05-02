@@ -443,6 +443,57 @@ tests:
           path: spec.replicas
           value: 0
 
+  # --- podAnnotations merge ---
+
+  - it: should render root podAnnotations on StatefulSet pod template
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      podAnnotations.injected: "true"
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.injected
+          value: "true"
+
+  - it: should render per-workload podAnnotations on StatefulSet pod template
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.podAnnotations.custom-annotation: my-value
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.custom-annotation
+          value: my-value
+
+  - it: per-workload podAnnotations should override root on collision for StatefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      podAnnotations.shared: from-root
+      statefulSets.db.podAnnotations.shared: from-workload
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.shared
+          value: from-workload
+
+  - it: per-workload podAnnotations should merge with root for StatefulSet (non-colliding keys both present)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      podAnnotations.root-key: root-value
+      statefulSets.db.podAnnotations.workload-key: workload-value
+    asserts:
+      - equal:
+          path: spec.template.metadata.annotations.root-key
+          value: root-value
+      - equal:
+          path: spec.template.metadata.annotations.workload-key
+          value: workload-value
+
   # --- per-workload metadataAnnotations ---
 
   - it: should render per-workload metadataAnnotations on the StatefulSet object

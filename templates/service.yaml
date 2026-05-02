@@ -100,7 +100,7 @@ spec:
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- $hsEnabled := ne (index ($wl.headlessService | default dict) "enabled") false -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $hsEnabled }}
+{{- if and (ne (index $wl "enabled") false) $hsEnabled }}
 {{- if and $wl.service $wl.service.clusterIP (ne $wl.service.clusterIP "None") -}}
 {{- fail (printf "statefulSets.%s.service.clusterIP=%q conflicts with the auto-rendered headless Service (clusterIP: None). The chart's StatefulSet branch always renders a headless Service for stable per-pod DNS — the ClusterIP variant is mutually exclusive. To run a non-headless Service for a StatefulSet workload, set statefulSets.%s.headlessService.enabled=false (and statefulSets.%s.serviceName to your existing Service) and manage the ClusterIP Service separately." $wlName $wl.service.clusterIP $wlName $wlName) -}}
 {{- end -}}
