@@ -14,7 +14,7 @@ tests:
   - it: should not render when pdb disabled on deployment
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.podDisruptionBudget.enabled: false
     asserts:
@@ -24,7 +24,7 @@ tests:
   - it: should render PDB for Deployment using global pdb
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       podDisruptionBudget.enabled: true
       podDisruptionBudget.minAvailable: 1
@@ -41,7 +41,7 @@ tests:
   - it: should render PDB for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       podDisruptionBudget.enabled: true
       podDisruptionBudget.minAvailable: 1
@@ -55,7 +55,7 @@ tests:
   - it: should use minAvailable when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       podDisruptionBudget.enabled: true
       podDisruptionBudget.minAvailable: 2
@@ -69,7 +69,7 @@ tests:
   - it: should use maxUnavailable when set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.podDisruptionBudget.enabled: true
       deployments.web.podDisruptionBudget.maxUnavailable: 1
@@ -81,7 +81,7 @@ tests:
   - it: should default to maxUnavailable 1 when neither specified
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.podDisruptionBudget.enabled: true
     asserts:
@@ -92,7 +92,7 @@ tests:
   - it: should use per-workload pdb over global
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       podDisruptionBudget.enabled: false
       podDisruptionBudget.minAvailable: 1
@@ -108,7 +108,7 @@ tests:
   - it: should have selector matching workload labels
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       podDisruptionBudget.enabled: true
       podDisruptionBudget.minAvailable: 1
@@ -119,7 +119,7 @@ tests:
   - it: should have argocd sync-wave annotation
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       podDisruptionBudget.enabled: true
       podDisruptionBudget.minAvailable: 1
@@ -130,7 +130,7 @@ tests:
   - it: should render PDB for both Deployment and StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       statefulSets.db.enabled: true
       podDisruptionBudget.enabled: true
@@ -144,7 +144,7 @@ tests:
   - it: should fail when both minAvailable and maxUnavailable are set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.podDisruptionBudget.enabled: true
       deployments.web.podDisruptionBudget.minAvailable: 1

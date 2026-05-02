@@ -12,7 +12,7 @@ Many Kubernetes resource specs are lists where each item carries a name: `contai
 - **Targeted disabling / overriding.** A map gives you `entry.<name>.enabled: false` for free; with a list you have to filter it during template render.
 - **Diff stability.** A reordered list looks like a meaningful diff to Argo CD; a reordered map round-trips identically because we sort it.
 
-The 2.0.0 refactor finished a multi-PR effort to push as many list-shaped values as possible into maps.
+The 2.0.0 refactor pushed as many list-shaped values as possible into maps. Where the map key would be an optional Kubernetes field (e.g. `ingress.tls[].secretName`), the native list shape was retained or restored to avoid forcing a required value.
 
 ## Decision
 
@@ -70,7 +70,7 @@ The pre-2.0.0 chart had a mix of list and map shapes for similar concepts. The 2
 
 - `monitoring` providers became a defaults-driven matrix (incidental side-effect: trimmed lists in scrape config).
 - The `integrations` namespace was introduced (incidental side-effect: ecosystem knobs that used to be top-level lists became maps under `integrations.*`).
-- The remaining lists were explicitly collapsed into maps where a natural key existed: `volumes`, `volumeMounts`, `service.ports`, `ports`, `ingress.hosts`, `ingress.tls`, `httpRoutes`, `referenceGrants`, `configMaps`, `sidecars`. Lists kept: `imagePullSecrets`, `envSecrets`, `envConfigMaps` (now lists of plain strings), Gateway API `rules`, `rbac.rules`, `tolerations`, `hostAliases`, ESO `dataFrom`.
+- The remaining lists were explicitly collapsed into maps where a natural key existed: `volumes`, `volumeMounts`, `service.ports`, `ports`, `ingress.hosts`, `httpRoutes`, `referenceGrants`, `configMaps`, `sidecars`. Lists kept: `imagePullSecrets`, `envSecrets`, `envConfigMaps` (now lists of plain strings), `ingress.tls` (native k8s list — `secretName` is optional in k8s so using it as a map key would make it falsely mandatory), Gateway API `rules`, `rbac.rules`, `tolerations`, `hostAliases`, ESO `dataFrom`.
 
 ## Alternatives considered
 
@@ -80,5 +80,5 @@ The pre-2.0.0 chart had a mix of list and map shapes for similar concepts. The 2
 
 ## References
 
-- `values.yaml` throughout — every map-shaped field is documented with a "Map key → …" comment naming the Kubernetes field it lands in.
+- `values.yaml` carries no inline comments by design — documentation lives in `docs/` and `values.schema.json`.
 - Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 013](013-schema-driven-validation.md), [ADR 014](014-deterministic-ordering.md).

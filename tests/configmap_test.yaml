@@ -59,7 +59,7 @@ tests:
   - it: should render per-workload ConfigMap when createConfigmap true
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.createConfigmap: true
       deployments.web.configData.server_port: "8080"
@@ -76,7 +76,7 @@ tests:
   - it: should have reloader annotation on per-workload ConfigMap when reloader.enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.createConfigmap: true
       deployments.web.configData.key: value
@@ -89,7 +89,7 @@ tests:
   - it: should NOT have reloader annotation on ConfigMap when reloader.enabled is false (regression)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.createConfigmap: true
       deployments.web.configData.key: value
@@ -100,7 +100,7 @@ tests:
   - it: should render per-workload ConfigMap for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       statefulSets.db.createConfigmap: true
       statefulSets.db.configData.pg_hba: "host all all 0.0.0.0/0 md5"

@@ -9,7 +9,7 @@ tests:
   - it: should not render deployment service when service not enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
     asserts:
       - hasDocuments:
@@ -18,7 +18,7 @@ tests:
   - it: should render deployment service when service.enabled true
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -34,7 +34,7 @@ tests:
   - it: should set service type
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.api.enabled: true
       deployments.api.service.enabled: true
       deployments.api.service.type: NodePort
@@ -48,7 +48,7 @@ tests:
   - it: should render single port with name http
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -82,7 +82,7 @@ tests:
   - it: should have selector labels on deployment service
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -95,7 +95,7 @@ tests:
   - it: should render headless service for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
     asserts:
       - isKind:
@@ -107,7 +107,7 @@ tests:
   - it: should default StatefulSet service name to headless format
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
     asserts:
       - matchRegex:
@@ -117,7 +117,7 @@ tests:
   - it: should use custom serviceName for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       statefulSets.db.serviceName: my-db
     asserts:
@@ -128,7 +128,7 @@ tests:
   - it: should render deployment service and StatefulSet headless service together
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -142,7 +142,7 @@ tests:
   - it: should not render headless Service when statefulSet headlessService.enabled is false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       statefulSets.db.headlessService.enabled: false
       statefulSets.db.serviceName: my-existing-headless
@@ -153,7 +153,7 @@ tests:
   - it: should render headless Service when statefulSet headlessService.enabled is true (explicit)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       statefulSets.db.headlessService.enabled: true
     asserts:
@@ -440,7 +440,7 @@ tests:
     # before they reach Ready, which requires this flag on the headless Service.
     set:
       image.repository: cassandra
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       statefulSets.db.service.enabled: true
       statefulSets.db.service.port: 9042

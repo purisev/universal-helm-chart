@@ -2,10 +2,10 @@
 {{- include "uhc.assertNoLegacyJobKeys" $ctx -}}
 {{- $releaseName := include "uhc.fullname" . -}}
 {{- range $groupName, $group := ($ctx.Values.jobGroups | default dict) }}
-{{- if and (hasKey $group "enabled") $group.enabled (eq (default "Job" $group.kind) "CronJob") }}
+{{- if and (ne (index $group "enabled") false) (eq (default "Job" $group.kind) "CronJob") }}
 {{- range $jobName := keys ($group.jobs | default dict) | sortAlpha }}
 {{- $job := index $group.jobs $jobName }}
-{{- if $job.enabled }}
+{{- if ne (index $job "enabled") false }}
 {{- $merged := include "uhc.jobGroupSpec" (dict "ctx" $ctx "group" $group "job" $job "groupName" $groupName "jobName" $jobName) | fromYaml }}
 {{- $wlName := include "uhc.jobGroupName" (dict "groupName" $groupName "jobName" $jobName) }}
 {{- $resourceName := include "uhc.jobGroupResourceName" (dict "ctx" $ctx "groupName" $groupName "jobName" $jobName "merged" $merged) }}
@@ -87,7 +87,7 @@ spec:
           containers:
             {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | trim | nindent 12 }}
           {{- end }}
-          {{- $useRootVolumes := true }}
+          {{- $useRootVolumes := false }}
           {{- if hasKey $merged "useRootVolumes" }}
           {{- $useRootVolumes = $merged.useRootVolumes }}
           {{- end }}

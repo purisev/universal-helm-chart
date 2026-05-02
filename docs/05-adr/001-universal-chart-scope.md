@@ -41,7 +41,7 @@ Everything is opt-in via `values.yaml`. A release that only fills in `deployment
 
 **What it costs:**
 
-- `values.yaml` is large (~1200 lines) — readers face a learning cliff. Mitigations: a JSON schema with strict shape validation ([ADR 013](013-schema-driven-validation.md)), the [`docs/02-examples/`](../02-examples/) catalogue, and the section index in `values.yaml` itself.
+- The chart's values surface is wide — readers face a learning cliff. Mitigations: a JSON schema with strict shape validation ([ADR 013](013-schema-driven-validation.md)) and the [`docs/02-examples/`](../02-examples/) catalogue. `values.yaml` itself carries machine-readable defaults only — no inline comments; documentation lives in `docs/` and `values.schema.json`.
 - Some niche workload types are deliberately out of scope.
 - The chart's blast radius on a change is large — every consumer is a downstream. Mitigations: helm-unittest snapshots ([ADR 018](018-testing-with-helm-unittest.md)) and conservative versioning.
 
@@ -64,5 +64,5 @@ This list is the contract. Adding a new workload kind is an ADR-worthy decision,
 ## References
 
 - `Chart.yaml` — chart name and version.
-- `values.yaml` — the env / labels narrative at the top of the file and the security/scheduling defaults blocks (`podSecurityContext`, `securityContext`, `terminationGracePeriodSeconds`, `automountServiceAccountToken`, …).
+- `values.yaml` — machine-readable defaults; see `docs/03-reference/01-values.md` for the annotated reference.
 - Related: [ADR 002](002-multi-workload-keyed-maps.md), [ADR 003](003-layered-inheritance-and-override.md), [ADR 006](006-integrations-namespace.md).

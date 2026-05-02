@@ -8,12 +8,12 @@ Returns JSON so callers can use: include "uhc.serviceWorkloads" . | fromJson
 {{- define "uhc.serviceWorkloads" -}}
 {{- $result := dict -}}
 {{- range $name, $spec := (.Values.deployments | default dict) -}}
-  {{- if and (hasKey $spec "enabled") $spec.enabled -}}
+  {{- if ne (index $spec "enabled") false -}}
     {{- $_ := set $result $name $spec -}}
   {{- end -}}
 {{- end -}}
 {{- range $name, $spec := (.Values.statefulSets | default dict) -}}
-  {{- if and (hasKey $spec "enabled") $spec.enabled -}}
+  {{- if ne (index $spec "enabled") false -}}
     {{- $_ := set $result $name $spec -}}
   {{- end -}}
 {{- end -}}
@@ -30,8 +30,8 @@ Usage: eq (include "uhc.metricsEnabled" (dict "ctx" $ctx "wl" $wl)) "true"
 {{- $wl := .wl -}}
 {{- $defaults := .ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $metrics := $wl.metrics | default dict -}}
-{{- if and (hasKey $wl "metrics") (hasKey $metrics "enabled") -}}
-  {{- if $metrics.enabled -}}true{{- end -}}
+{{- if hasKey $wl "metrics" -}}
+  {{- if ne (index $metrics "enabled") false -}}true{{- end -}}
 {{- else if $defaults.enabled -}}
 true
 {{- end -}}

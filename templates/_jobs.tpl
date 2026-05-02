@@ -286,10 +286,12 @@ Output at zero indent; caller controls nindent.
 {{- $repo := required "jobGroups: image.repository is required (set jobGroups.<group>.image.repository or root image.repository)" (default $ctx.Values.image.repository $imageOverride.repository) -}}
 {{- $tag := required "jobGroups: image.tag is required (set jobGroups.<group>.image.tag or root image.tag)" (default $ctx.Values.image.tag $imageOverride.tag) -}}
 {{- $pullPolicy := default $ctx.Values.image.pullPolicy $imageOverride.pullPolicy -}}
+{{- if and (eq $tag "latest") (eq $pullPolicy "IfNotPresent") }}
+{{- fail (printf "jobGroups tasks: imagePullPolicy: IfNotPresent combined with tag 'latest' is unsafe — nodes that already have the image cached will not pull updates. Set imagePullPolicy: Always or use a specific image tag.") }}
+{{- end }}
 {{- $secCtx := $wl.securityContext | default $ctx.Values.securityContext | default dict -}}
 {{- range $taskName := keys ($wl.tasks | default dict) | sortAlpha }}
 {{- $task := index $wl.tasks $taskName }}
-{{- if $task.enabled }}
 - name: {{ $taskName }}
   image: "{{ $repo }}:{{ $tag }}"
   imagePullPolicy: {{ $pullPolicy }}
@@ -346,6 +348,5 @@ Output at zero indent; caller controls nindent.
       readOnly: {{ .readOnly }}
     {{- end }}
   {{- end }}
-{{- end }}
 {{- end }}
 {{- end -}}

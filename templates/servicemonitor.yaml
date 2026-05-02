@@ -9,9 +9,11 @@
 {{- $metricsEnabled := eq (include "uhc.metricsEnabled" (dict "ctx" $ctx "wl" $wl)) "true" -}}
 {{- $discovery := include "uhc.metricsDiscovery" (dict "ctx" $ctx "wl" $wl) -}}
 {{- $provider := include "uhc.metricsProvider" (dict "ctx" $ctx "wl" $wl) -}}
-{{- if and $wl.service $wl.service.enabled $metricsEnabled (ne $metricsType "pod") (ne $discovery "annotations") }}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $hasService := or (and $wl.service $wl.service.enabled) (ne $exposeJson "") -}}
+{{- if and $hasService $metricsEnabled (ne $metricsType "pod") (ne $discovery "annotations") }}
 {{- $smName := printf "%s-%s-metrics" $releaseName $wlName }}
-{{- include "uhc.assertNameLength" (dict "name" $smName "kind" (printf "ServiceMonitor for workload %q" $wlName)) }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $smName "kind" (printf "ServiceMonitor for workload %q" $wlName)) }}
 ---
 {{- if eq $provider "victoriametrics" }}
 apiVersion: operator.victoriametrics.com/v1beta1

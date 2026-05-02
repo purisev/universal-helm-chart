@@ -157,9 +157,9 @@ ingresses:
             serviceName: kitchen-sink-api
             servicePort: 80
     tls:
-      app-example-tls:
-        hosts:
+      - hosts:
           - "app.example.com"
+        secretName: app-example-tls
 
 # ---- Cluster-wide policies / scheduling ------------------------------------------------
 
@@ -168,11 +168,9 @@ podDisruptionBudget:
   minAvailable: 1
 
 topologySpreadConstraints:
-  enabled: true
-  constraints:
-    - maxSkew: 1
-      topologyKey: topology.kubernetes.io/zone
-      whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
 
 verticalPodAutoscaler:
   enabled: false                   # off at root; opted in per workload below
@@ -410,11 +408,9 @@ jobGroups:
         # initContainers sequentially); prefix names with 01-, 02- to make ordering explicit.
         tasks:
           01-structure:
-            enabled: true
             command: |
               psql -c "CREATE TABLE IF NOT EXISTS ..."
           02-seed:
-            enabled: true
             args:
               - "seed"
               - "--rows=100"

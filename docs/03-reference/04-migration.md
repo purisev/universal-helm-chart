@@ -48,23 +48,85 @@ deployments:
 
 If you genuinely need different `parentRefs` or `hostnames` per workload, declare a separate route under the plural map (`httpRoutes.<name>`) — that entry takes the full route shape (and is itself rendered as its own HTTPRoute resource named `<release>-<name>`).
 
-### 63-char enforcement on constructed names and label values
+### Name-length enforcement split by resource kind
 
-Before this release, a long Helm release name combined with a long workload key could produce a value past Kubernetes' 63-char DNS-1123 label limit. For some kinds — label values themselves, and Service names — Kubernetes rejected the manifest at admission with a generic error that didn't point at the offending values key. For others — ConfigMap, Deployment, and friends, where the metadata.name is allowed up to 253 chars as a DNS-1123 subdomain — the manifest applied, but the resource ended up with a name the chart couldn't reuse as its own `app.kubernetes.io/instance` label value, so selector lookups and label-based queries against the resource silently broke.
+The chart enforces two different length ceilings depending on how the constructed name is used:
 
-The chart now fails fast at `helm template` time with a precise error naming the kind, the offending value, its length, and the values keys to shorten (Helm release name, `.Values.fullnameOverride`, or the workload / entry key). This is **stricter than Kubernetes** for the second category above — a values file that previously rendered a working ConfigMap or Deployment whose name exceeded 63 chars is now rejected, on the grounds that the chart's own labelling contract is the one that matters.
+- **63 characters** — applied to Service names and `app.kubernetes.io/instance` label values. Kubernetes DNS-1123 label rules cap both at 63 chars; a name longer than this produces a manifest the API server rejects (for Services) or that breaks selector lookups (for label values).
+- **253 characters** — applied to all other chart-constructed names: ConfigMap, Ingress, HTTPRoute, GRPCRoute, TLSRoute, ReferenceGrant, ServiceMonitor, PodMonitor. These are DNS-1123 subdomain names in Kubernetes, which allow up to 253 chars.
 
-**If you hit this**, shorten one of:
+The chart fails fast at `helm template` time with a precise error naming the kind, the offending value, its length, and the values keys to shorten (Helm release name, `.Values.fullnameOverride`, or the workload / entry key).
+
+**If you hit a length error**, shorten one of:
 
 - The Helm release name — `helm install --name <shorter>` / Argo CD `metadata.name` on the `Application`.
 - `.Values.fullnameOverride` — overrides `<release>-<chart>` with whatever you set.
 - The workload key under `deployments` / `statefulSets` / `configMaps` / `jobGroups` / `httpRoutes` / etc.
 
-Coverage is every workload-labelled resource (Deployment, StatefulSet, Service, HPA, PDB, VPA, ScaledObject, NetworkPolicy, ServiceMonitor, PodMonitor, ESO `SecretStore` / `ExternalSecret`) plus every plural-map entry whose name the chart exposes as a label value (configMaps, ingresses, httpRoutes / grpcRoutes / tlsRoutes, referenceGrants, the `-config` / `-headless` / `-metrics` suffixed names). Names supplied verbatim by the user (`integrations.argocd.imageUpdater.name`, `serviceAccount.name`, ESO `target.name`) are **not** asserted — that's the user's contract with the cluster's own DNS-1123 subdomain limit, and the chart doesn't reuse those names as label values.
+Names supplied verbatim by the user (`integrations.argocd.imageUpdater.name`, `serviceAccount.name`, ESO `target.name`) are **not** asserted — those are the user's contract with the cluster's DNS limits.
 
 ### `metadataAnnotations` dropped from `httpRoute` / `grpcRoute` / `tlsRoute`
 
 Both the singleton (`.Values.httpRoute.metadataAnnotations`) and the plural-map entries (`.Values.httpRoutes.<key>.metadataAnnotations`, and the gRPC / TLS equivalents) accepted a `metadataAnnotations` block that no template ever read. Every route callsite passes `$route.annotations` to the rendered Route's `metadata.annotations`, never `$route.metadataAnnotations`. The schema now rejects the field with `additional properties 'metadataAnnotations' not allowed` — move any values you had under it to the existing `annotations` field (which is the field the rendered Route picks up).
+
+### `ingress.tls` changed from map to native list
+
+`ingress.tls` and per-entry `ingresses.<name>.tls` are now a **native Kubernetes list** instead of a map keyed by secret name. The `secretName` field is optional — omit it for SNI-only TLS routing.
+
+```yaml
+# Before (map, secret name as key — schema-rejected):
+ingress:
+  tls:
+    my-tls-secret:
+      hosts:
+        - example.com
+
+# After (native k8s list):
+ingress:
+  tls:
+    - hosts:
+        - example.com
+      secretName: my-tls-secret   # optional
+```
+
+### `topologySpreadConstraints` changed to native list
+
+The `topologySpreadConstraints` wrapper object (`{enabled, constraints: [...]}`) is removed. The value is now a **native Kubernetes list** directly, at both root and per-workload level.
+
+```yaml
+# Before (object wrapper — schema-rejected):
+topologySpreadConstraints:
+  enabled: true
+  constraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+
+# After (native k8s list):
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+```
+
+Per-workload override follows the replace-not-concat rule: a workload-level list replaces the root list entirely. Set `topologySpreadConstraints: []` to explicitly disable root constraints on a specific workload.
+
+### `inheritRootSchedParams` removed
+
+The per-workload `inheritRootSchedParams` block (`{affinity, tolerations, tsc}`) is removed. Scheduling field inheritance now follows the universal rule: **workload value replaces root value; omit to inherit; empty value to disable**.
+
+```yaml
+# Before:
+deployments:
+  worker:
+    inheritRootSchedParams:
+      tolerations: false   # don't inherit root tolerations
+
+# After — set the field explicitly at workload level:
+deployments:
+  worker:
+    tolerations: []        # empty list: no tolerations on this workload
+```
 
 ### Other tightenings worth knowing about
 

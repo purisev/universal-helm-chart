@@ -27,10 +27,20 @@ tests:
           path: spec.template.spec.containers[0].image
           pattern: nginx:alpine
 
-  - it: should not render replicas when KEDA enabled
+  - it: should fail when image.tag is latest and imagePullPolicy is IfNotPresent
     set:
       image.repository: nginx
       image.tag: latest
+      image.pullPolicy: IfNotPresent
+      deployments.web.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "imagePullPolicy: IfNotPresent combined with tag 'latest' is unsafe"
+
+  - it: should not render replicas when KEDA enabled
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 3
       deployments.web.keda.enabled: true
@@ -48,7 +58,7 @@ tests:
   - it: should not render replicas when HPA enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 3
       deployments.web.hpa.enabled: true
@@ -81,7 +91,7 @@ tests:
   - it: should use root strategy when workload has no strategy override
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       strategy.type: RollingUpdate
       strategy.rollingUpdate.maxSurge: 2
       strategy.rollingUpdate.maxUnavailable: 1
@@ -106,7 +116,7 @@ tests:
   - it: should override root strategy with per-workload strategy
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       strategy.type: RollingUpdate
       strategy.rollingUpdate.maxSurge: 1
       strategy.rollingUpdate.maxUnavailable: 0
@@ -128,7 +138,7 @@ tests:
   - it: should use built-in fallback strategy when not set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -151,7 +161,7 @@ tests:
     set:
       image:
         repository: nginx
-        tag: latest
+        tag: v1.0.0
       securityContext:
         allowPrivilegeEscalation: false
       envSecrets:
@@ -221,7 +231,7 @@ tests:
     set:
       image:
         repository: nginx
-        tag: latest
+        tag: v1.0.0
       volumeMounts:
         web:
           app-config:
@@ -249,7 +259,7 @@ tests:
   - it: should keep single container when sidecars not configured
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -267,7 +277,7 @@ tests:
   - it: should not render initContainers field when none defined
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -280,7 +290,7 @@ tests:
   - it: should render initContainer when defined
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -303,7 +313,7 @@ tests:
   - it: should render initContainers in alphabetical order with prefix-controlled order
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -326,7 +336,7 @@ tests:
   - it: should override image per initContainer
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -341,13 +351,13 @@ tests:
           value: myrepo/migrations:v1.2.3
       - equal:
           path: spec.template.spec.containers[0].image
-          value: nginx:latest
+          value: nginx:v1.0.0
 
   - it: should not inherit root volumeMounts for initContainers
     set:
       image:
         repository: nginx
-        tag: latest
+        tag: v1.0.0
       volumeMounts:
         migrate:
           app-config:
@@ -376,7 +386,7 @@ tests:
   - it: should auto-mount configMap into initContainers as well
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -397,7 +407,7 @@ tests:
   - it: should propagate inherit.configMapMount false to initContainers
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -415,7 +425,7 @@ tests:
   - it: should propagate inherit.env from workload to its initContainers
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       global.env.APP_ENV.value: production
       env.DEBUG.value: "true"
       deployments.web.enabled: true
@@ -446,7 +456,7 @@ tests:
   - it: should fail when probesEnabled is set on initContainer
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -463,7 +473,7 @@ tests:
   - it: should fail when lifecycle is set on initContainer
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -479,7 +489,7 @@ tests:
   - it: should inherit all env levels by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       global.env.APP_ENV.value: production
       env.DEBUG.value: "true"
       deployments.web.enabled: true
@@ -515,7 +525,7 @@ tests:
   - it: should respect inherit.env flags and disable selected env layers
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       global.env.APP_ENV.value: production
       env.DEBUG.value: "true"
       deployments.web.enabled: true
@@ -546,7 +556,7 @@ tests:
   - it: should not add volume or volumeMount when configMaps has no mountPath
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.data.key: value
       deployments.web.enabled: true
@@ -563,7 +573,7 @@ tests:
   - it: should auto-mount configMap as volume when mountPath is set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -589,7 +599,7 @@ tests:
   - it: should auto-mount multiple configMaps into containers
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -618,7 +628,7 @@ tests:
   - it: should auto-mount configMap into sidecars as well
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -639,7 +649,7 @@ tests:
   - it: should set readOnly true on auto-mounted configMap by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -656,7 +666,7 @@ tests:
   - it: should set readOnly false when explicitly disabled on configMap
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.readOnly: false
@@ -674,7 +684,7 @@ tests:
   - it: should set defaultMode on configMap volume
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.scripts.enabled: true
       configMaps.scripts.mountPath: /scripts
       configMaps.scripts.defaultMode: 493
@@ -692,7 +702,7 @@ tests:
   - it: should not mount configMaps when inherit.configMapMount is false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -709,7 +719,7 @@ tests:
   - it: should disable only specific configMap via granular inherit.configMapMount map
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -732,7 +742,7 @@ tests:
   - it: should resolve chart-owned configMap name in envConfigMaps
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.env-config.enabled: true
       configMaps.env-config.data.LOG_LEVEL: info
       envConfigMaps:
@@ -750,7 +760,7 @@ tests:
   - it: should leave external envConfigMaps name as-is when not in configMaps
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       envConfigMaps:
         - external-cm
       deployments.web.enabled: true
@@ -762,7 +772,7 @@ tests:
   - it: should propagate inherit.configMapMount false to sidecars
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-config.enabled: true
       configMaps.app-config.mountPath: /etc/config
       configMaps.app-config.data.key: value
@@ -782,7 +792,7 @@ tests:
   - it: should inject root envConfigMaps into main container
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       envConfigMaps:
         - shared-config
       deployments.web.enabled: true
@@ -798,7 +808,7 @@ tests:
   - it: should merge root and per-workload envConfigMaps
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       envConfigMaps:
         - global-config
       deployments.web.enabled: true
@@ -819,7 +829,7 @@ tests:
   - it: should disable root envConfigMaps with inherit.configMaps false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       envConfigMaps:
         - global-config
       deployments.web.enabled: true
@@ -835,7 +845,7 @@ tests:
   - it: should keep per-workload envConfigMaps when inherit.configMaps is false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       envConfigMaps:
         - global-config
       deployments.web.enabled: true
@@ -856,7 +866,7 @@ tests:
   - it: should propagate inherit.configMaps false from workload to its sidecars
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       envConfigMaps:
         - global-config
       deployments.web.enabled: true
@@ -873,7 +883,7 @@ tests:
   - it: should propagate inherit.env from workload to its sidecars
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       global.env.APP_ENV.value: production
       env.DEBUG.value: "true"
       deployments.web.enabled: true
@@ -906,7 +916,7 @@ tests:
   - it: should default to 1 replica when replicaCount not set
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
@@ -921,7 +931,7 @@ tests:
   - it: should render command as exec array when a list is given
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -941,7 +951,7 @@ tests:
   - it: should wrap string command in sh -c
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -959,7 +969,7 @@ tests:
   - it: should render args independently without command
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -983,7 +993,7 @@ tests:
   - it: should set seccompProfile RuntimeDefault in podSecurityContext by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -999,7 +1009,7 @@ tests:
   - it: should set readOnlyRootFilesystem true in container securityContext by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -1015,7 +1025,7 @@ tests:
   - it: should set automountServiceAccountToken false by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -1029,7 +1039,7 @@ tests:
   - it: should allow enabling automountServiceAccountToken per-workload
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.automountServiceAccountToken: true
@@ -1046,7 +1056,7 @@ tests:
   - it: should render lifecycle preStop when configured
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -1066,7 +1076,7 @@ tests:
   - it: should not render minReadySeconds when it is 0
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true
@@ -1079,7 +1089,7 @@ tests:
   - it: should render minReadySeconds when non-zero
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       minReadySeconds: 10
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
@@ -1094,7 +1104,7 @@ tests:
   - it: should use per-workload minReadySeconds over root
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       minReadySeconds: 5
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
@@ -1112,7 +1122,7 @@ tests:
   - it: should set terminationGracePeriodSeconds from root values
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       terminationGracePeriodSeconds: 60
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
@@ -1127,7 +1137,7 @@ tests:
   - it: should set per-workload terminationGracePeriodSeconds
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       terminationGracePeriodSeconds: 30
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
@@ -1145,7 +1155,7 @@ tests:
   - it: should not emit helm.sh/chart label and should keep standard app.kubernetes.io/* labels
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.replicaCount: 1
       deployments.web.service.enabled: true

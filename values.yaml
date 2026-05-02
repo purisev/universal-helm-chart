@@ -1,86 +1,33 @@
-# Global environment variables injected into every container.
-# When this chart is used as a subchart, Helm automatically merges any `global:`
-# block from the parent chart's values into every subchart instance — so this is
-# the layer to use for env vars shared across many subchart instances (DRY).
 global:
   env: {}
 
-# Per-chart-instance environment variables injected into every container.
-# Use this layer for vars specific to one release (one app) — typically set in
-# the small per-app values block of an umbrella chart.
-# Merge order in each container:
-#   NAMESPACE (fieldRef) → global.env → env → <workload>.env
-# Per-workload inheritance is controlled via deployments.<name>.inherit.env:
-#   global: false → exclude global.env
-#   root:   false → exclude this env block
 env: {}
 
-# Unconditional metadata applied to every Kubernetes resource the chart creates.
-# commonLabels are also injected into pod template labels (so pods inherit them)
-# but NEVER into spec.selector.matchLabels (selectors are immutable on
-# Deployment/StatefulSet/Service — drift would break upgrades).
-# commonAnnotations are NOT propagated to pod templates — use podAnnotations for
-# pod-level annotations, or future per-feature integrations (e.g. integrations.vault).
-# When a key in commonLabels collides with a chart-managed app.kubernetes.io/* label,
-# the chart-managed value wins (commonLabels cannot shadow standard labels).
 commonLabels: {}
 commonAnnotations: {}
 
-# Toggles for the chart's standard label set (the app.kubernetes.io/* labels emitted
-# into metadata.labels of singleton resources — ServiceAccount, RBAC, Ingress, *Routes,
-# ReferenceGrant, NetworkPolicy, ImageUpdater, ConfigMap).
-#
-# IMPORTANT: For workload resources (Deployment, StatefulSet, Service, Job, CronJob,
-# HPA, VPA, PDB, ScaledObject, ServiceMonitor, PodMonitor, ESO resources) the
-# app.kubernetes.io/{name,instance} labels are ALWAYS emitted regardless of the
-# .name / .instance / .enabled flags below — they have to match spec.selector.matchLabels
-# (immutable on workload resources). The remaining flags (partOf, version, managedBy)
-# do apply to workload resources too.
-#
-# Set labels.standard.enabled: false to short-circuit all sub-flags at once on
-# singletons (useful in clusters with strict label-policy admission). Selector and
-# pod template label invariants on workloads are preserved.
 labels:
   standard:
     enabled: true
-    partOf: true     # app.kubernetes.io/part-of
-    name: true       # app.kubernetes.io/name (singletons only — workloads always emit)
-    instance: true   # app.kubernetes.io/instance (singletons only — workloads always emit)
-    version: true    # app.kubernetes.io/version
-    managedBy: true  # app.kubernetes.io/managed-by
+    partOf: true
+    name: true
+    instance: true
+    version: true
+    managedBy: true
 
-# integrations: ecosystem-specific knobs grouped by external system / controller.
-# Each subsection wraps one integration (ArgoCD, Stakater Reloader, External
-# Secrets Operator, Prometheus/VictoriaMetrics monitoring stack). Resources/CRDs
-# that those controllers consume live next to their on/off switches.
 integrations:
 
-  # --- ArgoCD ---
-  # Annotations and CRDs consumed by Argo CD: sync-wave ordering and the
-  # Image Updater CRD. JobGroup hook waves are user-set per group/job under
-  # jobGroups.<g>.hooks.argocd.* — no chart-level default applied for those.
   argocd:
 
-    # ArgoCD sync-wave ordering. Per-resource-kind defaults give a natural
-    # creation order with gaps of 10 for user-injected resources.
-    #   SA/RBAC (-30) → SecretStore (-20) → ExternalSecret/ConfigMap (-10) →
-    #   Service/ImageUpdater (0) → StatefulSet (10) → Deployment (20) →
-    #   derived: HPA/VPA/PDB/ScaledObject/ServiceMonitor/PodMonitor (21) →
-    #   NetworkPolicy/ReferenceGrant (25) → Ingress / *Routes (30)
-    #
-    # enabled: false strips the annotation from every kind chart-wide.
-    # Setting any individual field to null disables the annotation only for
-    # that kind (granular off-switch — independent of the global enabled flag).
     syncWaves:
       enabled: true
       serviceAccount: -30
-      rbac: -30                    # Role / RoleBinding / ClusterRole / ClusterRoleBinding
+      rbac: -30
       secretStore: -20
       externalSecret: -10
       configMap: -10
       service: 0
-      imageUpdater: 0              # neutral wave — CR consumed by an external observer
-                                   # controller, not part of the app creation chain
+      imageUpdater: 0
       statefulSet: 10
       deployment: 20
       hpa: 21
@@ -96,402 +43,102 @@ integrations:
       grpcRoute: 30
       tlsRoute: 30
 
-    # Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
-    # Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
-    # Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
-    #
-    # Full spec reference:
-    #   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
-    #
-    # TWO MODES:
-    #
-    #   Shorthand mode (applicationRefs is empty — the default):
-    #     A single applicationRef is built automatically.
-    #     namePattern defaults to .Release.Name (override with appNamePattern).
-    #     commonUpdateSettings, writeBackConfig and images are placed inside that
-    #     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
-    #     Use this when one release = one ArgoCD Application with a shared image.
-    #
-    #   Manual mode (applicationRefs is provided):
-    #     applicationRefs is rendered as-is.
-    #     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
-    #     top level are ignored — all config must live inside each applicationRef entry.
-    #     Use this when you need multiple application targets or fine-grained control.
     imageUpdater:
       enabled: false
 
-      # CR metadata
-      # name: override the ImageUpdater resource name (default: chart fullname)
       name: ""
-      # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
-      # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
-      # to scope which ArgoCD Applications it looks at.
       namespace: ""
       annotations: {}
 
-      # --- Shorthand mode fields (ignored when applicationRefs is set) ---
 
-      # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
-      # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
       appNamePattern: ""
 
-      # commonUpdateSettings: update strategy applied to all images in this applicationRef.
-      #   updateStrategy: alphabetical | semver | latest | digest | name
-      #   forceUpdate: false
-      #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
-      #   ignoreTags: ["latest", "dev"]
-      #   pullSecret: "pullsecret:<namespace>/<secret-name>"
-      #   platforms: []
       commonUpdateSettings: {}
 
-      # writeBackConfig: how Image Updater writes the new image tag back.
-      #   method: argocd   — imperative via Argo CD API (default)
-      #   method: git      — declarative, commits the new tag to a Git repository
-      #   gitConfig:         required when method: git
-      #     repository: git@github.com:myorg/config.git
-      #     branch: main
-      #     writeBackTarget: "helmvalues:/values.yaml"
       writeBackConfig: {}
 
-      # images: map of container images to track for the auto-generated applicationRef.
-      # Map key → applicationRefs[].images[].alias (Argo CD ImageUpdater CRD).
-      # Each entry can override update settings and declare Helm value targets.
-      #   imageName: full image reference without tag (registry/repo)
-      #   commonUpdateSettings:    # optional per-image override
-      #     updateStrategy: semver
-      #     allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
-      #     ignoreTags: ["latest"]
-      #   manifestTargets:         # optional: where to write the new tag in the manifest
-      #     helm:
-      #       name: image.repository   # Helm value key for the repository
-      #       tag: image.tag            # Helm value key for the tag
-      #
-      # Example (shorthand mode):
-      # images:
-      #   app:                          # ← becomes images[].alias
-      #     imageName: myregistry/myapp
-      #     manifestTargets:
-      #       helm:
-      #         name: image.repository
-      #         tag: image.tag
       images: {}
 
-      # --- Manual mode (takes precedence over all shorthand fields above) ---
-      #
-      # applicationRefs: full list of applicationRef entries rendered as-is.
-      # Each entry supports: namePattern, labelSelectors, useAnnotations,
-      # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
-      #
-      # Example:
-      # applicationRefs:
-      #   - namePattern: "my-app"
-      #     commonUpdateSettings:
-      #       updateStrategy: semver
-      #     writeBackConfig:
-      #       method: git
-      #       gitConfig:
-      #         repository: git@github.com:myorg/config.git
-      #         branch: main
-      #         writeBackTarget: "helmvalues:/values.yaml"
-      #     images:
-      #       - alias: app
-      #         imageName: myregistry/myapp
-      #         manifestTargets:
-      #           helm:
-      #             name: image.repository
-      #             tag: image.tag
-      #   - namePattern: "*"
-      #     labelSelectors:
-      #       matchLabels:
-      #         image-updater: my-updater
-      #     useAnnotations: true
       applicationRefs: []
 
-  # --- Stakater Reloader ---
-  # Annotates Deployments / StatefulSets / ConfigMaps and propagates annotations
-  # into ExternalSecret target templates so the Reloader controller restarts
-  # workloads on ConfigMap/Secret changes. Requires Stakater Reloader installed
-  # in the cluster.
   stakater:
     reloader:
       enabled: false
 
-      # When enabled and `annotations` is empty, the chart applies the default:
-      #   reloader.stakater.com/auto: "true"
-      # When non-empty, this dict FULLY REPLACES the default — useful to switch
-      # to match-strategy by setting `reloader.stakater.com/match: "true"` (instead
-      # of `auto`) or to add `reloader.stakater.com/search-cm-only` /
-      # `*-secret-only` / etc.
-      # The same dict is applied to:
-      #   - Deployment / StatefulSet metadata.annotations
-      #   - ConfigMap metadata.annotations
-      #   - ExternalSecret spec.target.template.metadata.annotations
-      #     (ESO propagates the annotation onto the generated Secret)
       annotations: {}
 
-  # --- External Secrets Operator ---
-  # SecretStores and ExternalSecrets resources. enabled: false short-circuits
-  # the rendering of both even if entries are declared — useful to "park"
-  # declarations in environments where ESO is not installed.
   eso:
     enabled: true
 
-    # SecretStores — access configuration for external secret backends (Vault, AWS, GCP).
-    # Map key → metadata.name suffix (External Secrets SecretStore/ClusterSecretStore):
-    # "<release-fullname>-<key>".
-    # JWT auth uses serviceAccount.name by default; override per store via serviceAccountRef.
-    # API version (v1 / v1beta1) is auto-detected via .Capabilities at install time.
     secretStores: {}
-    # Example:
-    # secretStores:
-    #   vault-store:
-    #     enabled: true
-    #     kind: SecretStore          # SecretStore | ClusterSecretStore (default: SecretStore)
-    #     provider:
-    #       vault:
-    #         server: https://vault.example.com
-    #         path: secret
-    #         version: v2
-    #         namespace: ""          # Vault Enterprise namespace (optional)
-    #         auth:
-    #           jwt:
-    #             mountPath: jwt
-    #             role: my-app-role
-    #             serviceAccountRef: ""   # default: serviceAccount.name
-    #             audiences:
-    #               - vault
-    #             expirationSeconds: 600
-    #   aws-store:
-    #     enabled: true
-    #     provider:
-    #       aws:
-    #         service: SecretsManager    # SecretsManager | ParameterStore
-    #         region: us-east-1
-    #         auth:
-    #           jwt:
-    #             serviceAccountRef: ""  # default: serviceAccount.name
-    #             audiences:
-    #               - sts.amazonaws.com
-    #   gcp-store:
-    #     enabled: true
-    #     provider:
-    #       gcpsm:
-    #         projectID: my-gcp-project
-    #         auth:
-    #           workloadIdentity:
-    #             clusterLocation: us-central1
-    #             clusterName: my-cluster
-    #             clusterProjectID: ""   # default: projectID
-    #             serviceAccountRef: ""  # default: serviceAccount.name
 
-    # ExternalSecrets — sync secrets from external backends into K8s Secrets.
-    # Outer map key → metadata.name suffix (External Secrets ExternalSecret):
-    # "<release-fullname>-<key>" (override via .targetName).
-    # Requires ExternalSecrets Operator. API version is auto-detected via .Capabilities.
-    # data: map keyed by secretKey (the field name in the resulting k8s Secret).
-    #   Map key → spec.data[].secretKey (External Secrets Operator).
-    # dataFrom: list (no natural unique key — the same remoteKey can appear multiple
-    #   times with different overrides; bulk-extracts the entire remote secret).
-    # conversionStrategy/decodingStrategy/metadataPolicy default to Default/None/None.
     externalSecrets: {}
-    # Example:
-    # externalSecrets:
-    #   db-creds:
-    #     enabled: true
-    #     secretStore: vault-store      # references secretStores key
-    #     storeKind: SecretStore        # SecretStore | ClusterSecretStore (default: SecretStore)
-    #     refreshInterval: 1h
-    #     targetName: db-creds          # K8s Secret name (default: map key)
-    #     type: Opaque                  # Opaque | kubernetes.io/tls | kubernetes.io/dockerconfigjson
-    #     data:
-    #       DB_PASSWORD:                # ← becomes data[].secretKey AND the field name in the k8s Secret
-    #         remoteKey: my-app/db
-    #         property: password
-    #         conversionStrategy: Default   # Default | Unicode
-    #         decodingStrategy: None        # None | Auto | Base64 | Base64URL
-    #         metadataPolicy: None          # None | Fetch
-    #     dataFrom:
-    #       - remoteKey: my-app/config
-    #         conversionStrategy: Default
-    #         decodingStrategy: None
-    #         metadataPolicy: None
 
-  # --- Monitoring (Prometheus / VictoriaMetrics) ---
-  # monitoring.defaults — global scrape defaults applied to every workload.
-  # EVERY field below has a per-workload override at deployments.<name>.metrics.*
-  # (or statefulSets.<name>.metrics.*) — per-workload value always wins.
-  # Values follow Prometheus upstream recommendations.
   monitoring:
     defaults:
-      # provider controls which CRD API group is used for scraping in CRD mode.
-      # prometheus      → ServiceMonitor / PodMonitor  (monitoring.coreos.com/v1)
-      # victoriametrics → VMServiceScrape / VMPodScrape (operator.victoriametrics.com/v1beta1)
       provider: prometheus
-      # discovery controls how scrape targets are registered.
-      # crd         → creates ServiceMonitor/PodMonitor/VMServiceScrape/VMPodScrape resources
-      # annotations → injects prometheus.io/* annotations into Service or Pod template.
-      #               Requires Prometheus/vmagent configured with kubernetes_sd + relabeling.
-      #               metrics.port must be NUMERIC if set (e.g. 8080) — port names are not
-      #               supported by prometheus.io/port annotation.
-      #               If metrics.port is not set, the chart falls back to service.targetPort
-      #               (or to integrations.monitoring.defaults.exposeService.port). If nothing
-      #               resolves, the prometheus.io/port annotation is omitted — Prometheus'
-      #               kubernetes_sd then auto-targets each declared containerPort. (Set
-      #               metrics.port explicitly only if your scrape_config uses
-      #               'action: keep, regex: \d+' on the port annotation, which is non-standard.)
       discovery: crd
-      # When true, monitoring is enabled for every workload by default; per-workload
-      # metrics.enabled: false explicitly disables. When false (default), each workload
-      # must opt in via metrics.enabled: true to be scraped.
       enabled: false
-      type: service       # service | pod — per-workload metrics.type overrides
-      port: http          # CRD mode: NAME of the port in Service (type:service) or Pod
-                          # (type:pod) — Prometheus/VM CRDs require a string name, not a
-                          # number. The name comes from the key under service.ports
-                          # (or ports for pod-targets); add an entry there before setting
-                          # this. A numeric value here makes kubectl apply reject the CRD.
-                          #
-                          # Annotation mode: set per-workload metrics.port to a NUMBER
-                          # (e.g. 9090) — defaults.port is intentionally ignored here to
-                          # avoid emitting non-numeric prometheus.io/port values.
+      type: service
+      port: http
       path: /metrics
-      scheme: http        # http | https — used in annotation mode
-      interval: 60s       # matches Prometheus global default scrape_interval
-      scrapeTimeout: 10s  # matches Prometheus global default scrape_timeout
-      # exposeService: when enabled, automatically adds a dedicated "metrics" port to
-      # the workload's Service and Pod template. Use this when the app exposes its
-      # /metrics endpoint on a separate process/port from the main HTTP API
-      # (avoids ALLOWED_HOSTS / middleware issues for in-cluster scraping).
-      # Port name is fixed as "metrics" (k8s convention). Per-workload metrics.exposeService
-      # overrides any of these. Ignored when metrics.type is "pod" (PodMonitor doesn't
-      # need a Service) and skipped if service.ports has a "metrics" entry.
+      scheme: http
+      interval: 60s
+      scrapeTimeout: 10s
       exposeService:
         enabled: false
-        port: 9090       # ServicePort
-        targetPort: 9090 # containerPort
-      # Optional global overrides — per-workload metrics.* overrides any of these:
-      # relabelConfigs:
-      #   - sourceLabels: [__address__]
-      #     targetLabel: instance
-      # basicAuth:
-      #   password:
-      #     name: scrape-secret
-      #     key: password
-      #   username:
-      #     name: scrape-secret
-      #     key: username
-      # headers:
-      #   - "Authorization: Bearer ..."   # VictoriaMetrics only
+        port: 9090
+        targetPort: 9090
 
-# Default image used by all workloads unless overridden per-workload.
 image:
   repository: ""
-  # IfNotPresent avoids registry rate limits and speeds up pod startup.
   pullPolicy: IfNotPresent
   tag: ""
 
-# List of registry pull secrets. Each entry is the k8s Secret name; the chart wraps
-# it as an object with a `name` field under spec.imagePullSecrets[]. Referenced
-# Secrets must already exist in the namespace.
-# Example:
-#   imagePullSecrets:
-#     - regcred-prod
-#     - regcred-mirror
 imagePullSecrets: []
 
-# 10 revisions — matches Kubernetes default; gives safer rollback history.
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+
 revisionHistoryLimit: 10
-# 10 min deadline — 3 min is too short for large images or slow cluster pulls.
 progressDeadlineSeconds: 600
 
-# Default update strategy for Deployments; can be overridden per-workload.
-# Uses Deployment-specific rollingUpdate keys (maxSurge / maxUnavailable).
-# Do NOT use for StatefulSet rolling update — use statefulSetUpdateStrategy instead.
 strategy:
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
   type: RollingUpdate
 
-# Default update strategy for StatefulSets. Uses StatefulSet-specific key (partition).
-# Checked before the shared 'strategy' key, so Deployment and StatefulSet defaults stay separate.
-# Override per-workload via statefulSets.<name>.statefulSetUpdateStrategy.
 statefulSetUpdateStrategy:
   type: RollingUpdate
   rollingUpdate:
     partition: 0
 
-# Secrets mounted as environment variables in all containers via envFrom[].secretRef.
-# List of k8s Secret names (must already exist in the namespace). The chart wraps each
-# entry as a `secretRef` object pointing at the Secret name, under envFrom[].
-# Example:
-#   envSecrets:
-#     - db-creds
-#     - api-keys
 envSecrets: []
 
-# ConfigMaps mounted as environment variables in all containers via envFrom[].configMapRef.
-# List of names. Resolution per entry:
-#   - if the name matches a key in `.Values.configMaps` → chart-owned: the
-#     reference points at the chart-managed ConfigMap "<release-fullname>-<name>";
-#   - otherwise → external CM: the reference points at "<name>" as-is.
-# On collision (an external CM and a chart-owned configMaps.<name> with the same name)
-# the chart-owned one wins and the external CM is shadowed. Two CMs with the same logical
-# name in one release is itself a smell — pick distinct names if you need both.
-# Disable per-workload inheritance with inherit.configMaps: false.
-# Example:
-#   configMaps:
-#     app-config:
-#       enabled: true
-#       data:
-#         LOG_LEVEL: info
-#   envConfigMaps:
-#     - app-config        # chart-owned → <fullname>-app-config
-#     - external-cm       # external → external-cm
 envConfigMaps: []
 
 nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
-  create: false
+  create: true
   annotations: {}
   name: ""
 
-# RBAC — creates a Role and RoleBinding bound to the chart's ServiceAccount.
-# Requires serviceAccount.create: true. The chart fails fast at render time if
-# rbac.enabled=true is paired with serviceAccount.create=false (the binding
-# would target a ServiceAccount that the chart isn't managing).
 rbac:
   enabled: false
+  clusterScoped: false
   rules: []
-  # Example:
-  # rules:
-  #   - apiGroups: [""]
-  #     resources: ["configmaps", "secrets"]
-  #     verbs: ["get", "list", "watch"]
 
-# Annotations added to pod templates of Deployments and StatefulSets.
-# NOTE: also applied to Job and CronJob pod templates — this is intentional for cases
-# like Vault agent injection or Datadog admission. Use jobPodAnnotations for Job-only annotations.
 podAnnotations: {}
 
-# Annotations added exclusively to pod templates of Jobs and CronJobs from jobGroups.
-# Merged with podAnnotations — values here take precedence. Effective resolution order
-# (highest wins): jobGroups.<g>.jobs.<j>.podAnnotations → jobGroups.<g>.podAnnotations →
-# jobPodAnnotations → podAnnotations. Changes propagate into the jobGroups hash by
-# default, so adding/removing an injection annotation (Vault, Datadog, etc.) recreates
-# the affected Jobs. Set jobGroups.<g>.hashIncludePodAnnotations: false to opt out.
 jobPodAnnotations: {}
 
-# Image used for the trailing "job-completed" container in tasks-mode jobGroups (the
-# tiny container whose only job is to echo SUCCESS so the Job pod reports completion).
-# Override per group/job via jobGroups.<g>.completionImage; override globally for all
-# jobGroups (e.g. air-gapped clusters with internal mirrors) here.
 jobCompletionImage: alpine:3.21
 
-# Secure pod-level defaults: run as a non-root user, enable RuntimeDefault seccomp profile.
-# Meets Kubernetes Pod Security Standards "Restricted" level.
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
@@ -500,8 +147,6 @@ podSecurityContext:
   seccompProfile:
     type: RuntimeDefault
 
-# Secure container-level defaults: drop all Linux capabilities, no privilege escalation,
-# read-only root filesystem. Override per-workload via deployments.<name>.securityContext.
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
@@ -509,814 +154,90 @@ securityContext:
     drop:
       - ALL
 
-# Disable ServiceAccount token auto-mount for workloads that don't need K8s API access.
-# Override per-workload via deployments.<name>.automountServiceAccountToken: true.
 automountServiceAccountToken: false
 
-# Give pods time for graceful shutdown before SIGKILL.
-# Override per-workload via deployments.<name>.terminationGracePeriodSeconds.
 terminationGracePeriodSeconds: 30
 
-# minReadySeconds: seconds a pod must be ready before it is considered available.
-# 0 means immediately (Kubernetes default). Override per-workload.
 minReadySeconds: 0
 
-# Pod-level volumes shared across all containers in deployments/statefulSets
-# (and propagated into Jobs/CronJobs via jobGroups).
-# Map key → spec.template.spec.volumes[].name (k8s Pod). Drop the `name:` field
-# from the value — the chart injects it from the map key.
-# Example:
-#   volumes:
-#     cache:                              # ← becomes volumes[].name
-#       emptyDir: {}
-#     config:                             # ← becomes volumes[].name
-#       configMap:
-#         name: my-external-cm
 volumes: {}
 
-# Per-workload container volumeMounts. Outer key = workload name (deployments/
-# statefulSets entry), inner key = mount name (must match a key in `volumes`
-# above or in the workload's local `volumes`).
-# Inner map key → spec.containers[].volumeMounts[].name (k8s Container).
-# Example:
-#   volumeMounts:
-#     web:                                # outer key = workload name
-#       cache:                            # ← becomes volumeMounts[].name
-#         mountPath: /var/cache
-#       config:
-#         mountPath: /etc/app
-#         readOnly: true
 volumeMounts: {}
 
-# Chart-level ConfigMaps. Each entry creates a separate ConfigMap resource.
-# Map key → metadata.name suffix (k8s ConfigMap): "<release-fullname>-<key>".
-# mountPath: if set, the ConfigMap is automatically mounted into all containers at that path.
-# Each key in data becomes a separate file under mountPath.
-# Disable auto-mount per-workload with inherit.configMapMount: false.
 configMaps: {}
-# Example:
-# configMaps:
-#   app-config:                             # ← becomes <release>-app-config
-#     enabled: true
-#     mountPath: /etc/config        # optional: auto-mount into all containers
-#     readOnly: true                # default true; set false to allow writes
-#     data:
-#       config.json: |
-#         {"broker": "mqtt://broker:1883"}
-#   scripts:
-#     enabled: true
-#     mountPath: /scripts
-#     defaultMode: 0755             # make files executable (e.g. shell scripts)
-#     data:
-#       entrypoint.sh: |
-#         #!/bin/sh
-#         exec java -jar app.jar
-#   nginx-config:
-#     enabled: true
-#     mountPath: /etc/nginx/conf.d
-#     data:
-#       default.conf: |
-#         server { listen 80; }
-#   env-config:
-#     enabled: true
-#     data:                         # no mountPath — use via envConfigMaps
-#       LOG_LEVEL: info
 
-# Unified Job / CronJob configuration. Each top-level key is a "group" — a logical bundle
-# of one-or-more jobs sharing image, env, hooks and other params. Each job inside `jobs:`
-# becomes a separate Job (or CronJob) resource. Per-job fields override group fields.
-#
-# Resource name: "{release}-{group[:8]}-{job}-{sha8}" where sha8 is computed from the
-# spec fields that affect Job behavior (image, command, env, volumes, resources, tasks, ...).
-# When the spec doesn't change, the name doesn't change → ArgoCD/Flux/Helm see the resource
-# as already in desired state and don't re-run it. Old Jobs (from previous specs) are cleaned
-# up via ttlSecondsAfterFinished. The chart enforces fail-fast on configurations that would
-# break this contract (e.g. hashSuffix=true together with deletePolicy that removes the Job
-# after success — use hashSuffix: false or a different deletePolicy in that case).
-#
-# `kind` is set on the group only (Job | CronJob); per-job override is intentionally not
-# supported. Build separate groups when you need both Job and CronJob members.
-#
-# `podAnnotations` (effective merge of root podAnnotations + root jobPodAnnotations + group
-# + job) participate in the hash by default, so adding a Vault/Datadog injection annotation
-# recreates Jobs. Set hashIncludePodAnnotations: false on the group to opt out (useful when
-# a mutating webhook adds annotations post-render and you don't want spurious recreations).
-#
-# === Mutable image tags (dev / stage / main) ===
-# The hash is computed from the rendered spec text. If image.tag is "dev" and a new image
-# is pushed under the same tag, the rendered string is unchanged → hash is unchanged →
-# the Job is NOT re-created and migrations/init scripts will NOT run on the new image.
-# pullPolicy: Always doesn't help — it only matters when a Pod is actually created.
-#
-# Recommended setups:
-#
-# 1. ArgoCD Image Updater with `update-strategy: digest` (preferred for mutable tags):
-#    Image Updater polls the registry, detects a new digest under the same tag, and
-#    rewrites image.tag to "dev@sha256:..." via parameter overrides on the Application.
-#    The digest becomes part of the rendered spec → hash changes → Job recreated.
-#    No chart changes required (k8s natively understands "repo:tag@sha256:..." form).
-#    Example annotations on the Application CR:
-#      argocd-image-updater.argoproj.io/image-list: migrator=myrepo/migrator
-#      argocd-image-updater.argoproj.io/migrator.update-strategy: digest
-#      argocd-image-updater.argoproj.io/migrator.allow-tags: regexp:^dev$
-#      argocd-image-updater.argoproj.io/migrator.helm.image-name: jobGroups.db.image.repository
-#      argocd-image-updater.argoproj.io/migrator.helm.image-tag: jobGroups.db.image.tag
-#      argocd-image-updater.argoproj.io/write-back-method: argocd
-#
-# 2. Immutable tags (semver / git-sha): just works — every release has a unique tag,
-#    hash naturally changes between deploys.
-#
-# 3. No Image Updater + mutable tags: opt out of idempotency on the affected groups by
-#    setting hashSuffix: false and using a delete policy that recreates on every sync
-#    (e.g. argocd hooks.argocd.deletePolicy: BeforeHookCreation, or helm
-#    hooks.helm.deletePolicy: before-hook-creation). The Job will run on every sync.
-# jobGroups: outer map keyed by group name → metadata.name suffix
-# (k8s Job/CronJob): "<release-fullname>-<group>-<job>[-<sha8>]".
-# Inner `jobs:` map keyed by job name → second segment of metadata.name.
 jobGroups: {}
-# Example covering all features:
-# jobGroups:
-#   db:                                    # ← group name (truncated to 8 chars in resource name)
-#     enabled: true
-#     kind: Job                            # default Job; or CronJob
-#     hooks:
-#       argocd:                            # rendered as argocd.argoproj.io/* annotations
-#         hook: Sync                       # "" | PreSync | Sync | PostSync | SyncFail
-#         syncWave: "2"
-#         deletePolicy: ""                 # "" | HookSucceeded | HookFailed | BeforeHookCreation
-#       helm:                              # rendered as helm.sh/* annotations
-#         hook: pre-install,pre-upgrade
-#         weight: "-5"
-#         deletePolicy: hook-succeeded     # "" | before-hook-creation | hook-succeeded | hook-failed
-#     image:
-#       repository: my/migrator
-#       tag: v1
-#       pullPolicy: IfNotPresent
-#     env:
-#       LOG_LEVEL:
-#         value: info
-#     envSecrets: []
-#     envConfigMaps: []
-#     inherit:
-#       env:
-#         global: true
-#         root: true
-#       configMaps: true
-#     backoffLimit: 3
-#     ttlSecondsAfterFinished: 3600
-#     activeDeadlineSeconds: null
-#     restartPolicy: Never                 # Never | OnFailure
-#     securityContext: {}
-#     resources:
-#       requests:
-#         cpu: 100m
-#         memory: 128Mi
-#       limits:
-#         memory: 256Mi
-#     volumes: {}                           # map keyed by volume name (see root `volumes`)
-#     volumeMounts: {}                      # map keyed by mount name (see root `volumeMounts`)
-#     useRootVolumes: true
-#     useRootVolumeMounts: true
-#     nodeSelector: {}
-#     affinity: {}
-#     tolerations: []
-#     metadataAnnotations: {}
-#     podAnnotations: {}
-#     hashSuffix: true                     # default true; set false for stable names
-#     hashIncludePodAnnotations: true      # default true; affects whether podAnnotations changes recreate the Job
-#     jobs:
-#       migrate:
-#         enabled: true
-#         # tasks-mode: each task becomes an initContainer. Kubernetes runs
-#         # initContainers sequentially in declared order, and the chart sorts
-#         # the tasks map alphabetically — prefix names with 01-, 02-, ... when
-#         # ordering matters.
-#         tasks:
-#           01-schema:
-#             enabled: true
-#             command: |
-#               psql -c "CREATE TABLE IF NOT EXISTS ..."
-#           02-seed:
-#             enabled: true
-#             args:
-#               - seed
-#               - --rows=100
-#         completionImage: alpine:3.21
-#       smoke-check:
-#         enabled: true
-#         # single-container mode (mutually exclusive with tasks)
-#         command: wget -q -O- http://myapp-web/health || exit 1
-#         # per-job overrides
-#         backoffLimit: 1
-#         hooks:
-#           argocd:
-#             syncWave: "3"
-#   nightly:
-#     enabled: true
-#     kind: CronJob                        # CronJobs ignore hooks; schedule is per-job
-#     image:
-#       repository: my/cleaner
-#       tag: v1
-#     jobs:
-#       cleanup:
-#         enabled: true
-#         schedule: "0 2 * * *"
-#         timeZone: UTC
-#         concurrencyPolicy: Forbid
-#         successfulJobsHistoryLimit: 3
-#         failedJobsHistoryLimit: 1
-#         command: ./cleanup.sh
 
-# Singleton Ingress (one per release).
-# hosts: map keyed by hostname. Map key → spec.rules[].host (k8s Ingress).
-# tls:   map keyed by k8s Secret name. Map key → spec.tls[].secretName (k8s Ingress).
-# paths inside hosts stay as a list — order of paths can matter for some ingress
-# controllers (legacy nginx and friends match in declared order on equal precedence).
 ingress:
   enabled: false
-  # ingressClassName: if set, maps to spec.ingressClassName on the Ingress resource.
-  # Leave empty ("") to omit the field and let the cluster use its default IngressClass.
-  # Example values: nginx, traefik, alb, haproxy, kong
   ingressClassName: ""
   annotations: {}
   hosts: {}
-  tls: {}
-# Example:
-# ingress:
-#   enabled: true
-#   ingressClassName: nginx
-#   hosts:
-#     app.example.com:                      # ← becomes spec.rules[].host
-#       paths:
-#         - path: /api
-#           pathType: Prefix
-#           serviceName: my-release-api
-#           servicePort: 8080
-#   tls:
-#     app-tls:                              # ← becomes spec.tls[].secretName
-#       hosts:
-#         - app.example.com
+  tls: []
+  defaultBackend: {}
 
-# Multi-ingress map: each key becomes a separate Ingress named <fullname>-<key>.
-# Useful when a single release needs multiple ingress controllers (e.g. internal + external).
-# Falls back to ingress.ingressClassName when ingressClassName is not specified per entry.
-# Inner shape (hosts/tls) is the same as the singleton `ingress` block above.
 ingresses: {}
-# Example:
-# ingresses:
-#   internal:
-#     enabled: true
-#     ingressClassName: nginx-internal
-#     annotations:
-#       nginx.ingress.kubernetes.io/rewrite-target: /
-#     hosts:
-#       app.internal.example.com:
-#         paths:
-#           - path: /
-#             pathType: Prefix
-#             serviceName: my-release-web
-#             servicePort: 80
-#     tls: {}
-#   external:
-#     enabled: true
-#     ingressClassName: nginx
-#     annotations:
-#       cert-manager.io/cluster-issuer: letsencrypt-prod
-#     hosts:
-#       app.example.com:
-#         paths:
-#           - path: /api
-#             pathType: Prefix
-#             serviceName: my-release-api
-#             servicePort: 8080
-#     tls:
-#       app-tls:
-#         hosts:
-#           - app.example.com
 
-# Kubernetes Gateway API — HTTPRoute (gateway.networking.k8s.io/v1).
-# Requires the Gateway API CRDs and a compatible Gateway controller installed in the cluster
-# (e.g. Cilium, Envoy Gateway, Istio, Traefik, Kong).
-# The Gateway itself must be created separately (outside this chart).
-#
-# Singleton HTTPRoute: one resource named <fullname>.
 httpRoute:
   enabled: false
   annotations: {}
 
-  # parentRefs: references to the Gateway(s) this route attaches to.
-  # name and namespace are required; sectionName targets a specific listener.
-  # parentRefs:
-  #   - name: my-gateway
-  #     namespace: gateway-system
-  #     sectionName: https   # optional: target a specific listener by name
   parentRefs: []
 
-  # hostnames: list of hostnames this route serves.
-  # Must match a listener's hostname (or be a subdomain of it).
   hostnames: []
 
-  # rules: list of routing rules.
-  # Each rule matches requests and forwards them to a backend service.
-  #
-  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
-  #   rules:
-  #     - serviceName: my-release-web   # default: chart fullname
-  #       servicePort: 8080             # default: 80
-  #       matches:
-  #         - path:
-  #             type: PathPrefix
-  #             value: /
-  #
-  # Full form — use backendRefs for multiple backends or weights:
-  #   rules:
-  #     - matches:
-  #         - path:
-  #             type: PathPrefix
-  #             value: /api
-  #       backendRefs:
-  #         - name: my-release-api
-  #           port: 8080
-  #           weight: 100
-  #
-  # filters: optional request/response transformations per rule:
-  #   filters:
-  #     - type: RequestRedirect
-  #       requestRedirect:
-  #         scheme: https
   rules: []
 
-# Multi-HTTPRoute map: each key becomes a separate HTTPRoute named <fullname>-<key>.
-# Map key → metadata.name suffix (Gateway API HTTPRoute): "<release-fullname>-<key>".
-# Mirrors the ingresses map — useful when workloads in one release need separate routes
-# (e.g. different parentRefs, hostnames, or listener sections per route).
 httpRoutes: {}
-# Example:
-# httpRoutes:
-#   internal:
-#     enabled: true
-#     parentRefs:
-#       - name: internal-gateway
-#         namespace: gateway-system
-#     hostnames:
-#       - "app.internal.example.com"
-#     rules:
-#       - serviceName: my-release-web
-#         servicePort: 80
-#         matches:
-#           - path:
-#               type: PathPrefix
-#               value: /
-#   external:
-#     enabled: true
-#     parentRefs:
-#       - name: external-gateway
-#         namespace: gateway-system
-#         sectionName: https
-#     hostnames:
-#       - "app.example.com"
-#     rules:
-#       - matches:
-#           - path:
-#               type: PathPrefix
-#               value: /api
-#         backendRefs:
-#           - name: my-release-api
-#             port: 8080
-#       - matches:
-#           - path:
-#               type: PathPrefix
-#               value: /
-#         filters:
-#           - type: RequestRedirect
-#             requestRedirect:
-#               scheme: https
-#               statusCode: 301
-#         backendRefs:
-#           - name: my-release-web
-#             port: 80
 
-# Kubernetes Gateway API — GRPCRoute (gateway.networking.k8s.io/v1).
-# Requires a Gateway with a gRPC-capable listener and controller (e.g. Envoy Gateway, Istio, Cilium).
-# matches use gRPC service/method names instead of HTTP paths.
-# Default servicePort shorthand is 50051 (standard gRPC port).
-#
-# Singleton GRPCRoute: one resource named <fullname>.
 grpcRoute:
   enabled: false
   annotations: {}
   parentRefs: []
   hostnames: []
-  # rules: list of routing rules. Each rule matches gRPC methods and forwards to a backend.
-  #
-  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
-  #   rules:
-  #     - serviceName: my-release-grpc   # default: chart fullname
-  #       servicePort: 50051             # default: 50051
-  #       matches:
-  #         - method:
-  #             type: Exact
-  #             service: com.example.UserService
-  #             method: Login              # optional: omit to match all methods in the service
-  #
-  # Full form — use backendRefs for multiple backends:
-  #   rules:
-  #     - matches:
-  #         - method:
-  #             type: Exact
-  #             service: com.example.UserService
-  #       backendRefs:
-  #         - name: my-release-grpc
-  #           port: 50051
-  #           weight: 100
-  #
-  # filters: same as HTTPRoute (RequestHeaderModifier, ResponseHeaderModifier, etc.)
   rules: []
 
-# Multi-GRPCRoute map: each key becomes a separate GRPCRoute named <fullname>-<key>.
-# Map key → metadata.name suffix (Gateway API GRPCRoute): "<release-fullname>-<key>".
 grpcRoutes: {}
-# Example:
-# grpcRoutes:
-#   user-svc:
-#     enabled: true
-#     parentRefs:
-#       - name: my-gateway
-#         namespace: gateway-system
-#     hostnames:
-#       - "grpc.example.com"
-#     rules:
-#       - matches:
-#           - method:
-#               type: Exact
-#               service: com.example.UserService
-#         serviceName: my-release-user
-#         servicePort: 50051
-#   order-svc:
-#     enabled: true
-#     parentRefs:
-#       - name: my-gateway
-#         namespace: gateway-system
-#     rules:
-#       - matches:
-#           - method:
-#               type: Exact
-#               service: com.example.OrderService
-#         backendRefs:
-#           - name: my-release-order
-#             port: 50051
 
-# Kubernetes Gateway API — TLSRoute (gateway.networking.k8s.io/v1).
-# Operates at L4 — matches on SNI hostnames only, no HTTP-level routing.
-# Requires a Gateway listener with tls.mode: Passthrough or Terminate.
-# hostnames is required and must be FQDN (no IP addresses).
-# Default servicePort shorthand is 443.
-#
-# Singleton TLSRoute: one resource named <fullname>.
 tlsRoute:
   enabled: false
   annotations: {}
   parentRefs: []
-  # hostnames: required — list of FQDN hostnames matched via SNI during TLS handshake.
   hostnames: []
-  # rules: list of routing rules. Each rule forwards matching TLS connections to backends.
-  # No matches or filters — routing is determined entirely by hostnames (SNI).
-  #
-  # Shorthand form:
-  #   rules:
-  #     - serviceName: my-release-tls   # default: chart fullname
-  #       servicePort: 8443             # default: 443
-  #
-  # Full form:
-  #   rules:
-  #     - backendRefs:
-  #         - name: my-release-tls
-  #           port: 8443
-  #           weight: 100
   rules: []
 
-# Multi-TLSRoute map: each key becomes a separate TLSRoute named <fullname>-<key>.
-# Map key → metadata.name suffix (Gateway API TLSRoute): "<release-fullname>-<key>".
 tlsRoutes: {}
-# Example:
-# tlsRoutes:
-#   external:
-#     enabled: true
-#     parentRefs:
-#       - name: my-gateway
-#         namespace: gateway-system
-#         sectionName: tls-passthrough
-#     hostnames:
-#       - "secure.example.com"
-#     rules:
-#       - serviceName: my-release-web
-#         servicePort: 8443
 
-# Kubernetes Gateway API — ReferenceGrant (gateway.networking.k8s.io/v1beta1).
-# Required when an HTTPRoute in a different namespace needs to reference a Service
-# in this release's namespace (cross-namespace backend reference).
-# The ReferenceGrant is always created in the same namespace as the target Service
-# (i.e. the release namespace).
-#
-# Singleton ReferenceGrant: one resource named <fullname>.
 referenceGrant:
   enabled: false
   annotations: {}
 
-  # from: list of sources allowed to reference resources in this namespace.
-  # group and kind identify the referencing resource type; namespace is required.
-  # from:
-  #   - group: gateway.networking.k8s.io
-  #     kind: HTTPRoute
-  #     namespace: gateway-system   # namespace where the HTTPRoute lives
   from: []
 
-  # to: list of target resource types in THIS namespace that may be referenced.
-  # group: "" means core API group (Services). name is optional — omit to allow
-  # all resources of that kind; set to restrict to a specific resource by name.
-  # to:
-  #   - group: ""
-  #     kind: Service
-  #     # name: my-release-web   # optional: restrict to a single Service
   to: []
 
-# Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
-# Map key → metadata.name suffix (Gateway API ReferenceGrant): "<release-fullname>-<key>".
-# Useful when HTTPRoutes from multiple namespaces need access, or when different
-# source kinds (HTTPRoute, GRPCRoute) require separate grants.
 referenceGrants: {}
-# Example:
-# referenceGrants:
-#   from-gateway-ns:
-#     enabled: true
-#     from:
-#       - group: gateway.networking.k8s.io
-#         kind: HTTPRoute
-#         namespace: gateway-system
-#     to:
-#       - group: ""
-#         kind: Service
-#   from-other-app:
-#     enabled: true
-#     annotations:
-#       team: platform
-#     from:
-#       - group: gateway.networking.k8s.io
-#         kind: HTTPRoute
-#         namespace: other-app-ns
-#     to:
-#       - group: ""
-#         kind: Service
-#         name: my-release-api   # restrict to a specific Service
 
 nodeSelector: {}
 
 tolerations: []
 
-# Global host aliases injected into every pod. Override or disable per-workload via:
-#   hostAliases: []            — local aliases only
-#   inheritRootHostAliases: false — skip root aliases entirely
-# https://kubernetes.io/docs/tasks/network/customize-hosts-file-for-pods/
 hostAliases: []
-# Per-workload scheduling inheritance control via inheritRootSchedParams.
-# Each key defaults to true (inherit from root). Set to false to disable:
-#   affinity: true/false
-#   tolerations: true/false
-#   tsc: true/false
 
 affinity: {}
 
 priorityClassName: ""
 
-# Default Pod Disruption Budget. Can be overridden per-workload via
-# deployments.<name>.podDisruptionBudget or statefulSets.<name>.podDisruptionBudget.
-#
-# IMPORTANT — per-workload override is an ATOMIC REPLACE, not a merge. If you set
-# even one field on a workload, you must restate every field you want to keep,
-# including `enabled: true`. The chart uses the per-workload block as-is and
-# ignores this root one. Example: writing
-#   deployments.web.podDisruptionBudget: { minAvailable: 2 }
-# will NOT inherit `enabled: true` from here — the PDB renders nothing. Write
-#   deployments.web.podDisruptionBudget: { enabled: true, minAvailable: 2 }
-# instead.
 podDisruptionBudget:
   enabled: false
   minAvailable: 1
 
-# Vertical Pod Autoscaler — requires the VPA CRD (autoscaling.k8s.io/v1).
-# Can be overridden per-workload via deployments.<name>.verticalPodAutoscaler.
-#
-# Same atomic-replace rule as podDisruptionBudget above: a per-workload block
-# replaces this root one wholesale. Restate `enabled: true` on the workload if
-# you want the per-workload override to actually render a VPA.
 verticalPodAutoscaler:
   enabled: false
-  # updateMode: Off | Initial | Recreate | InPlaceOrRecreate
   updateMode: Initial
-  # resourcePolicy:
-  #   containerPolicies:
-  #   - containerName: "*"
-  #     minAllowed:
-  #       cpu: 100m
-  #       memory: 128Mi
-  #     maxAllowed:
-  #       cpu: 2
-  #       memory: 2Gi
 
-# Topology spread constraints — disabled by default to avoid scheduling
-# failures on single-node clusters (kind, k3s, minikube).
-topologySpreadConstraints:
-  enabled: false
-  constraints:
-    - maxSkew: 1
-      topologyKey: topology.kubernetes.io/zone
-      whenUnsatisfiable: ScheduleAnyway
-    - maxSkew: 1
-      topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: ScheduleAnyway
+topologySpreadConstraints: []
 
-# Map of Deployment workloads. Each key becomes a separate Deployment + Service.
-# Map key → metadata.name suffix (k8s Deployment/Service): "<release-fullname>-<key>".
 deployments: {}
-# Example:
-# deployments:
-#   web:                                    # ← becomes <release>-web
-#     enabled: true
-#     replicaCount: 2
-#     # service.ports: map keyed by port name. Map key → spec.ports[].name (k8s Service)
-#     # AND becomes the matching containerPort name in the pod template.
-#     # Render order: "http" first (if present), "metrics" last (if present), all
-#     # other names alphabetically between. Auto-injected metrics port from
-#     # metrics.exposeService is always appended last.
-#     # Omit to use the singleton service.port/targetPort fallback below.
-#     service:
-#       enabled: true
-#       type: ClusterIP
-#       port: 80                            # used only when ports is empty (single-port shorthand)
-#       targetPort: 8080
-#       ports:
-#         http:                             # ← becomes ports[].name
-#           port: 80
-#           targetPort: 8080
-#           protocol: TCP                   # optional, default TCP
-#         metrics:
-#           port: 9090
-#           targetPort: 9090
-#       # Optional pass-through to k8s Service spec. All five fields render
-#       # only when set; the chart imposes no defaults.
-#       # clusterIP: None                   # special "None" → headless Deployment Service
-#       # loadBalancerIP: 192.0.2.1         # type: LoadBalancer; pin static external IP
-#       # externalTrafficPolicy: Local      # preserve client source IP on LB/NodePort
-#       # sessionAffinity: ClientIP         # sticky sessions for stateful HTTP
-#       # publishNotReadyAddresses: true    # include not-ready pods in DNS — peer
-#                                            # discovery for Cassandra/Kafka/etcd/etc.
-#                                            # On StatefulSet headless this is the
-#                                            # common case; on Deployment use only
-#                                            # if your service has the same need.
-#     # Direct container ports (used by sidecars or workloads without a Service).
-#     # Map key → spec.containers[].ports[].name (k8s Pod). Same render order as
-#     # service.ports: "http" first, "metrics" last, others alphabetically between.
-#     ports: {}
-#     # Per-workload env inheritance control. Each flag defaults to true.
-#     # Set false to exclude that layer from this workload (and its sidecars).
-#     inherit:
-#       env:
-#         global: true            # set false to exclude global.env from this workload
-#         root: true              # set false to exclude root env from this workload
-#       configMaps: true          # set false to exclude root envConfigMaps from this workload
-#       configMapMount: true      # set false to skip all auto-mounts, or use map for granular control:
-#       configMapMount:
-#         nginx-config: false     # skip only this configMap's auto-mount
-#     # Sidecars are a map keyed by container name (deterministic sort order).
-#     sidecars:
-#       fluent-bit:
-#         image:
-#           repository: fluent/fluent-bit
-#           tag: "3.1"
-#           pullPolicy: IfNotPresent
-#         args:
-#           - -c
-#           - /fluent-bit/etc/fluent-bit.conf
-#         env: {}
-#         envSecrets: []
-#         volumeMounts: {}                  # map keyed by mount name
-#         resources: {}
-#         ports: {}                         # map keyed by port name (becomes ports[].name)
-#         # Root envSecrets are merged automatically for sidecars.
-#         # volumeMounts.<workload> is NOT inherited by sidecars; define mounts locally.
-#     # initContainers are a map keyed by container name. Map key →
-#     # spec.initContainers[].name. Render order is sortAlpha; Kubernetes runs
-#     # initContainers sequentially in declared order, so prefix names with
-#     # 01-, 02-, … when run order matters (same convention as jobGroups tasks).
-#     # Same env / envFrom / envSecrets / configMap auto-mount and inherit
-#     # semantics as sidecars. Root envSecrets are merged automatically.
-#     # volumeMounts.<initContainerName> is NOT inherited; define mounts locally.
-#     # Reloader does not re-trigger initContainers — they run only on Pod
-#     # creation; rolling the workload triggers a fresh init pass.
-#     # Probes (readinessProbe / livenessProbe / startupProbe) and lifecycle
-#     # are NOT allowed on standard init containers — Kubernetes rejects
-#     # them at admission. The chart fail-fasts at template render if any
-#     # of these are set on an initContainers entry.
-#     # The same shape applies under statefulSets.<name>.initContainers.
-#     initContainers:
-#       01-wait-for-db:
-#         image:
-#           repository: busybox
-#           tag: "1.36"
-#           pullPolicy: IfNotPresent
-#         command: |
-#           until nc -z postgres.example.svc 5432; do sleep 1; done
-#       02-migrate:
-#         image:
-#           repository: myrepo/migrations
-#           tag: v1.2.3
-#         command:
-#           - /bin/migrate
-#           - --config=/etc/config/migrate.yaml
-#         envSecrets:
-#           - db-credentials
-#     # Per-workload host aliases (merged with root hostAliases by default).
-#     # Set inheritRootHostAliases: false to use only local aliases.
-#     hostAliases: []
-#     # Gateway API routes — per-workload shorthand.
-#     # Rules from all enabled workloads are merged into the singleton HTTPRoute/GRPCRoute/TLSRoute.
-#     # parentRefs and hostnames are inherited from the root httpRoute/grpcRoute/tlsRoute block.
-#     # servicePort defaults to service.port; serviceName defaults to <fullname>-<workloadName>.
-#     # priority: lower number = earlier in the merged rules list; omit for alphabetical ordering.
-#     httpRoute:
-#       enabled: true
-#       priority: 10              # optional — controls rule order within the merged HTTPRoute
-#       rules:
-#         - matches:
-#             - path:
-#                 type: PathPrefix
-#                 value: /api
-#           # backendRefs: explicit override (optional)
-#     grpcRoute:
-#       enabled: true
-#       priority: 10
-#       rules:
-#         - matches:
-#             - method:
-#                 type: Exact
-#                 service: com.example.MyService
-#     tlsRoute:
-#       enabled: true
-#       priority: 10
-#       rules:
-#         - {}                    # no matches for TLSRoute — routing is SNI-based via root hostnames
 
-# Map of StatefulSet workloads. Each key becomes a separate StatefulSet plus a
-# headless Service (clusterIP: None) for stable per-pod DNS — this is required by
-# k8s for StatefulSet pod identity and is rendered regardless of service.enabled.
-# Map key → metadata.name suffix (k8s StatefulSet): "<release-fullname>-<key>".
-# Set headlessService.enabled: false to opt out — only do that when something else
-# (a separately managed Service, ExternalName, or split-horizon DNS) already gives
-# pods stable network identity. **When you opt out, you MUST also set serviceName
-# to the existing Service.** k8s rejects a StatefulSet whose spec.serviceName
-# resolves to no Service; the chart's default serviceName is the auto-generated
-# `<release-fullname>-<key>-headless`, which won't exist if you've turned off the
-# auto rendering. The chart fails fast at render time when this combination is
-# misconfigured. Most workloads should leave headlessService on the default.
 statefulSets: {}
-# Override image per StatefulSet:
-#   image:
-#     repository: myrepo/myimage
-#     tag: v1.0
-#     pullPolicy: IfNotPresent
-# Optional: volumeClaimTemplates. Update strategy uses the same strategy key as Deployments.
-# Optional: opt out of the auto-generated headless Service. Pair with serviceName.
-#   headlessService:
-#     enabled: false
-#   serviceName: my-existing-headless-service
-# Optional pass-through to k8s Service spec on the headless Service. All five
-# fields render only when set. publishNotReadyAddresses: true is the canonical
-# use case here — peer discovery for clustered StatefulSet workloads (Cassandra,
-# Kafka, Elasticsearch, Cockroach, etcd, Zookeeper), where peers must resolve
-# each other via DNS before they reach Ready.
-#   service:
-#     enabled: true
-#     port: 9042
-#     targetPort: 9042
-#     publishNotReadyAddresses: true     # peer discovery — recommended for clustered StatefulSets
-#     # loadBalancerIP / externalTrafficPolicy / sessionAffinity also pass through.
-#     # clusterIP must be "None" or unset — the chart hardcodes None on the
-#     # headless Service, and any other value fails fast at render time
-#     # (mutually exclusive with stable per-pod DNS).
-#
-# When headlessService.enabled: false AND service.enabled: true the chart
-# renders a *separate* non-headless ClusterIP Service named "<release>-<key>"
-# (same pattern as Deployment Services) for client traffic. The user's
-# externally-managed headless Service (referenced by serviceName) provides
-# stable per-pod DNS; the chart's non-headless Service is for clients that
-# just need a stable VIP. Independent knobs.
-#   headlessService:
-#     enabled: false
-#   serviceName: my-external-headless    # required: spec.serviceName must point at an existing Service
-#   service:
-#     enabled: true
-#     type: ClusterIP
-#     port: 6379
-#     targetPort: 6379
-#     # all five pass-through fields apply here too
-

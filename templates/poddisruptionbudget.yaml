@@ -3,9 +3,9 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if ne (index $wl "enabled") false }}
 {{- $pdbSpec := default $ctx.Values.podDisruptionBudget $wl.podDisruptionBudget }}
-{{- if and $pdbSpec (default false $pdbSpec.enabled) }}
+{{- if and $pdbSpec (ne (index $pdbSpec "enabled") false) }}
 {{- if and (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
 {{- fail (printf "podDisruptionBudget for workload %q: cannot set both minAvailable and maxUnavailable" $wlName) }}
 {{- end }}
@@ -37,9 +37,9 @@ spec:
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if ne (index $wl "enabled") false }}
 {{- $pdbSpec := default $ctx.Values.podDisruptionBudget $wl.podDisruptionBudget }}
-{{- if and $pdbSpec (default false $pdbSpec.enabled) }}
+{{- if and $pdbSpec (ne (index $pdbSpec "enabled") false) }}
 {{- if and (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
 {{- fail (printf "podDisruptionBudget for workload %q: cannot set both minAvailable and maxUnavailable" $wlName) }}
 {{- end }}

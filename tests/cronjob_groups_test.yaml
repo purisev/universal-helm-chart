@@ -9,7 +9,7 @@ tests:
   - it: should render nothing when no CronJob groups exist
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.db.enabled: true
       jobGroups.db.kind: Job
       jobGroups.db.jobs.task.enabled: true
@@ -21,7 +21,7 @@ tests:
   - it: should render CronJob when group enabled and kind=CronJob
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -37,7 +37,7 @@ tests:
   - it: should fail when CronJob job has no schedule
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -49,7 +49,7 @@ tests:
   - it: should render schedule and timeZone
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -67,7 +67,7 @@ tests:
   - it: should render CronJob fields (concurrencyPolicy, history, startingDeadline)
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -94,7 +94,7 @@ tests:
   - it: should default restartPolicy to Never
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -108,7 +108,7 @@ tests:
   - it: should fail-fast when CronJob group declares any hooks
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.hooks.argocd.hook: Sync
@@ -122,7 +122,7 @@ tests:
   - it: should render container with jobName in single-container mode
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.cleanup.enabled: true
@@ -136,7 +136,7 @@ tests:
   - it: should produce metadata.name with sha8 suffix by default
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -150,7 +150,7 @@ tests:
   - it: should drop hash when hashSuffix is false
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.hashSuffix: false
@@ -165,7 +165,7 @@ tests:
   - it: should render multiple CronJobs from one group
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.daily.enabled: true
@@ -181,7 +181,7 @@ tests:
   - it: should let job override group schedule
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
@@ -195,12 +195,11 @@ tests:
   - it: should render initContainers and job-completed when tasks present
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.run.enabled: true
       jobGroups.cron.jobs.run.schedule: "0 0 * * *"
-      jobGroups.cron.jobs.run.tasks.step.enabled: true
       jobGroups.cron.jobs.run.tasks.step.command: "true"
     asserts:
       - lengthEqual:
@@ -216,7 +215,7 @@ tests:
   - it: should label resource with truncated group-job name
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       jobGroups.cron.enabled: true
       jobGroups.cron.kind: CronJob
       jobGroups.cron.jobs.cleanup.enabled: true
@@ -230,7 +229,7 @@ tests:
   - it: should add cm volume for CronJob with configMap mountPath
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       configMaps.app-cfg.enabled: true
       configMaps.app-cfg.mountPath: /etc/app
       configMaps.app-cfg.data.foo: bar
