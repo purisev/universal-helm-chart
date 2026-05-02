@@ -40,9 +40,10 @@ spec:
   template:
     metadata:
       {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "pod") -}}
-      {{- if or $ctx.Values.podAnnotations $promAnnots }}
+      {{- $podAnnots := mergeOverwrite (deepCopy ($ctx.Values.podAnnotations | default dict)) ($wl.podAnnotations | default dict) -}}
+      {{- if or $podAnnots $promAnnots }}
       annotations:
-        {{- with $ctx.Values.podAnnotations }}
+        {{- with $podAnnots }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
         {{- with $promAnnots }}

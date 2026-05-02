@@ -92,6 +92,25 @@ tests:
       - isNotNull:
           path: spec.selector
 
+  - it: should render headless Service when StatefulSet has no explicit enabled field
+    # Regression guard: statefulset.yaml uses ne (index $wl "enabled") false,
+    # so a StatefulSet without enabled: true still renders. The headless Service
+    # must follow the same semantics — otherwise spec.serviceName points at a
+    # non-existent Service and pods fail to start.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      statefulSets.db.image.repository: postgres
+      statefulSets.db.image.tag: "16.3"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.clusterIP
+          value: None
+
   - it: should render headless service for StatefulSet
     set:
       image.repository: nginx
