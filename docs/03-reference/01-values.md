@@ -43,7 +43,7 @@ For each container, env is composed in this order (later layers win on key colli
 NAMESPACE (fieldRef)  →  global.env  →  env  →  workload.env  →  container.env
 ```
 
-Per-workload opt-out via `deployments.<name>.inherit.env.{global,root}: false`. See [ADR 003](../05-adr/003-layered-inheritance-and-override.md).
+Per-workload opt-out: `inherit.env.{global,root}: false` (skip env layers), `inherit.envSecrets: false` (exclude root `envSecrets` from `envFrom`), `inherit.configMaps: false` (skip root `envConfigMaps`). See [ADR 003](../05-adr/003-layered-inheritance-and-override.md).
 
 ### Label precedence on workload resources
 

@@ -42,6 +42,7 @@ deployments:
       env:
         global: true            # opt out of global.env  → false
         root: true              # opt out of root env    → false
+      envSecrets: true          # opt out of root envSecrets in envFrom → false
       configMaps: true          # opt out of root envConfigMaps
       configMapMount: true      # or fine-grained: configMapMount.<name>: false
 ```

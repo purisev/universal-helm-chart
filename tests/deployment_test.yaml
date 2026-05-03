@@ -880,6 +880,60 @@ tests:
       - isNull:
           path: spec.template.spec.containers[1].envFrom
 
+  - it: should disable root envSecrets with inherit.envSecrets false
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      envSecrets:
+        - global-db-creds
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.envSecrets: false
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom
+
+  - it: should keep per-workload envSecrets when inherit.envSecrets is false
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      envSecrets:
+        - global-db-creds
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.envSecrets: false
+      deployments.web.envSecrets:
+        - web-only-secret
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].envFrom[0].secretRef.name
+          value: web-only-secret
+      - isNull:
+          path: spec.template.spec.containers[0].envFrom[1]
+
+  - it: should propagate inherit.envSecrets false from workload to its sidecars
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      envSecrets:
+        - global-db-creds
+      deployments.web.enabled: true
+      deployments.web.replicaCount: 1
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.inherit.envSecrets: false
+      deployments.web.sidecars.log-shipper: {}
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[1].envFrom
+
   - it: should propagate inherit.env from workload to its sidecars
     set:
       image.repository: nginx
@@ -1406,6 +1460,30 @@ tests:
       - equal:
           path: spec.replicas
           value: 0
+
+  # ---------- podSecurityContext override ----------
+  - it: should use root podSecurityContext by default
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      podSecurityContext.runAsUser: 1000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+
+  - it: should use per-workload podSecurityContext when set
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      podSecurityContext.runAsUser: 1000
+      deployments.web.podSecurityContext.runAsUser: 2000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 2000
 
   # ---------- podAnnotations merge ----------
   - it: should render root podAnnotations on pod template

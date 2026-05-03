@@ -170,7 +170,7 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
   {{- $aDel := ($mergedHooks.argocd | default dict).deletePolicy | default "" -}}
   {{- $hDel := ($mergedHooks.helm | default dict).deletePolicy | default "" -}}
   {{- if or (eq $aDel "HookSucceeded") (eq $hDel "hook-succeeded") -}}
-    {{- fail (printf "jobGroups.%s.jobs.%s: hashSuffix=true is incompatible with deletePolicy that removes the Job after success (argocd HookSucceeded / helm hook-succeeded). The Job would be deleted then recreated on every sync, breaking idempotency. Use hashSuffix: false, or a different deletePolicy (e.g. BeforeHookCreation / before-hook-creation), and rely on ttlSecondsAfterFinished for cleanup" $gn $jn) -}}
+    {{- fail (printf "jobGroups.%s.jobs.%s: hashSuffix=true is incompatible with deletePolicy that removes the Job after success (argocd HookSucceeded / helm hook-succeeded). The Job would be deleted then recreated on every sync, breaking idempotency. Use hashSuffix: false, or leave deletePolicy unset (HookFailed default ensures idempotency)" $gn $jn) -}}
   {{- end -}}
 {{- end -}}
 {{- toYaml $merged -}}
@@ -239,7 +239,8 @@ Output at zero indent; caller controls nindent.
 {{- $h := $hooks.helm | default dict -}}
 {{- $aHook := $a.hook | default "" -}}
 {{- $aWave := $a.syncWave -}}
-{{- $aDel := $a.deletePolicy | default "" -}}
+{{- /* Default to HookFailed when hook is set: succeeded jobs stay (idempotent re-sync), failed jobs are deleted (retry on next sync) */ -}}
+{{- $aDel := $a.deletePolicy | default (ternary "HookFailed" "" (ne $aHook "")) -}}
 {{- $hHook := $h.hook | default "" -}}
 {{- $hWeight := $h.weight -}}
 {{- $hDel := $h.deletePolicy | default "" -}}

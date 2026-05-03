@@ -109,6 +109,14 @@ Output at zero indent; caller controls nindent.
 {{- if hasKey $inheritSource "configMaps" }}
   {{- $inheritConfigMaps = ne (index $inheritSource "configMaps") false }}
 {{- end }}
+{{- $inheritEnvSecrets := true }}
+{{- if hasKey $inheritSource "envSecrets" }}
+  {{- $inheritEnvSecrets = ne (index $inheritSource "envSecrets") false }}
+{{- end }}
+{{- $rootSecretsForFrom := $ctx.Values.envSecrets | default list }}
+{{- if not $inheritEnvSecrets }}
+  {{- $rootSecretsForFrom = list }}
+{{- end }}
 {{- $globalCMs := $ctx.Values.envConfigMaps | default list }}
 {{- if not $inheritConfigMaps }}
   {{- $globalCMs = list }}
@@ -160,7 +168,7 @@ Output at zero indent; caller controls nindent.
   {{- end }}
   env:
     {{- include "uhc.envVars" (dict "ctx" $ctx "extraEnv" $wl.env "inherit" $envInherit) | trim | nindent 4 }}
-  {{- $envFromYaml := include "uhc.envFrom" (dict "rootSecrets" $ctx.Values.envSecrets "workloadSecrets" $wl.envSecrets "rootConfigMaps" $resolvedRootCMs "workloadConfigMaps" $resolvedWorkloadCMs) | trim }}
+  {{- $envFromYaml := include "uhc.envFrom" (dict "rootSecrets" $rootSecretsForFrom "workloadSecrets" $wl.envSecrets "rootConfigMaps" $resolvedRootCMs "workloadConfigMaps" $resolvedWorkloadCMs) | trim }}
   {{- if $envFromYaml }}
   {{- $envFromYaml | nindent 2 }}
   {{- end }}
@@ -357,8 +365,9 @@ automountServiceAccountToken: {{ $autoMount }}
 {{- if or $wl.priorityClassName $ctx.Values.priorityClassName }}
 priorityClassName: {{ default $ctx.Values.priorityClassName $wl.priorityClassName }}
 {{- end }}
+{{- $podSec := $wl.podSecurityContext | default $ctx.Values.podSecurityContext }}
 securityContext:
-  {{- toYaml $ctx.Values.podSecurityContext | nindent 2 }}
+  {{- toYaml $podSec | nindent 2 }}
 {{- with ($wl.terminationGracePeriodSeconds | default $ctx.Values.terminationGracePeriodSeconds) }}
 terminationGracePeriodSeconds: {{ . | int }}
 {{- end }}
