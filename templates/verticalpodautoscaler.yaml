@@ -3,16 +3,18 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if ne (index $wl "enabled") false }}
 {{- $vpaSpec := default $ctx.Values.verticalPodAutoscaler $wl.verticalPodAutoscaler }}
-{{- if and $vpaSpec (default false $vpaSpec.enabled) }}
+{{- if and $vpaSpec (ne (index $vpaSpec "enabled") false) }}
 ---
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "vpa") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:
@@ -32,16 +34,18 @@ spec:
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if ne (index $wl "enabled") false }}
 {{- $vpaSpec := default $ctx.Values.verticalPodAutoscaler $wl.verticalPodAutoscaler }}
-{{- if and $vpaSpec (default false $vpaSpec.enabled) }}
+{{- if and $vpaSpec (ne (index $vpaSpec "enabled") false) }}
 ---
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "vpa") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:

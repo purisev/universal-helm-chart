@@ -3,9 +3,11 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
-{{- if and $wl.hpa $wl.hpa.enabled }}
-{{- if not (and $wl.keda $wl.keda.enabled) }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.hpa (ne (index $wl.hpa "enabled") false) }}
+{{- if and $wl.keda (ne (index $wl.keda "enabled") false) }}
+{{- fail (printf "deployments.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -13,8 +15,10 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "hpa") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
@@ -31,6 +35,42 @@ spec:
     {{- toYaml $wl.hpa.behavior | nindent 4 }}
   {{- end }}
 {{- end }}
+{{- end }}
+{{- end }}
+{{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
+{{- $wl := index $statefulSetSpecs $wlName }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.hpa (ne (index $wl.hpa "enabled") false) }}
+{{- if and $wl.keda (ne (index $wl.keda "enabled") false) }}
+{{- fail (printf "statefulSets.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ $releaseName }}-{{ $wlName }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "hpa") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: StatefulSet
+    name: {{ $releaseName }}-{{ $wlName }}
+  minReplicas: {{ $wl.hpa.minReplicas | default 1 }}
+  maxReplicas: {{ required (printf "statefulSets.%s.hpa.maxReplicas is required" $wlName) $wl.hpa.maxReplicas }}
+  {{- if $wl.hpa.metrics }}
+  metrics:
+    {{- toYaml $wl.hpa.metrics | nindent 4 }}
+  {{- end }}
+  {{- if $wl.hpa.behavior }}
+  behavior:
+    {{- toYaml $wl.hpa.behavior | nindent 4 }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

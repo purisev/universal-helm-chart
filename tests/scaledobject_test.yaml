@@ -9,11 +9,29 @@ tests:
   - it: should not render when no keda enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
     asserts:
       - hasDocuments:
           count: 0
+
+  - it: should fail when both hpa and keda are enabled on the same workload
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+      deployments.web.keda.enabled: true
+      deployments.web.keda.maxReplicas: 5
+      deployments.web.keda.triggers[0].type: cron
+      deployments.web.keda.triggers[0].metadata.timezone: UTC
+      deployments.web.keda.triggers[0].metadata.start: "0 9 * * 1-5"
+      deployments.web.keda.triggers[0].metadata.end: "0 17 * * 1-5"
+      deployments.web.keda.triggers[0].metadata.desiredReplicas: "3"
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one."
 
   - it: should render ScaledObject for Deployment when keda enabled
     values:
@@ -55,7 +73,7 @@ tests:
   - it: should default minReplicaCount to 1
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.keda.enabled: true
       deployments.web.keda.maxReplicas: 5
@@ -112,3 +130,70 @@ tests:
       - equal:
           path: spec.scaleTargetRef.envSourceContainerName
           value: worker
+
+  - it: should render idleReplicaCount=0 (canonical scale-to-zero signal)
+    # KEDA reads idleReplicaCount: 0 as "scale to zero when no triggers fire".
+    # A truthiness gate would silently drop the field and KEDA would scale to
+    # minReplicaCount (≥1) instead of 0 — losing the entire idle-cost saving.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.idleReplicaCount: 0
+      deployments.worker.keda.triggers[0].type: kafka
+      deployments.worker.keda.triggers[0].metadata.bootstrapServers: kafka:9092
+      deployments.worker.keda.triggers[0].metadata.consumerGroup: workers
+      deployments.worker.keda.triggers[0].metadata.topic: tasks
+      deployments.worker.keda.triggers[0].metadata.lagThreshold: "5"
+    asserts:
+      - equal:
+          path: spec.idleReplicaCount
+          value: 0
+
+  - it: should render minReplicaCount=0 (canonical scale-to-zero pair with idleReplicaCount=0)
+    # `default 1 $wl.keda.minReplicas` would have collapsed 0 to 1, leaving KEDA
+    # unable to scale below 1 even when idleReplicaCount=0 is also set. The
+    # hasKey-pattern preserves the explicit zero so KEDA can drive replicas to 0.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.minReplicas: 0
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.idleReplicaCount: 0
+      deployments.worker.keda.triggers[0].type: kafka
+      deployments.worker.keda.triggers[0].metadata.bootstrapServers: kafka:9092
+      deployments.worker.keda.triggers[0].metadata.consumerGroup: workers
+      deployments.worker.keda.triggers[0].metadata.topic: tasks
+      deployments.worker.keda.triggers[0].metadata.lagThreshold: "5"
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.idleReplicaCount
+          value: 0
+
+  - it: should render cooldownPeriod=0 (no cooldown wait)
+    # cooldownPeriod: 0 is a valid KEDA value meaning "scale down immediately
+    # when triggers fall below the threshold". A truthiness gate would drop
+    # the field and KEDA would fall back to its 300s default.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.cooldownPeriod: 0
+      deployments.worker.keda.triggers[0].type: kafka
+      deployments.worker.keda.triggers[0].metadata.bootstrapServers: kafka:9092
+      deployments.worker.keda.triggers[0].metadata.consumerGroup: workers
+      deployments.worker.keda.triggers[0].metadata.topic: tasks
+      deployments.worker.keda.triggers[0].metadata.lagThreshold: "5"
+    asserts:
+      - equal:
+          path: spec.cooldownPeriod
+          value: 0

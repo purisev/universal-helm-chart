@@ -6,17 +6,26 @@ Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1beta1).
 Grants permission for HTTPRoutes in other namespaces to reference Services
 in this release's namespace — required for cross-namespace Gateway routing.
 */}}
-{{- if .Values.referenceGrant.enabled -}}
+{{- if ne (index .Values.referenceGrant "enabled") false -}}
+{{- if not .Values.referenceGrant.from -}}
+{{- fail "referenceGrant is enabled but .Values.referenceGrant.from is empty. A ReferenceGrant with no from entries grants nothing. Set .Values.referenceGrant.from to at least one {group, kind, namespace} entry." -}}
+{{- end -}}
+{{- if not .Values.referenceGrant.to -}}
+{{- fail "referenceGrant is enabled but .Values.referenceGrant.to is empty. A ReferenceGrant with no to entries grants nothing. Set .Values.referenceGrant.to to at least one {group, kind} entry." -}}
+{{- end -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
   name: {{ $releaseName }}
+  {{- $lbls := include "uhc.labels" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.referenceGrant.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "referenceGrant" "extra" (.Values.referenceGrant.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   from:
@@ -30,17 +39,28 @@ Useful when multiple source namespaces or different resource types need separate
 */}}
 {{- range $grantName := keys ($ctx.Values.referenceGrants | default dict) | sortAlpha }}
 {{- $grant := index $ctx.Values.referenceGrants $grantName }}
-{{- if and (hasKey $grant "enabled") $grant.enabled }}
+{{- if ne (index $grant "enabled") false }}
+{{- if not $grant.from -}}
+{{- fail (printf "referenceGrants.%s is enabled but from is empty. A ReferenceGrant with no from entries grants nothing. Set referenceGrants.%s.from to at least one {group, kind, namespace} entry." $grantName $grantName) -}}
+{{- end -}}
+{{- if not $grant.to -}}
+{{- fail (printf "referenceGrants.%s is enabled but to is empty. A ReferenceGrant with no to entries grants nothing. Set referenceGrants.%s.to to at least one {group, kind} entry." $grantName $grantName) -}}
+{{- end -}}
+{{- $rgFullName := printf "%s-%s" $releaseName $grantName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $rgFullName "kind" (printf "ReferenceGrant %q" $grantName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1beta1
 kind: ReferenceGrant
 metadata:
-  name: {{ $releaseName }}-{{ $grantName }}
+  name: {{ $rgFullName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $grant.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "referenceGrant" "extra" ($grant.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   from:

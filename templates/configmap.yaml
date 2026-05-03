@@ -3,57 +3,79 @@
 
 {{- range $wlName := keys ($ctx.Values.deployments | default dict) | sortAlpha }}
 {{- $wl := index $ctx.Values.deployments $wlName -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
+{{- if and (ne (index $wl "enabled") false) $wl.createConfigmap }}
+---
+{{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}-config
+  name: {{ $cmFullName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
-  annotations:
-    reloader.stakater.com/auto: "true"
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 data:
   {{- if $wl.configData }}
   {{- toYaml $wl.configData | nindent 2 }}
   {{- else }}
   {{ required (printf "deployments.%s.configData is required when createConfigmap is true" $wlName) nil }}
   {{- end }}
----
 {{- end }}
 {{- end }}
 
 {{- range $wlName := keys ($ctx.Values.statefulSets | default dict) | sortAlpha }}
 {{- $wl := index $ctx.Values.statefulSets $wlName -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.createConfigmap }}
+{{- if and (ne (index $wl "enabled") false) $wl.createConfigmap }}
 ---
+{{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}-config
+  name: {{ $cmFullName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
-  annotations:
-    reloader.stakater.com/auto: "true"
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 data:
   {{- if $wl.configData }}
   {{- toYaml $wl.configData | nindent 2 }}
   {{- else }}
   {{ required (printf "statefulSets.%s.configData is required when createConfigmap is true" $wlName) nil }}
   {{- end }}
----
 {{- end }}
 {{- end }}
 
 {{- range $cmName := keys ($ctx.Values.configMaps | default dict) | sortAlpha }}
 {{- $cm := index $ctx.Values.configMaps $cmName }}
-{{- if and (hasKey $cm "enabled") $cm.enabled }}
+{{- if ne (index $cm "enabled") false }}
 ---
+{{- $cmFullName := printf "%s-%s" $releaseName $cmName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap %q" $cmName)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $releaseName }}-{{ $cmName }}
+  name: {{ $cmFullName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 data:
   {{- if $cm.data }}
   {{- toYaml $cm.data | nindent 2 }}

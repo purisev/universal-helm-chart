@@ -3,7 +3,10 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.keda $wl.keda.enabled }}
+{{- if and (ne (index $wl "enabled") false) $wl.keda (ne (index $wl.keda "enabled") false) }}
+{{- if and $wl.hpa (ne (index $wl.hpa "enabled") false) }}
+{{- fail (printf "deployments.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -11,24 +14,30 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 spec:
   scaleTargetRef:
     name: {{ $releaseName }}-{{ $wlName }}
     kind: Deployment
     envSourceContainerName: {{ $wlName }}
-  minReplicaCount: {{ $wl.keda.minReplicas | default 1 }}
+  {{- $minReplicas := 1 }}
+  {{- if hasKey $wl.keda "minReplicas" }}
+  {{- $minReplicas = $wl.keda.minReplicas }}
+  {{- end }}
+  minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "deployments.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
     {{- toYaml $wl.keda.triggers | nindent 4 }}
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
-  {{- if $wl.keda.cooldownPeriod }}
+  {{- if hasKey $wl.keda "cooldownPeriod" }}
   cooldownPeriod: {{ $wl.keda.cooldownPeriod }}
   {{- end }}
-  {{- if $wl.keda.idleReplicaCount }}
+  {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
   {{- end }}
 {{- end }}
@@ -36,7 +45,10 @@ spec:
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
 {{- range $wlName := keys $statefulSetSpecs | sortAlpha }}
 {{- $wl := index $statefulSetSpecs $wlName -}}
-{{- if and (hasKey $wl "enabled") $wl.enabled $wl.keda $wl.keda.enabled }}
+{{- if and (ne (index $wl "enabled") false) $wl.keda (ne (index $wl.keda "enabled") false) }}
+{{- if and $wl.hpa (ne (index $wl.hpa "enabled") false) }}
+{{- fail (printf "statefulSets.%s: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one." $wlName) }}
+{{- end }}
 ---
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
@@ -44,24 +56,30 @@ metadata:
   name: {{ $releaseName }}-{{ $wlName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  annotations:
-    "argocd.argoproj.io/sync-wave": "{{ add 1 $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
 spec:
   scaleTargetRef:
     name: {{ $releaseName }}-{{ $wlName }}
     kind: StatefulSet
     envSourceContainerName: {{ $wlName }}
-  minReplicaCount: {{ $wl.keda.minReplicas | default 1 }}
+  {{- $minReplicas := 1 }}
+  {{- if hasKey $wl.keda "minReplicas" }}
+  {{- $minReplicas = $wl.keda.minReplicas }}
+  {{- end }}
+  minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "statefulSets.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
     {{- toYaml $wl.keda.triggers | nindent 4 }}
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
-  {{- if $wl.keda.cooldownPeriod }}
+  {{- if hasKey $wl.keda "cooldownPeriod" }}
   cooldownPeriod: {{ $wl.keda.cooldownPeriod }}
   {{- end }}
-  {{- if $wl.keda.idleReplicaCount }}
+  {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
   {{- end }}
 {{- end }}

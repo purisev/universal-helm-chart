@@ -34,7 +34,10 @@ jobs:
     name: Publish branch build to GHCR
     needs: lint-test
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    # Fork PRs run with packages: write stripped by GitHub, so the publish
+    # step can never push to GHCR. Skip the job entirely on forks to keep
+    # those runs green; the lint-test job above is fork-safe and still runs.
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && !github.event.pull_request.head.repo.fork
     permissions:
       contents: read
       packages: write
@@ -64,4 +67,4 @@ jobs:
         run: helm package . --version "${{ steps.version.outputs.version }}"
 
       - name: Push chart to GHCR
-        run: helm push universal-helm-chart-*.tgz oci://ghcr.io/purisev
+        run: helm push universal-helm-chart-*.tgz oci://ghcr.io/${{ github.repository_owner }}

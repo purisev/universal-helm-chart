@@ -1,10 +1,12 @@
-externalSecrets:
-  mixed:
-    enabled: true
-    secretStore: vault-store
-    data:
-      - remoteKey: my-app/db
-        secretKey: DB_URL
-        property: url
-    dataFrom:
-      - remoteKey: my-app/config
+integrations:
+  eso:
+    externalSecrets:
+      mixed:
+        enabled: true
+        secretStore: vault-store
+        data:
+          DB_URL:
+            remoteKey: my-app/db
+            property: url
+        dataFrom:
+          - remoteKey: my-app/config

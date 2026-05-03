@@ -3,23 +3,26 @@
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
-{{- if and (hasKey $wl "enabled") $wl.enabled }}
+{{- if ne (index $wl "enabled") false }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ $releaseName }}-{{ $wlName }}
-  annotations:
-    {{- if $ctx.Values.reloader.enabled }}
-    "reloader.stakater.com/auto": "true"
-    {{- end }}
-    "argocd.argoproj.io/sync-wave": "{{ $ctx.Values.syncWaves.deploymentSyncWave | int }}"
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "deployment" "includeReloader" true "extra" ($wl.metadataAnnotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:
   {{- if not (and $wl.keda $wl.keda.enabled) }}
   {{- if not (and $wl.hpa $wl.hpa.enabled) }}
-  replicas: {{ $wl.replicaCount | default 1 }}
+  {{- $replicas := 1 }}
+  {{- if hasKey $wl "replicaCount" }}
+  {{- $replicas = $wl.replicaCount }}
+  {{- end }}
+  replicas: {{ $replicas }}
   {{- end }}
   {{- end }}
   progressDeadlineSeconds: {{ default (default 600 $ctx.Values.progressDeadlineSeconds) $wl.progressDeadlineSeconds | int }}
@@ -36,36 +39,59 @@ spec:
       {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
   template:
     metadata:
-      {{- with $ctx.Values.podAnnotations }}
+      {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "pod") -}}
+      {{- $podAnnots := mergeOverwrite (deepCopy ($ctx.Values.podAnnotations | default dict)) ($wl.podAnnotations | default dict) -}}
+      {{- if or $podAnnots $promAnnots }}
       annotations:
+        {{- with $podAnnots }}
         {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- with $promAnnots }}
+        {{- . | nindent 8 }}
+        {{- end }}
       {{- end }}
       labels:
         {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
     spec:
-      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | nindent 6 }}
+      {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 6 }}
+      {{- if $wl.initContainers }}
+      initContainers:
+        {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 8 }}
+      {{- end }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | nindent 8 }}
-        {{- include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | nindent 8 }}
-      {{- $inheritParentVolumes := ne ($wl.useRootVolumes | toString) "false" }}
-      {{- $hasAutoVols := false }}
-      {{- range $cmName, $cm := ($ctx.Values.configMaps | default dict) }}
-        {{- if and (hasKey $cm "enabled") $cm.enabled $cm.mountPath }}
-          {{- $hasAutoVols = true }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | trim | nindent 8 }}
+        {{- $sidecars := include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | trim }}
+        {{- if $sidecars }}
+        {{- $sidecars | nindent 8 }}
         {{- end }}
+      {{- $inheritParentVolumes := true }}
+      {{- if hasKey $wl "useRootVolumes" }}
+      {{- $inheritParentVolumes = $wl.useRootVolumes }}
+      {{- end }}
+      {{- $cmm := include "uhc.resolveConfigMapMount" ($wl.inherit | default dict) | fromJson }}
+      {{- $hasAutoVols := "" }}
+      {{- if $cmm.enabled }}
+      {{- $hasAutoVols = include "uhc.hasConfigMapAutoVolumes" (dict "ctx" $ctx "granularDisable" $cmm.granular) }}
       {{- end }}
       {{- if or (and $inheritParentVolumes $ctx.Values.volumes) $wl.volumes $hasAutoVols }}
       volumes:
         {{- if $inheritParentVolumes }}
-        {{- with $ctx.Values.volumes }}
-        {{- toYaml . | nindent 8 }}
+        {{- range $vName := keys ($ctx.Values.volumes | default dict) | sortAlpha }}
+        - name: {{ $vName }}
+          {{- toYaml (index $ctx.Values.volumes $vName) | nindent 10 }}
         {{- end }}
         {{- end }}
-        {{- with $wl.volumes }}
-        {{- toYaml . | nindent 8 }}
+        {{- range $vName := keys ($wl.volumes | default dict) | sortAlpha }}
+        - name: {{ $vName }}
+          {{- toYaml (index $wl.volumes $vName) | nindent 10 }}
         {{- end }}
-        {{- include "uhc.configMapAutoVolumes" $ctx | nindent 8 }}
+        {{- if $cmm.enabled }}
+        {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 8 }}
+        {{- end }}
       {{- end }}
-      {{- include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | nindent 6 }}
+      {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) | trim }}
+      {{- if $sched }}
+      {{- $sched | nindent 6 }}
+      {{- end }}
 {{- end }}
 {{- end }}

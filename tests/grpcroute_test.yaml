@@ -65,12 +65,12 @@ tests:
           path: spec.parentRefs[0].sectionName
           value: grpc
 
-  - it: should omit parentRefs when not set
+  - it: should fail fast when grpcRoute is enabled without parentRefs
     set:
       grpcRoute.enabled: true
     asserts:
-      - isNull:
-          path: spec.parentRefs
+      - failedTemplate:
+          errorPattern: "grpcRoute is enabled .* but .Values.grpcRoute.parentRefs is empty"
 
   # --- hostnames ---
 
@@ -85,6 +85,8 @@ tests:
   - it: should omit hostnames when not set
     set:
       grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
     asserts:
       - isNull:
           path: spec.hostnames
@@ -124,6 +126,8 @@ tests:
   - it: should default serviceName to fullname when not specified
     set:
       grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       grpcRoute.rules:
         - {}
     asserts:
@@ -134,6 +138,8 @@ tests:
   - it: should default servicePort to 50051 when not specified
     set:
       grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       grpcRoute.rules:
         - {}
     asserts:
@@ -153,8 +159,12 @@ tests:
   - it: should render multiple GRPCRoutes from grpcRoutes map
     set:
       grpcRoutes.user.enabled: true
+      grpcRoutes.user.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       grpcRoutes.user.rules[0].serviceName: my-release-user
       grpcRoutes.order.enabled: true
+      grpcRoutes.order.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       grpcRoutes.order.rules[0].serviceName: my-release-order
     asserts:
       - hasDocuments:
@@ -164,6 +174,8 @@ tests:
     set:
       fullnameOverride: test-release
       grpcRoutes.user.enabled: true
+      grpcRoutes.user.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       grpcRoutes.user.rules[0].serviceName: my-svc
     asserts:
       - matchRegex:
@@ -173,6 +185,8 @@ tests:
   - it: should render hostnames in multi-route
     set:
       grpcRoutes.user.enabled: true
+      grpcRoutes.user.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       grpcRoutes.user.hostnames[0]: grpc.example.com
       grpcRoutes.user.rules[0].serviceName: my-svc
     asserts:

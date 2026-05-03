@@ -1,0 +1,854 @@
+# values.yaml.example — every chart feature exercised in one file.
+# Passes `helm template`; do NOT deploy verbatim.
+# Copy relevant sections into your real values file.
+
+# ---------------------------------------------------------------------------
+# Global env (subchart "global:" mechanism — propagates to all subcharts)
+# ---------------------------------------------------------------------------
+global:
+  env:
+    CLUSTER_NAME:
+      value: prod-us-east-1
+
+# ---------------------------------------------------------------------------
+# Release-level env — injected into every container
+# ---------------------------------------------------------------------------
+env:
+  APP_ENV:
+    value: production
+  POD_NAMESPACE:
+    fieldRef:
+      fieldPath: metadata.namespace
+
+commonLabels:
+  cost-center: platform
+  team: backend
+
+commonAnnotations:
+  owner: platform-team@example.com
+  repo: https://github.com/example/myapp
+
+# Standard label toggles (all on by default; shown explicitly for reference)
+labels:
+  standard:
+    enabled: true
+    name: true
+    instance: true
+    version: true
+    managedBy: true
+    partOf: true
+
+# ---------------------------------------------------------------------------
+# Integrations
+# ---------------------------------------------------------------------------
+
+integrations:
+
+  argocd:
+    syncWaves:
+      enabled: true
+      ingress: 40                         # push Ingress past a CRD wave at 35
+      deployment: 20                      # keep default; shown for reference
+
+    imageUpdater:
+      enabled: true
+      namespace: argocd
+      appNamePattern: myapp
+      commonUpdateSettings:
+        updateStrategy: semver
+        allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
+      writeBackConfig:
+        method: argocd
+      images:
+        api:
+          imageName: ghcr.io/example/api
+          manifestTargets:
+            helm:
+              name: deployments.api.image.repository
+              tag: deployments.api.image.tag
+
+  stakater:
+    reloader:
+      enabled: true                       # injects reloader.stakater.com/auto: "true"
+
+  eso:
+    enabled: true
+
+    secretStores:
+      vault:
+        enabled: true
+        kind: SecretStore
+        provider:
+          vault:
+            server: https://vault.example.com
+            path: secret
+            version: v2
+            auth:
+              jwt:
+                mountPath: jwt
+                role: myapp-role
+                audiences:
+                  - vault
+                expirationSeconds: 600
+
+    externalSecrets:
+      app-secrets:
+        enabled: true
+        secretStore: vault
+        refreshInterval: 1h
+        targetName: app-secrets
+        data:
+          DB_PASSWORD:
+            remoteKey: myapp/db
+            property: password
+          API_TOKEN:
+            remoteKey: myapp/api
+            property: token
+
+      worker-bulk:
+        enabled: true
+        secretStore: vault
+        refreshInterval: 30m
+        dataFrom:
+          - remoteKey: myapp/worker
+            conversionStrategy: Default
+            decodingStrategy: None
+
+  monitoring:
+    defaults:
+      enabled: true
+      provider: prometheus               # use "victoriametrics" for VMServiceScrape/VMPodScrape
+      discovery: crd                     # use "annotations" to inject prometheus.io/* instead
+      type: service
+      port: metrics
+      path: /metrics
+      scheme: http
+      interval: 30s
+      scrapeTimeout: 10s
+      exposeService:
+        enabled: true                    # auto-add metrics port to Services without one
+        port: 9090
+        targetPort: 9090
+
+# ---------------------------------------------------------------------------
+# Root image (inherited by workloads that do not override)
+# ---------------------------------------------------------------------------
+image:
+  repository: ghcr.io/example/api
+  tag: v1.2.3
+  pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - regcred
+
+# ---------------------------------------------------------------------------
+# Default resource requests/limits (overridden per-workload below)
+# ---------------------------------------------------------------------------
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 128Mi
+
+# ---------------------------------------------------------------------------
+# Deployment behaviour
+# ---------------------------------------------------------------------------
+revisionHistoryLimit: 5
+progressDeadlineSeconds: 300
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 0
+
+statefulSetUpdateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    partition: 0
+
+minReadySeconds: 5
+
+# ---------------------------------------------------------------------------
+# Identity
+# ---------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: myapp
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/myapp-role
+
+rbac:
+  enabled: true
+  clusterScoped: false                   # set true for ClusterRole + ClusterRoleBinding
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["coordination.k8s.io"]
+      resources: ["leases"]
+      verbs: ["get", "create", "update"]
+
+automountServiceAccountToken: false
+
+# ---------------------------------------------------------------------------
+# Security
+# ---------------------------------------------------------------------------
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# ---------------------------------------------------------------------------
+# Annotations injected into every pod template
+# ---------------------------------------------------------------------------
+podAnnotations:
+  cluster-autoscaler.kubernetes.io/safe-to-evict: "true"
+
+# Annotations injected into every Job/CronJob pod template
+jobPodAnnotations:
+  sidecar.istio.io/inject: "false"
+
+# ---------------------------------------------------------------------------
+# Pod-level settings
+# ---------------------------------------------------------------------------
+terminationGracePeriodSeconds: 60
+
+hostAliases:
+  - ip: "192.168.100.10"
+    hostnames:
+      - "internal-registry.local"
+
+priorityClassName: high-priority
+
+# ---------------------------------------------------------------------------
+# Scheduling (inherited by all workloads; override per-workload to replace)
+# ---------------------------------------------------------------------------
+nodeSelector:
+  kubernetes.io/os: linux
+
+tolerations:
+  - key: dedicated
+    operator: Equal
+    value: app
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: api
+          topologyKey: kubernetes.io/hostname
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+
+# ---------------------------------------------------------------------------
+# Root volumes and mounts (available to all workloads unless opted out)
+# ---------------------------------------------------------------------------
+volumes:
+  shared-tmp:
+    emptyDir: {}
+
+# volumeMounts keyed by workload name → applied to that container
+volumeMounts:
+  api:
+    shared-tmp:
+      mountPath: /tmp
+
+# ---------------------------------------------------------------------------
+# Root envSecrets / envConfigMaps (injected via envFrom into every container)
+# ---------------------------------------------------------------------------
+envSecrets:
+  - app-secrets
+
+envConfigMaps:
+  - app-config
+
+# ---------------------------------------------------------------------------
+# ConfigMaps (chart-owned; auto-mounted when mountPath is set)
+# ---------------------------------------------------------------------------
+configMaps:
+  app-config:
+    enabled: true
+    mountPath: /etc/app
+    data:
+      config.yaml: |
+        log_level: info
+        db_host: db.default.svc.cluster.local
+
+# ---------------------------------------------------------------------------
+# Cluster-wide PodDisruptionBudget (applied to all workloads unless overridden)
+# ---------------------------------------------------------------------------
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Disabled at root; opted in per-workload below
+verticalPodAutoscaler:
+  enabled: false
+  updateMode: Initial
+
+# ---------------------------------------------------------------------------
+# Completion image used by jobGroups tasks mode
+# ---------------------------------------------------------------------------
+jobCompletionImage: alpine:3.21
+
+# ---------------------------------------------------------------------------
+# Networking — Ingress
+# ---------------------------------------------------------------------------
+
+# Singleton Ingress
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+  hosts:
+    app.example.com:
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePort: 80
+  tls:
+    - secretName: app-example-tls
+      hosts:
+        - app.example.com
+  defaultBackend:
+    serviceName: fallback-service
+    servicePort: 8080
+
+# Multiple named Ingresses
+ingresses:
+  internal:
+    enabled: true
+    ingressClassName: nginx-internal
+    hosts:
+      app.internal.example.com:
+        paths:
+          - path: /
+            pathType: Prefix
+            servicePort: 80
+
+# ---------------------------------------------------------------------------
+# Networking — Gateway API
+# ---------------------------------------------------------------------------
+
+# Singleton HTTPRoute (per-workload httpRoute.rules merge into this)
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: external-gateway
+      namespace: gateway-system
+      sectionName: https
+  hostnames:
+    - app.example.com
+
+# Additional named HTTPRoutes
+httpRoutes:
+  admin:
+    enabled: true
+    parentRefs:
+      - name: internal-gateway
+        namespace: gateway-system
+    hostnames:
+      - admin.example.com
+    rules:
+      - backendRefs:
+          - name: myapp-api
+            port: 8081
+
+# Singleton GRPCRoute
+grpcRoute:
+  enabled: true
+  parentRefs:
+    - name: external-gateway
+      namespace: gateway-system
+      sectionName: grpc
+  hostnames:
+    - grpc.example.com
+  rules:
+    - matches:
+        - method:
+            type: Exact
+            service: com.example.ApiService
+      backendRefs:
+        - name: myapp-api
+          port: 9000
+
+# Singleton TLSRoute
+tlsRoute:
+  enabled: true
+  parentRefs:
+    - name: external-gateway
+      namespace: gateway-system
+      sectionName: tls-passthrough
+  hostnames:
+    - secure.example.com
+  rules:
+    - backendRefs:
+        - name: myapp-api
+          port: 8443
+
+# Singleton ReferenceGrant
+referenceGrant:
+  enabled: true
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: gateway-system
+  to:
+    - group: ""
+      kind: Service
+
+# Additional named ReferenceGrants
+referenceGrants:
+  from-grpc-gw:
+    enabled: true
+    from:
+      - group: gateway.networking.k8s.io
+        kind: GRPCRoute
+        namespace: gateway-system
+    to:
+      - group: ""
+        kind: Service
+
+# ---------------------------------------------------------------------------
+# Deployments
+# ---------------------------------------------------------------------------
+
+deployments:
+
+  # --- api: main HTTP API ---
+  # Features: service ports, HPA, VPA, PDB, sidecar, initContainer, probes,
+  #           lifecycle, networkPolicy, httpRoute shorthand, ServiceMonitor (CRD)
+  api:
+    replicaCount: 2
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+        grpc:
+          port: 9000
+          targetPort: 9000
+        admin:
+          port: 8081
+          targetPort: 8081
+        metrics:
+          port: 9090
+          targetPort: 9090
+
+    env:
+      LOG_LEVEL:
+        value: info
+      POD_NAME:
+        fieldRef:
+          fieldPath: metadata.name
+
+    envSecrets:
+      - app-secrets
+
+    metrics:
+      enabled: true
+      port: metrics
+      path: /metrics
+
+    probesEnabled: true
+    readinessProbe:
+      httpGet:
+        path: /health/ready
+        port: http
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      failureThreshold: 3
+    livenessProbe:
+      httpGet:
+        path: /health/live
+        port: http
+      initialDelaySeconds: 15
+      periodSeconds: 20
+    startupProbe:
+      httpGet:
+        path: /health/ready
+        port: http
+      failureThreshold: 30
+      periodSeconds: 5
+
+    lifecycle:
+      preStop:
+        exec:
+          command: ["/bin/sh", "-c", "sleep 10"]
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+    # HPA (mutually exclusive with keda on the same workload)
+    hpa:
+      enabled: true
+      minReplicas: 2
+      maxReplicas: 10
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+        - type: Resource
+          resource:
+            name: memory
+            target:
+              type: Utilization
+              averageUtilization: 80
+
+    # VPA (compatible with HPA when targeting different axes)
+    verticalPodAutoscaler:
+      enabled: true
+      updateMode: Initial
+
+    # Per-workload PDB (overrides root)
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 1
+
+    # NetworkPolicy with ingress + egress rules
+    networkPolicy:
+      enabled: true
+      policyTypes:
+        - Ingress
+        - Egress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: ingress-nginx
+          ports:
+            - port: 8080
+              protocol: TCP
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: db
+          ports:
+            - port: 5432
+              protocol: TCP
+        - ports:                         # allow DNS
+            - port: 53
+              protocol: UDP
+
+    # Per-workload httpRoute rules merged into the root httpRoute above
+    httpRoute:
+      enabled: true
+      priority: 10
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /api
+          backendRefs:
+            - port: 80
+
+    # Init container (runs before main container; no probes/lifecycle)
+    initContainers:
+      wait-for-db:
+        image:
+          repository: busybox
+          tag: "1.36"
+        command: |
+          until nc -z db.default.svc.cluster.local 5432; do
+            echo "waiting for db..."; sleep 2
+          done
+
+    # Sidecar container
+    sidecars:
+      otel-collector:
+        image:
+          repository: otel/opentelemetry-collector-contrib
+          tag: "0.103.0"
+        args:
+          - "--config=/etc/otel/config.yaml"
+        ports:
+          otlp:
+            containerPort: 4318
+            protocol: TCP
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            memory: 128Mi
+
+    # Per-workload volume (merged with root volumes)
+    volumes:
+      api-tmp:
+        emptyDir: {}
+
+    volumeMounts:
+      api-tmp:
+        mountPath: /app/tmp
+
+    # Override root topologySpreadConstraints for this workload
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: DoNotSchedule
+
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxSurge: 2
+        maxUnavailable: 0
+
+    minReadySeconds: 10
+
+  # --- worker: background processor ---
+  # Features: KEDA, PodMonitor (type=pod, discovery=crd), inherit overrides,
+  #           workload-level tolerations replacing root
+  worker:
+    image:
+      repository: ghcr.io/example/worker
+      tag: v0.9.0
+
+    inherit:
+      env:
+        global: false                   # skip global.env on this workload
+      configMapMount:
+        app-config: false               # skip the chart-owned configmap here
+
+    tolerations: []                     # opt out of root tolerations
+
+    metrics:
+      enabled: true
+      type: pod                         # renders PodMonitor instead of ServiceMonitor
+      discovery: crd
+      path: /metrics
+      port: 8080
+
+    # KEDA ScaledObject (mutually exclusive with hpa on the same workload)
+    keda:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 20
+      pollingInterval: 30
+      cooldownPeriod: 300
+      triggers:
+        - type: kafka
+          metadata:
+            bootstrapServers: kafka.kafka.svc.cluster.local:9092
+            consumerGroup: myapp-worker
+            topic: events
+            lagThreshold: "100"
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+  # --- frontend: shows annotations-based metrics discovery ---
+  # Features: single port, prometheus.io/* annotations (no ServiceMonitor CRD)
+  frontend:
+    image:
+      repository: ghcr.io/example/frontend
+      tag: v2.1.0
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 3000
+
+    metrics:
+      enabled: true
+      type: service
+      discovery: annotations            # injects prometheus.io/* instead of rendering CRD
+      port: 3000
+      path: /metrics
+
+    podDisruptionBudget:
+      enabled: false                    # opt out of root PDB
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+# ---------------------------------------------------------------------------
+# StatefulSets
+# ---------------------------------------------------------------------------
+
+statefulSets:
+
+  # --- db: PostgreSQL ---
+  # Features: volumeClaimTemplates (list), headless service, podManagementPolicy,
+  #           per-workload envSecrets, NetworkPolicy, ServiceMonitor
+  db:
+    image:
+      repository: postgres
+      tag: "16.3"
+
+    replicaCount: 1
+    podManagementPolicy: Parallel
+
+    # Headless service (default); adds non-headless ClusterIP service for metrics scrape
+    service:
+      enabled: true
+      ports:
+        postgres:
+          port: 5432
+          targetPort: 5432
+        metrics:
+          port: 9187
+          targetPort: 9187
+
+    env:
+      POSTGRES_DB:
+        value: appdb
+      POSTGRES_USER:
+        value: app
+
+    envSecrets:
+      - app-secrets                     # picks up DB_PASSWORD
+
+    metrics:
+      enabled: true
+      port: metrics                     # port named "metrics" in service.ports above
+
+    # PVC templates — must be a list (Kubernetes native form)
+    volumeClaimTemplates:
+      - metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 10Gi
+
+    # Per-pod volumeMount referencing the PVC template named "data"
+    volumeMounts:
+      data:
+        mountPath: /var/lib/postgresql/data
+
+    networkPolicy:
+      enabled: true
+      policyTypes:
+        - Ingress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: api
+          ports:
+            - port: 5432
+              protocol: TCP
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+    # Disable auto-mount of chart-owned configmap (db doesn't need app config)
+    inherit:
+      configMapMount: false
+
+# ---------------------------------------------------------------------------
+# jobGroups
+# ---------------------------------------------------------------------------
+
+jobGroups:
+
+  # --- migrations: sequential DB migration tasks (ArgoCD PreSync hook) ---
+  # Features: Job kind, tasks mode (initContainers), ArgoCD hook, hashSuffix: false
+  migrations:
+    kind: Job
+    image:
+      repository: ghcr.io/example/migrator
+      tag: v1.0.0
+    hashSuffix: false                   # required when deletePolicy: HookSucceeded
+    envSecrets:
+      - app-secrets
+    hooks:
+      argocd:
+        hook: PreSync
+        syncWave: "-5"
+        deletePolicy: HookSucceeded
+    jobs:
+      schema:
+        backoffLimit: 1
+        ttlSecondsAfterFinished: 3600
+        activeDeadlineSeconds: 600
+        tasks:
+          01-create-tables:
+            command: |
+              psql -c "CREATE TABLE IF NOT EXISTS events (id SERIAL PRIMARY KEY);"
+          02-seed-data:
+            args:
+              - seed
+              - --env=production
+
+  # --- cleanup: nightly CronJob (no hooks — CronJobs don't support hooks) ---
+  # Features: CronJob kind, schedule, timeZone, concurrencyPolicy, history limits
+  cleanup:
+    kind: CronJob
+    image:
+      repository: ghcr.io/example/cleaner
+      tag: v0.3.0
+    jobs:
+      nightly:
+        schedule: "0 2 * * *"
+        timeZone: UTC
+        concurrencyPolicy: Forbid
+        successfulJobsHistoryLimit: 3
+        failedJobsHistoryLimit: 1
+        startingDeadlineSeconds: 120
+        command: ./cleanup.sh
+        backoffLimit: 2
+
+  # --- post-deploy: Helm hook after install/upgrade ---
+  # Features: Job kind, Helm hook, single-container command mode
+  post-deploy:
+    kind: Job
+    hashSuffix: false
+    hooks:
+      helm:
+        hook: post-install,post-upgrade
+        weight: "10"
+        deletePolicy: hook-succeeded
+    jobs:
+      notify:
+        command: |
+          echo "Deploy complete at $(date)"
+        ttlSecondsAfterFinished: 300

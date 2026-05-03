@@ -14,6 +14,7 @@ tests:
   - it: should render Ingress when enabled
     set:
       ingress.enabled: true
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - isKind:
           of: Ingress
@@ -24,6 +25,7 @@ tests:
   - it: should use release name for ingress name
     set:
       ingress.enabled: true
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - matchRegex:
           path: metadata.name
@@ -33,6 +35,7 @@ tests:
     set:
       ingress.enabled: true
       ingress.ingressClassName: traefik
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - equal:
           path: spec.ingressClassName
@@ -42,6 +45,7 @@ tests:
     set:
       ingress.enabled: true
       ingress.ingressClassName: nginx
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - equal:
           path: spec.ingressClassName
@@ -51,6 +55,7 @@ tests:
     set:
       ingress.enabled: true
       ingress.ingressClassName: alb
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - equal:
           path: spec.ingressClassName
@@ -60,6 +65,7 @@ tests:
     set:
       ingress.enabled: true
       ingress.ingressClassName: ""
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - isNull:
           path: spec.ingressClassName
@@ -102,6 +108,7 @@ tests:
   - it: should have helm labels
     set:
       ingress.enabled: true
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/managed-by"]
@@ -118,6 +125,125 @@ tests:
   - it: should not render tls section when not set
     set:
       ingress.enabled: true
+      ingress.defaultBackend.serviceName: fallback
     asserts:
       - isNull:
           path: spec.tls
+
+  - it: should render multiple hosts in sorted order from a map
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        zeta.example.com:
+          paths:
+            - path: /z
+              pathType: Prefix
+        alpha.example.com:
+          paths:
+            - path: /a
+              pathType: Prefix
+    asserts:
+      - lengthEqual:
+          path: spec.rules
+          count: 2
+      - equal:
+          path: spec.rules[0].host
+          value: alpha.example.com
+      - equal:
+          path: spec.rules[1].host
+          value: zeta.example.com
+
+  - it: should render TLS from list with secretName
+    values:
+      - fixtures/ingress-tls-with-secret.yaml
+    asserts:
+      - equal:
+          path: spec.tls[0].secretName
+          value: app-tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: app.example.com
+
+  - it: should render TLS without secretName when omitted
+    values:
+      - fixtures/ingress-tls-no-secret.yaml
+    asserts:
+      - isNotNull:
+          path: spec.tls
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: app.example.com
+      - isNull:
+          path: spec.tls[0].secretName
+
+  - it: should fail when neither hosts nor defaultBackend is set
+    set:
+      ingress.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "neither hosts nor defaultBackend is set"
+
+  - it: should render defaultBackend when hosts is empty
+    set:
+      ingress.enabled: true
+      ingress.defaultBackend.serviceName: fallback-svc
+    asserts:
+      - isNotNull:
+          path: spec.defaultBackend
+      - equal:
+          path: spec.defaultBackend.service.name
+          value: fallback-svc
+      - isNull:
+          path: spec.rules
+
+  - it: should render multi-ingress map entries with separate ingress resources
+    set:
+      ingresses:
+        internal:
+          enabled: true
+          ingressClassName: nginx-internal
+          hosts:
+            internal.example.com:
+              paths:
+                - path: /
+                  pathType: Prefix
+        external:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            external.example.com:
+              paths:
+                - path: /
+                  pathType: Prefix
+    asserts:
+      - hasDocuments:
+          count: 2
+      - matchRegex:
+          path: metadata.name
+          pattern: -external$
+        documentIndex: 0
+      - matchRegex:
+          path: metadata.name
+          pattern: -internal$
+        documentIndex: 1
+
+  - it: should preserve declared path order inside a host (not alphabetical)
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        app.example.com:
+          paths:
+            - path: /b
+              pathType: Prefix
+            - path: /a
+              pathType: Prefix
+    asserts:
+      - lengthEqual:
+          path: spec.rules[0].http.paths
+          count: 2
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: /b
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: /a

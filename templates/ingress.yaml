@@ -3,21 +3,34 @@
 {{- /*
 Singleton ingress (backward-compatible).
 */}}
-{{- if .Values.ingress.enabled -}}
+{{- if ne (index .Values.ingress "enabled") false -}}
+{{- if and (not .Values.ingress.hosts) (not .Values.ingress.defaultBackend) -}}
+{{- fail "ingress is enabled but neither hosts nor defaultBackend is set. Set ingress.hosts to define routing rules, or ingress.defaultBackend to define a catch-all backend, or both." -}}
+{{- end -}}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ $releaseName }}
+  {{- $lbls := include "uhc.labels" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "ingress" "extra" (.Values.ingress.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if .Values.ingress.ingressClassName }}
   ingressClassName: {{ .Values.ingress.ingressClassName }}
+  {{- end }}
+  {{- if .Values.ingress.defaultBackend }}
+  defaultBackend:
+    service:
+      name: {{ (.Values.ingress.defaultBackend).serviceName | default $releaseName }}
+      port:
+        number: {{ (.Values.ingress.defaultBackend).servicePort | default 80 }}
   {{- end }}
   {{- if .Values.ingress.tls }}
   tls:
@@ -31,12 +44,14 @@ spec:
       {{- end }}
     {{- end }}
   {{- end }}
+  {{- if .Values.ingress.hosts }}
   rules:
-  {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+  {{- range $host := keys .Values.ingress.hosts | sortAlpha }}
+  {{- $hostCfg := index $.Values.ingress.hosts $host }}
+    - host: {{ $host | quote }}
       http:
         paths:
-        {{- range .paths }}
+        {{- range $hostCfg.paths }}
           - path: {{ .path }}
             pathType: {{ .pathType | default "ImplementationSpecific" }}
             backend:
@@ -46,6 +61,7 @@ spec:
                   number: {{ .servicePort | default 80 }}
         {{- end }}
   {{- end }}
+  {{- end }}
 {{- end }}
 {{- /*
 Multi-ingress map: each key becomes a separate Ingress named <fullname>-<key>.
@@ -53,22 +69,37 @@ Allows different ingress controllers for different workloads in the same release
 */}}
 {{- range $ingressName := keys ($ctx.Values.ingresses | default dict) | sortAlpha }}
 {{- $ing := index $ctx.Values.ingresses $ingressName }}
-{{- if and (hasKey $ing "enabled") $ing.enabled }}
+{{- if ne (index $ing "enabled") false }}
+{{- if and (not $ing.hosts) (not $ing.defaultBackend) -}}
+{{- fail (printf "ingresses.%s is enabled but neither hosts nor defaultBackend is set. Set ingresses.%s.hosts to define routing rules, or ingresses.%s.defaultBackend to define a catch-all backend, or both." $ingressName $ingressName $ingressName) -}}
+{{- end -}}
+{{- $ingFullName := printf "%s-%s" $releaseName $ingressName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $ingFullName "kind" (printf "Ingress %q" $ingressName)) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ $releaseName }}-{{ $ingressName }}
+  name: {{ $ingFullName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $ing.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "ingress" "extra" ($ing.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- $ingressClass := $ing.ingressClassName | default $ctx.Values.ingress.ingressClassName }}
   {{- if $ingressClass }}
   ingressClassName: {{ $ingressClass }}
+  {{- end }}
+  {{- if $ing.defaultBackend }}
+  defaultBackend:
+    service:
+      name: {{ $ing.defaultBackend.serviceName | default $releaseName }}
+      port:
+        number: {{ $ing.defaultBackend.servicePort | default 80 }}
   {{- end }}
   {{- if $ing.tls }}
   tls:
@@ -82,12 +113,14 @@ spec:
       {{- end }}
     {{- end }}
   {{- end }}
+  {{- if $ing.hosts }}
   rules:
-  {{- range $ing.hosts }}
-    - host: {{ .host | quote }}
+  {{- range $host := keys $ing.hosts | sortAlpha }}
+  {{- $hostCfg := index $ing.hosts $host }}
+    - host: {{ $host | quote }}
       http:
         paths:
-        {{- range .paths }}
+        {{- range $hostCfg.paths }}
           - path: {{ .path }}
             pathType: {{ .pathType | default "ImplementationSpecific" }}
             backend:
@@ -96,6 +129,7 @@ spec:
                 port:
                   number: {{ .servicePort | default 80 }}
         {{- end }}
+  {{- end }}
   {{- end }}
 {{- end }}
 {{- end }}

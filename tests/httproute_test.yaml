@@ -16,6 +16,8 @@ tests:
   - it: should render HTTPRoute when enabled
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
     asserts:
       - hasDocuments:
           count: 1
@@ -28,6 +30,8 @@ tests:
   - it: should use release name for httproute name
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
     asserts:
       - matchRegex:
           path: metadata.name
@@ -36,6 +40,8 @@ tests:
   - it: should have helm labels
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
     asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/managed-by"]
@@ -65,12 +71,12 @@ tests:
           path: spec.parentRefs[0].sectionName
           value: https
 
-  - it: should omit parentRefs when not set
+  - it: should fail fast when httpRoute is enabled without parentRefs
     set:
       httpRoute.enabled: true
     asserts:
-      - isNull:
-          path: spec.parentRefs
+      - failedTemplate:
+          errorPattern: "httpRoute is enabled .* but .Values.httpRoute.parentRefs is empty"
 
   # --- hostnames ---
 
@@ -85,6 +91,8 @@ tests:
   - it: should omit hostnames when not set
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
     asserts:
       - isNull:
           path: spec.hostnames
@@ -124,6 +132,8 @@ tests:
   - it: should default serviceName to fullname when not specified
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       httpRoute.rules:
         - {}
     asserts:
@@ -134,6 +144,8 @@ tests:
   - it: should default servicePort to 80 when not specified
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       httpRoute.rules:
         - {}
     asserts:
@@ -146,6 +158,8 @@ tests:
   - it: should render filters when set
     set:
       httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       httpRoute.rules:
         - filters:
             - type: RequestRedirect
@@ -267,6 +281,8 @@ tests:
       httpRoutes.api.rules[0].serviceName: my-release-api
       httpRoutes.api.rules[0].servicePort: 8080
       httpRoutes.web.enabled: true
+      httpRoutes.web.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       httpRoutes.web.hostnames[0]: app.example.com
       httpRoutes.web.rules[0].serviceName: my-release-web
       httpRoutes.web.rules[0].servicePort: 80
@@ -278,6 +294,8 @@ tests:
     set:
       fullnameOverride: test-release
       httpRoutes.api.enabled: true
+      httpRoutes.api.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       httpRoutes.api.rules[0].serviceName: my-svc
     asserts:
       - matchRegex:
@@ -302,6 +320,8 @@ tests:
   - it: should render hostnames in multi-route
     set:
       httpRoutes.api.enabled: true
+      httpRoutes.api.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
       httpRoutes.api.hostnames[0]: api.example.com
       httpRoutes.api.rules[0].serviceName: my-svc
     asserts:

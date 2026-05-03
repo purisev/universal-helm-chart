@@ -14,7 +14,7 @@ tests:
   - it: should not render when hpa disabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: false
       deployments.web.hpa.maxReplicas: 5
@@ -22,23 +22,23 @@ tests:
       - hasDocuments:
           count: 0
 
-  - it: should not render when keda is enabled (keda takes priority)
+  - it: should fail when both hpa and keda are enabled on the same workload
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
       deployments.web.keda.enabled: true
       deployments.web.keda.maxReplicas: 5
     asserts:
-      - hasDocuments:
-          count: 0
+      - failedTemplate:
+          errorMessage: "deployments.web: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one."
 
   - it: should render HPA when enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -52,7 +52,7 @@ tests:
   - it: should have correct name
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -64,7 +64,7 @@ tests:
   - it: should default minReplicas to 1
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -76,7 +76,7 @@ tests:
   - it: should set custom minReplicas and maxReplicas
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.minReplicas: 2
@@ -92,7 +92,7 @@ tests:
   - it: should reference correct deployment in scaleTargetRef
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -107,7 +107,7 @@ tests:
   - it: should have argocd sync-wave annotation
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.hpa.enabled: true
       deployments.web.hpa.maxReplicas: 5
@@ -128,13 +128,60 @@ tests:
   - it: should render two HPAs for two deployments
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.alpha.enabled: true
       deployments.alpha.hpa.enabled: true
       deployments.alpha.hpa.maxReplicas: 5
       deployments.beta.enabled: true
       deployments.beta.hpa.enabled: true
       deployments.beta.hpa.maxReplicas: 5
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should render HPA targeting StatefulSet kind
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.cache.enabled: true
+      statefulSets.cache.hpa.enabled: true
+      statefulSets.cache.hpa.maxReplicas: 5
+    asserts:
+      - isKind:
+          of: HorizontalPodAutoscaler
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: StatefulSet
+      - matchRegex:
+          path: spec.scaleTargetRef.name
+          pattern: -cache$
+      - matchRegex:
+          path: metadata.name
+          pattern: -cache$
+
+  - it: should fail when both hpa and keda are enabled on the same statefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.cache.enabled: true
+      statefulSets.cache.hpa.enabled: true
+      statefulSets.cache.hpa.maxReplicas: 5
+      statefulSets.cache.keda.enabled: true
+      statefulSets.cache.keda.maxReplicas: 5
+    asserts:
+      - failedTemplate:
+          errorMessage: "statefulSets.cache: hpa.enabled and keda.enabled are mutually exclusive — both manage spec.replicas. Pick one."
+
+  - it: should render HPAs for both a Deployment and a StatefulSet
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplicas: 5
+      statefulSets.cache.enabled: true
+      statefulSets.cache.hpa.enabled: true
+      statefulSets.cache.hpa.maxReplicas: 5
     asserts:
       - hasDocuments:
           count: 2

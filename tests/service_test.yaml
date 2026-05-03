@@ -9,7 +9,7 @@ tests:
   - it: should not render deployment service when service not enabled
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
     asserts:
       - hasDocuments:
@@ -18,7 +18,7 @@ tests:
   - it: should render deployment service when service.enabled true
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -34,7 +34,7 @@ tests:
   - it: should set service type
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.api.enabled: true
       deployments.api.service.enabled: true
       deployments.api.service.type: NodePort
@@ -48,7 +48,7 @@ tests:
   - it: should render single port with name http
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -82,7 +82,7 @@ tests:
   - it: should have selector labels on deployment service
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -92,10 +92,29 @@ tests:
       - isNotNull:
           path: spec.selector
 
+  - it: should render headless Service when StatefulSet has no explicit enabled field
+    # Regression guard: statefulset.yaml uses ne (index $wl "enabled") false,
+    # so a StatefulSet without enabled: true still renders. The headless Service
+    # must follow the same semantics — otherwise spec.serviceName points at a
+    # non-existent Service and pods fail to start.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      statefulSets.db.image.repository: postgres
+      statefulSets.db.image.tag: "16.3"
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.clusterIP
+          value: None
+
   - it: should render headless service for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
     asserts:
       - isKind:
@@ -107,7 +126,7 @@ tests:
   - it: should default StatefulSet service name to headless format
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
     asserts:
       - matchRegex:
@@ -117,7 +136,7 @@ tests:
   - it: should use custom serviceName for StatefulSet
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       statefulSets.db.enabled: true
       statefulSets.db.serviceName: my-db
     asserts:
@@ -128,7 +147,7 @@ tests:
   - it: should render deployment service and StatefulSet headless service together
     set:
       image.repository: nginx
-      image.tag: latest
+      image.tag: v1.0.0
       deployments.web.enabled: true
       deployments.web.service.enabled: true
       deployments.web.service.type: ClusterIP
@@ -139,3 +158,459 @@ tests:
       - hasDocuments:
           count: 2
 
+  - it: should not render headless Service when statefulSet headlessService.enabled is false
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.serviceName: my-existing-headless
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render headless Service when statefulSet headlessService.enabled is true (explicit)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.enabled: true
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+
+  # --- exposeService: dedicated metrics port ---
+
+  - it: should add metrics port when exposeService is enabled alongside main service
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+      - equal:
+          path: spec.ports[1].port
+          value: 9090
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 9090
+
+  - it: should use custom exposeService.port and targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.port: 9091
+      deployments.web.metrics.exposeService.targetPort: 8000
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - equal:
+          path: spec.ports[1].port
+          value: 9091
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 8000
+
+  - it: should create standalone metrics Service when service.enabled is false
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.exposeService.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-worker-metrics
+      - equal:
+          path: spec.ports[0].name
+          value: metrics
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+
+  - it: should NOT add metrics port when metrics.type is pod
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.type: pod
+      deployments.web.metrics.exposeService.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - notEqual:
+          path: spec.ports[0].name
+          value: metrics
+
+  - it: should NOT duplicate metrics port when service.ports already has one named metrics
+    # helm-unittest set: cannot create nested arrays (service.ports[].name) — using fixture.
+    values:
+      - fixtures/service-existing-metrics-port.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[1].port
+          value: 9999
+
+  - it: should use global integrations.monitoring.defaults.exposeService when per-workload not set
+    set:
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 8000
+      integrations.monitoring.defaults.exposeService.targetPort: 8000
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - equal:
+          path: spec.ports[1].port
+          value: 8000
+      - equal:
+          path: spec.ports[1].targetPort
+          value: 8000
+
+  - it: per-workload exposeService.enabled=false should override global default true
+    set:
+      integrations.monitoring.defaults.exposeService.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: false
+    documentSelector:
+      path: metadata.name
+      value: test-release-universal-helm-chart-web
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+
+  - it: should render service ports from a map keyed by name in sorted order
+    values:
+      - fixtures/service-multiport.yaml
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 2
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+      - equal:
+          path: spec.ports[1].port
+          value: 9090
+
+  # --- explicit pass-through Service fields ---
+
+  - it: should render service.loadBalancerIP on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: LoadBalancer
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.loadBalancerIP: 192.0.2.1
+    asserts:
+      - equal:
+          path: spec.loadBalancerIP
+          value: 192.0.2.1
+
+  - it: should render service.externalTrafficPolicy on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: LoadBalancer
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.externalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.externalTrafficPolicy
+          value: Local
+
+  - it: should render service.sessionAffinity on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.sessionAffinity: ClientIP
+    asserts:
+      - equal:
+          path: spec.sessionAffinity
+          value: ClientIP
+
+  - it: should render service.clusterIP on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.clusterIP: None
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+  - it: should render service.publishNotReadyAddresses on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.publishNotReadyAddresses: true
+    asserts:
+      - equal:
+          path: spec.publishNotReadyAddresses
+          value: true
+
+  - it: should render service.annotations on the headless StatefulSet Service
+    # Regression: the headless branch used to drop $wl.service.annotations and
+    # only emit chart-managed (sync-wave/etc.) annotations. The Deployment and
+    # non-headless StatefulSet branches always merged user annotations on top
+    # of the chart-managed ones — this test pins that the headless branch now
+    # behaves the same.
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.annotations:
+        custom-annotation: my-value
+        another-annotation: another-value
+    asserts:
+      - equal:
+          path: metadata.annotations.custom-annotation
+          value: my-value
+      - equal:
+          path: metadata.annotations.another-annotation
+          value: another-value
+
+  - it: should render service.publishNotReadyAddresses on StatefulSet headless (peer discovery)
+    # The Cassandra/Kafka/etcd use case: peers must resolve each other via DNS
+    # before they reach Ready, which requires this flag on the headless Service.
+    set:
+      image.repository: cassandra
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 9042
+      statefulSets.db.service.targetPort: 9042
+      statefulSets.db.service.publishNotReadyAddresses: true
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+      - equal:
+          path: spec.publishNotReadyAddresses
+          value: true
+
+  - it: should fail fast when StatefulSet service.clusterIP is set to a non-None value
+    # The auto-rendered headless Service hardcodes clusterIP: None.
+    # User-supplied clusterIP=<ip> would be silently overridden — fail loudly instead.
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.clusterIP: 10.0.0.5
+    asserts:
+      - failedTemplate:
+          errorPattern: "conflicts with the auto-rendered headless Service"
+
+  - it: should accept service.clusterIP=None on StatefulSet (redundant but harmless)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.clusterIP: None
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+  # --- non-headless StatefulSet Service (headlessService opt-out + service.enabled) ---
+
+  - it: should render non-headless ClusterIP Service for StatefulSet when headless is opted out and service.enabled is true
+    # User manages the headless externally (referenced by spec.serviceName) and
+    # asks the chart to render a regular ClusterIP Service for client traffic.
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.serviceName: my-external-headless
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.type: ClusterIP
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - notEqual:
+          path: spec.clusterIP
+          value: None
+      - equal:
+          path: spec.ports[0].port
+          value: 6379
+
+  - it: should render zero Services for StatefulSet when headless opted out and service.enabled false
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.serviceName: my-external-headless
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should pass through service.* fields to non-headless StatefulSet Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.serviceName: my-external-headless
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.type: ClusterIP
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.sessionAffinity: ClientIP
+    asserts:
+      - equal:
+          path: spec.sessionAffinity
+          value: ClientIP
+
+  - it: default headless still renders single Service when service.enabled is true (backward compat)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+  - it: should keep http first and metrics last around alphabetically-sorted middle ports
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.ports:
+        admin:
+          port: 8081
+          targetPort: 8081
+        metrics:
+          port: 9090
+          targetPort: 9090
+        http:
+          port: 80
+          targetPort: 8080
+        zzz-debug:
+          port: 9999
+          targetPort: 9999
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 4
+      - equal:
+          path: spec.ports[0].name
+          value: http
+      - equal:
+          path: spec.ports[1].name
+          value: admin
+      - equal:
+          path: spec.ports[2].name
+          value: zzz-debug
+      - equal:
+          path: spec.ports[3].name
+          value: metrics

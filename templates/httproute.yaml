@@ -10,26 +10,32 @@ parentRefs and hostnames come from root httpRoute and are shared by all merged r
 */}}
 {{- $wlState := dict "has" false }}
 {{- range $wlName, $wl := .Values.deployments }}
-  {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+  {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
     {{- $_ := set $wlState "has" true }}
   {{- end }}
 {{- end }}
 {{- range $wlName, $wl := .Values.statefulSets }}
-  {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+  {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
     {{- $_ := set $wlState "has" true }}
   {{- end }}
 {{- end }}
 {{- if or .Values.httpRoute.enabled (get $wlState "has") -}}
+{{- if not .Values.httpRoute.parentRefs -}}
+{{- fail "httpRoute is enabled (root or by a workload) but .Values.httpRoute.parentRefs is empty. The chart's singleton HTTPRoute model takes parentRefs from the root entry and shares it across every merged per-workload rule — without a parentRef the rendered HTTPRoute attaches to no Gateway and routes no traffic. Set .Values.httpRoute.parentRefs to the Gateway(s) the route should bind to, or use the plural-map shape (.Values.httpRoutes.<name>) where each entry carries its own parentRefs." -}}
+{{- end -}}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: {{ $releaseName }}
+  {{- $lbls := include "uhc.labels" . }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" . | nindent 4 }}
-  {{- with .Values.httpRoute.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "httpRoute" "extra" (.Values.httpRoute.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if .Values.httpRoute.parentRefs }}
@@ -64,13 +70,13 @@ spec:
   {{- /* Per-workload rules: sorted by priority (asc) then alphabetically by workload name */}}
   {{- $sortKeys := list }}
   {{- range $wlName, $wl := $ctx.Values.deployments }}
-    {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+    {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
       {{- $priority := int ($wl.httpRoute.priority | default 999999999) }}
       {{- $sortKeys = append $sortKeys (printf "%09d|d|%s" $priority $wlName) }}
     {{- end }}
   {{- end }}
   {{- range $wlName, $wl := $ctx.Values.statefulSets }}
-    {{- if and (hasKey $wl "httpRoute") $wl.httpRoute.enabled }}
+    {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) }}
       {{- $priority := int ($wl.httpRoute.priority | default 999999999) }}
       {{- $sortKeys = append $sortKeys (printf "%09d|s|%s" $priority $wlName) }}
     {{- end }}
@@ -113,17 +119,25 @@ need separate routes (e.g. different parentRefs or hostnames per route).
 */}}
 {{- range $routeName := keys ($ctx.Values.httpRoutes | default dict) | sortAlpha }}
 {{- $route := index $ctx.Values.httpRoutes $routeName }}
-{{- if and (hasKey $route "enabled") $route.enabled }}
+{{- if ne (index $route "enabled") false }}
+{{- if not $route.parentRefs -}}
+{{- fail (printf "httpRoutes.%s is enabled but parentRefs is empty. Each plural-map HTTPRoute carries its own parentRefs — without a parentRef the rendered HTTPRoute attaches to no Gateway and routes no traffic. Set httpRoutes.%s.parentRefs to the Gateway(s) the route should bind to." $routeName $routeName) -}}
+{{- end -}}
+{{- $hrFullName := printf "%s-%s" $releaseName $routeName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $hrFullName "kind" (printf "HTTPRoute %q" $routeName)) }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
-  name: {{ $releaseName }}-{{ $routeName }}
+  name: {{ $hrFullName }}
+  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- if $lbls }}
   labels:
-    {{- include "uhc.labels" $ctx | nindent 4 }}
-  {{- with $route.annotations }}
-  annotations:
-    {{- toYaml . | nindent 4 }}
+    {{- $lbls | nindent 4 }}
+  {{- end }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "httpRoute" "extra" ($route.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
   {{- end }}
 spec:
   {{- if $route.parentRefs }}

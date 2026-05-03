@@ -1,22 +1,24 @@
-imageUpdater:
-  enabled: true
-  namespace: argocd
-  appNamePattern: "my-app"
-  commonUpdateSettings:
-    updateStrategy: alphabetical
-    forceUpdate: true
-    allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
-    pullSecret: "pullsecret:argocd/docker-pull-secret"
-  writeBackConfig:
-    method: git
-    gitConfig:
-      repository: git@github.com:myorg/config.git
-      branch: main
-      writeBackTarget: "helmvalues:/values/app-image.yml"
-  images:
-    - alias: app
-      imageName: myregistry/myapp
-      manifestTargets:
-        helm:
-          name: image.repository
-          tag: image.tag
+integrations:
+  argocd:
+    imageUpdater:
+      enabled: true
+      namespace: argocd
+      appNamePattern: "my-app"
+      commonUpdateSettings:
+        updateStrategy: alphabetical
+        forceUpdate: true
+        allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
+        pullSecret: "pullsecret:argocd/docker-pull-secret"
+      writeBackConfig:
+        method: git
+        gitConfig:
+          repository: git@github.com:myorg/config.git
+          branch: main
+          writeBackTarget: "helmvalues:/values/app-image.yml"
+      images:
+        app:
+          imageName: myregistry/myapp
+          manifestTargets:
+            helm:
+              name: image.repository
+              tag: image.tag

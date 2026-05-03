@@ -1,0 +1,381 @@
+suite: test podmonitor
+templates:
+  - podmonitor.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # --- Provider selection ---
+
+  - it: should render PodMonitor when metrics.type is pod (prometheus default)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+      - equal:
+          path: apiVersion
+          value: monitoring.coreos.com/v1
+
+  - it: should render VMPodScrape when metrics.type is pod and provider is victoriametrics
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: VMPodScrape
+      - equal:
+          path: apiVersion
+          value: operator.victoriametrics.com/v1beta1
+
+  # --- Negative cases ---
+
+  - it: should not render when metrics.type is service (default)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when metrics.type not set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when workload disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: false
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when metrics disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: false
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Does not require service ---
+
+  - it: should render even when service is not configured
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+
+  # --- Uses podMetricsEndpoints ---
+
+  - it: should use podMetricsEndpoints field (not endpoints)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - isNotNull:
+          path: spec.podMetricsEndpoints
+      - isNull:
+          path: spec.endpoints
+
+  # --- Global defaults ---
+
+  - it: should use built-in defaults when monitoring.defaults not set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: http
+      - equal:
+          path: spec.podMetricsEndpoints[0].path
+          value: /metrics
+      - equal:
+          path: spec.podMetricsEndpoints[0].interval
+          value: 60s
+      - equal:
+          path: spec.podMetricsEndpoints[0].scrapeTimeout
+          value: 10s
+
+  - it: should use global monitoring.defaults when per-workload not set
+    set:
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.interval: 120s
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.podMetricsEndpoints[0].interval
+          value: 120s
+
+  - it: per-workload metrics values should override global defaults
+    set:
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.interval: 120s
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.port: custom
+      deployments.worker.metrics.interval: 15s
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints[0].port
+          value: custom
+      - equal:
+          path: spec.podMetricsEndpoints[0].interval
+          value: 15s
+
+  # --- Selectors ---
+
+  - it: should set correct selector matchLabels for Deployment source
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: worker
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-worker
+
+  - it: should set correct selector matchLabels for StatefulSet source
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.metrics.enabled: true
+      statefulSets.redis.metrics.type: pod
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: redis
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-redis
+
+  # --- relabelConfigs mapping ---
+
+  - it: should render relabelings for prometheus provider
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.relabelConfigs[0].targetLabel: instance
+    asserts:
+      - isNotNull:
+          path: spec.podMetricsEndpoints[0].relabelings
+      - isNull:
+          path: spec.podMetricsEndpoints[0].relabelConfigs
+
+  - it: should render relabelConfigs for victoriametrics provider
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.relabelConfigs[0].targetLabel: instance
+    asserts:
+      - isNotNull:
+          path: spec.podMetricsEndpoints[0].relabelConfigs
+      - isNull:
+          path: spec.podMetricsEndpoints[0].relabelings
+
+  # --- headers (VM-only) ---
+
+  - it: should render vm_scrape_params headers for victoriametrics provider
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.headers[0]: "X-Token: abc"
+    asserts:
+      - equal:
+          path: spec.podMetricsEndpoints[0].vm_scrape_params.headers[0]
+          value: "X-Token: abc"
+
+  - it: should not render vm_scrape_params for prometheus even when headers set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.headers[0]: "X-Token: abc"
+    asserts:
+      - isNull:
+          path: spec.podMetricsEndpoints[0].vm_scrape_params
+
+  # --- ArgoCD sync-wave ---
+
+  - it: should set argocd sync-wave annotation from per-kind podMonitor wave
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.argocd.syncWaves.podMonitor: 6
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "6"
+
+  - it: should not render when discovery is annotations
+    set:
+      integrations.monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Global default-enable opt-out mode ---
+
+  - it: should render when integrations.monitoring.defaults.enabled=true and metrics.type=pod without metrics.enabled
+    set:
+      integrations.monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+
+  - it: per-workload metrics.enabled=false should override integrations.monitoring.defaults.enabled=true
+    set:
+      integrations.monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Global defaults: type ---
+
+  - it: should render PodMonitor when integrations.monitoring.defaults.type is pod without per-workload type
+    set:
+      integrations.monitoring.defaults.type: pod
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: PodMonitor
+
+  - it: per-workload metrics.type=service should override defaults.type=pod
+    set:
+      integrations.monitoring.defaults.type: pod
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.service.enabled: true
+      deployments.worker.service.port: 80
+      deployments.worker.service.targetPort: 80
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: service
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Per-workload provider/discovery overrides ---
+
+  - it: per-workload metrics.provider=victoriametrics should render VMPodScrape
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.provider: victoriametrics
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: VMPodScrape
+
+  - it: per-workload metrics.discovery=annotations should skip PodMonitor render
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.enabled: true
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.discovery: annotations
+    asserts:
+      - hasDocuments:
+          count: 0

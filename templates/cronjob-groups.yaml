@@ -1,0 +1,122 @@
+{{- $ctx := . }}
+{{- include "uhc.assertNoLegacyJobKeys" $ctx -}}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- range $groupName, $group := ($ctx.Values.jobGroups | default dict) }}
+{{- if and (ne (index $group "enabled") false) (eq (default "Job" $group.kind) "CronJob") }}
+{{- range $jobName := keys ($group.jobs | default dict) | sortAlpha }}
+{{- $job := index $group.jobs $jobName }}
+{{- if ne (index $job "enabled") false }}
+{{- $merged := include "uhc.jobGroupSpec" (dict "ctx" $ctx "group" $group "job" $job "groupName" $groupName "jobName" $jobName) | fromYaml }}
+{{- $wlName := include "uhc.jobGroupName" (dict "groupName" $groupName "jobName" $jobName) }}
+{{- $resourceName := include "uhc.jobGroupResourceName" (dict "ctx" $ctx "groupName" $groupName "jobName" $jobName "merged" $merged) }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ $resourceName }}
+  {{- $cAnnots := dict }}
+  {{- $cAnnots = mergeOverwrite $cAnnots ($ctx.Values.commonAnnotations | default dict) }}
+  {{- $cAnnots = mergeOverwrite $cAnnots ($merged.metadataAnnotations | default dict) }}
+  {{- if $cAnnots }}
+  annotations:
+    {{- toYaml $cAnnots | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+spec:
+  schedule: {{ $merged.schedule | quote }}
+  {{- with $merged.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
+  {{- with $merged.concurrencyPolicy }}
+  concurrencyPolicy: {{ . }}
+  {{- end }}
+  {{- if hasKey $merged "successfulJobsHistoryLimit" }}
+  successfulJobsHistoryLimit: {{ $merged.successfulJobsHistoryLimit }}
+  {{- end }}
+  {{- if hasKey $merged "failedJobsHistoryLimit" }}
+  failedJobsHistoryLimit: {{ $merged.failedJobsHistoryLimit }}
+  {{- end }}
+  {{- with $merged.startingDeadlineSeconds }}
+  startingDeadlineSeconds: {{ . }}
+  {{- end }}
+  jobTemplate:
+    spec:
+      {{- $backoffLimit := 3 }}
+      {{- if hasKey $merged "backoffLimit" }}
+      {{- $backoffLimit = $merged.backoffLimit }}
+      {{- end }}
+      backoffLimit: {{ $backoffLimit }}
+      {{- with $merged.ttlSecondsAfterFinished }}
+      ttlSecondsAfterFinished: {{ . | int }}
+      {{- end }}
+      {{- with $merged.activeDeadlineSeconds }}
+      activeDeadlineSeconds: {{ . | int }}
+      {{- end }}
+      template:
+        metadata:
+          {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}
+          {{- with $merged.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 12 }}
+        spec:
+          {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | trim | nindent 10 }}
+          restartPolicy: {{ default "Never" $merged.restartPolicy }}
+          {{- if $merged.tasks }}
+          initContainers:
+            {{- include "uhc.jobTasksContainers" (dict "ctx" $ctx "wl" $merged) | trim | nindent 12 }}
+          containers:
+            - name: job-completed
+              image: {{ default (default "alpine:3.21" $ctx.Values.jobCompletionImage) $merged.completionImage | quote }}
+              imagePullPolicy: IfNotPresent
+              command: ["sh", "-c", "echo SUCCESS"]
+              {{- with $merged.securityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 16Mi
+                limits:
+                  memory: 16Mi
+          {{- else }}
+          containers:
+            {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $merged "containerName" $jobName "useRootVolumeMounts" false) | trim | nindent 12 }}
+          {{- end }}
+          {{- $useRootVolumes := false }}
+          {{- if hasKey $merged "useRootVolumes" }}
+          {{- $useRootVolumes = $merged.useRootVolumes }}
+          {{- end }}
+          {{- $cmm := include "uhc.resolveConfigMapMount" ($merged.inherit | default dict) | fromJson }}
+          {{- $hasAutoVols := "" }}
+          {{- if $cmm.enabled }}
+          {{- $hasAutoVols = include "uhc.hasConfigMapAutoVolumes" (dict "ctx" $ctx "granularDisable" $cmm.granular) }}
+          {{- end }}
+          {{- if or (and $useRootVolumes $ctx.Values.volumes) $merged.volumes $hasAutoVols }}
+          volumes:
+            {{- if $useRootVolumes }}
+            {{- range $vName := keys ($ctx.Values.volumes | default dict) | sortAlpha }}
+            - name: {{ $vName }}
+              {{- toYaml (index $ctx.Values.volumes $vName) | nindent 14 }}
+            {{- end }}
+            {{- end }}
+            {{- range $vName := keys ($merged.volumes | default dict) | sortAlpha }}
+            - name: {{ $vName }}
+              {{- toYaml (index $merged.volumes $vName) | nindent 14 }}
+            {{- end }}
+            {{- if $cmm.enabled }}
+            {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | trim }}
+          {{- if $sched }}
+          {{- $sched | nindent 10 }}
+          {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

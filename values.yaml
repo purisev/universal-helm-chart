@@ -1,228 +1,144 @@
-# Global environment variables injected into every container.
 global:
   env: {}
 
-# Argo CD Image Updater CRD (v1alpha1 ImageUpdater).
-# Requires Argo CD Image Updater >= 1.x with CRD support installed in the cluster.
-# Creates an ImageUpdater resource that monitors Argo CD Applications and updates their images.
-#
-# Full spec reference:
-#   https://argocd-image-updater.readthedocs.io/en/stable/configuration/applications/
-#
-# TWO MODES:
-#
-#   Shorthand mode (applicationRefs is empty — the default):
-#     A single applicationRef is built automatically.
-#     namePattern defaults to .Release.Name (override with appNamePattern).
-#     commonUpdateSettings, writeBackConfig and images are placed inside that
-#     applicationRef — exactly as Argo CD Image Updater >= 1.x expects.
-#     Use this when one release = one ArgoCD Application with a shared image.
-#
-#   Manual mode (applicationRefs is provided):
-#     applicationRefs is rendered as-is.
-#     appNamePattern, commonUpdateSettings, writeBackConfig and images at the
-#     top level are ignored — all config must live inside each applicationRef entry.
-#     Use this when you need multiple application targets or fine-grained control.
-imageUpdater:
-  enabled: false
+env: {}
 
-  # CR metadata
-  # name: override the ImageUpdater resource name (default: chart fullname)
-  name: ""
-  # namespace: namespace where the ImageUpdater CR is created (default: release namespace).
-  # Typically the Argo CD namespace (e.g. argocd). The controller uses metadata.namespace
-  # to scope which ArgoCD Applications it looks at.
-  namespace: ""
-  annotations: {}
+commonLabels: {}
+commonAnnotations: {}
 
-  # --- Shorthand mode fields (ignored when applicationRefs is set) ---
+labels:
+  standard:
+    enabled: true
+    partOf: true
+    name: true
+    instance: true
+    version: true
+    managedBy: true
 
-  # appNamePattern: ArgoCD Application name pattern for the auto-generated applicationRef.
-  # Supports glob patterns (e.g. "my-app-*"). Defaults to .Release.Name when empty.
-  appNamePattern: ""
+integrations:
 
-  # commonUpdateSettings: update strategy applied to all images in this applicationRef.
-  #   updateStrategy: alphabetical | semver | latest | digest | name
-  #   forceUpdate: false
-  #   allowTags: "regexp:^[0-9]{8}t[0-9]{6}$"
-  #   ignoreTags: ["latest", "dev"]
-  #   pullSecret: "pullsecret:<namespace>/<secret-name>"
-  #   platforms: []
-  commonUpdateSettings: {}
+  argocd:
 
-  # writeBackConfig: how Image Updater writes the new image tag back.
-  #   method: argocd   — imperative via Argo CD API (default)
-  #   method: git      — declarative, commits the new tag to a Git repository
-  #   gitConfig:         required when method: git
-  #     repository: git@github.com:myorg/config.git
-  #     branch: main
-  #     writeBackTarget: "helmvalues:/values.yaml"
-  writeBackConfig: {}
+    syncWaves:
+      enabled: true
+      serviceAccount: -30
+      rbac: -30
+      secretStore: -20
+      externalSecret: -10
+      configMap: -10
+      service: 0
+      imageUpdater: 0
+      statefulSet: 10
+      deployment: 20
+      hpa: 21
+      vpa: 21
+      scaledObject: 21
+      podDisruptionBudget: 21
+      serviceMonitor: 21
+      podMonitor: 21
+      networkPolicy: 25
+      referenceGrant: 25
+      ingress: 30
+      httpRoute: 30
+      grpcRoute: 30
+      tlsRoute: 30
 
-  # images: list of container images to track for the auto-generated applicationRef.
-  # Each image can override update settings and declare Helm value targets.
-  #   - alias: short identifier used as the write-back key
-  #     imageName: full image reference without tag (registry/repo)
-  #     commonUpdateSettings:    # optional per-image override
-  #       updateStrategy: semver
-  #       allowTags: "regexp:^v[0-9]+\\.[0-9]+\\.[0-9]+$"
-  #       ignoreTags: ["latest"]
-  #     manifestTargets:         # optional: where to write the new tag in the manifest
-  #       helm:
-  #         name: image.repository   # Helm value key for the repository
-  #         tag: image.tag           # Helm value key for the tag
-  #
-  # Example (shorthand mode):
-  # images:
-  #   - alias: app
-  #     imageName: myregistry/myapp
-  #     manifestTargets:
-  #       helm:
-  #         name: image.repository
-  #         tag: image.tag
-  images: []
+    imageUpdater:
+      enabled: false
 
-  # --- Manual mode (takes precedence over all shorthand fields above) ---
-  #
-  # applicationRefs: full list of applicationRef entries rendered as-is.
-  # Each entry supports: namePattern, labelSelectors, useAnnotations,
-  # commonUpdateSettings, writeBackConfig, images (with manifestTargets).
-  #
-  # Example:
-  # applicationRefs:
-  #   - namePattern: "my-app"
-  #     commonUpdateSettings:
-  #       updateStrategy: semver
-  #     writeBackConfig:
-  #       method: git
-  #       gitConfig:
-  #         repository: git@github.com:myorg/config.git
-  #         branch: main
-  #         writeBackTarget: "helmvalues:/values.yaml"
-  #     images:
-  #       - alias: app
-  #         imageName: myregistry/myapp
-  #         manifestTargets:
-  #           helm:
-  #             name: image.repository
-  #             tag: image.tag
-  #   - namePattern: "*"
-  #     labelSelectors:
-  #       matchLabels:
-  #         image-updater: my-updater
-  #     useAnnotations: true
-  applicationRefs: []
+      name: ""
+      namespace: ""
+      annotations: {}
 
-# Environment-specific variable sets; only one should be enabled at a time.
-envDev:
-  enabled: false
-  env: {}
 
-envProd:
-  enabled: false
-  env: {}
+      appNamePattern: ""
 
-# Default image used by all workloads unless overridden per-workload.
+      commonUpdateSettings: {}
+
+      writeBackConfig: {}
+
+      images: {}
+
+      applicationRefs: []
+
+  stakater:
+    reloader:
+      enabled: false
+
+      annotations: {}
+
+  eso:
+    enabled: true
+
+    secretStores: {}
+
+    externalSecrets: {}
+
+  monitoring:
+    defaults:
+      provider: prometheus
+      discovery: crd
+      enabled: false
+      type: service
+      port: http
+      path: /metrics
+      scheme: http
+      interval: 60s
+      scrapeTimeout: 10s
+      exposeService:
+        enabled: false
+        port: 9090
+        targetPort: 9090
+
 image:
   repository: ""
-  # IfNotPresent avoids registry rate limits and speeds up pod startup.
   pullPolicy: IfNotPresent
   tag: ""
 
 imagePullSecrets: []
 
-# ArgoCD sync-wave ordering for different resource types.
-syncWaves:
-  jobsSyncWave: "3"
-  databaseJobsSyncWave: "2"
-  deploymentSyncWave: "10"
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
 
-# 10 revisions — matches Kubernetes default; gives safer rollback history.
 revisionHistoryLimit: 10
-# 10 min deadline — 3 min is too short for large images or slow cluster pulls.
 progressDeadlineSeconds: 600
 
-# Default update strategy for Deployments; can be overridden per-workload.
-# Uses Deployment-specific rollingUpdate keys (maxSurge / maxUnavailable).
-# Do NOT use for StatefulSet rolling update — use statefulSetUpdateStrategy instead.
 strategy:
   rollingUpdate:
     maxSurge: 1
     maxUnavailable: 0
   type: RollingUpdate
 
-# Default update strategy for StatefulSets. Uses StatefulSet-specific key (partition).
-# Checked before the shared 'strategy' key, so Deployment and StatefulSet defaults stay separate.
-# Override per-workload via statefulSets.<name>.statefulSetUpdateStrategy.
 statefulSetUpdateStrategy:
   type: RollingUpdate
   rollingUpdate:
     partition: 0
 
-# Secrets mounted as environment variables in all containers via envFrom[].secretRef.
 envSecrets: []
 
-# ConfigMaps mounted as environment variables in all containers via envFrom[].configMapRef.
-# Disable per-workload with inherit.configMaps: false; add workload-local refs via envConfigMaps.
-# Shorthand: {configMapRef: key} resolves to {name: <fullname>-key} (references configMaps entries).
 envConfigMaps: []
-
-# Stakater Reloader integration — annotates Deployments and StatefulSets to
-# restart on ConfigMap/Secret changes. Disable if Reloader is not installed.
-reloader:
-  enabled: true
-
-# Database setup job — runs before application Deployments (lower sync wave).
-dbJob:
-  enabled: false
-  image:
-    repository: ""
-    pullPolicy: IfNotPresent
-    tag: ""
-  imagePullSecrets: []
-  backoffLimit: 3
-  # activeDeadlineSeconds: abort the job if it runs longer than this (prevents infinite hangs).
-  activeDeadlineSeconds: null
-  # ttlSecondsAfterFinished: auto-delete completed jobs after this many seconds.
-  ttlSecondsAfterFinished: 3600
-  env: {}
-  # Sequential tasks executed as initContainers.
-  tasks: {}
-  # Extra annotations merged onto the Job metadata (ArgoCD defaults are always set).
-  metadataAnnotations: {}
-  # Image used for the completion container (signals job success to Kubernetes).
-  completionImage: alpine:3.21
 
 nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
-  create: false
+  create: true
   annotations: {}
   name: ""
 
-# RBAC — creates a Role and RoleBinding bound to the chart's ServiceAccount.
-# Requires serviceAccount.create: true.
 rbac:
   enabled: false
+  clusterScoped: false
   rules: []
-  # Example:
-  # rules:
-  #   - apiGroups: [""]
-  #     resources: ["configmaps", "secrets"]
-  #     verbs: ["get", "list", "watch"]
 
-# Annotations added to pod templates of Deployments and StatefulSets.
-# NOTE: also applied to Job and CronJob pod templates — this is intentional for cases
-# like Vault agent injection or Datadog admission. Use jobPodAnnotations for Job-only annotations.
 podAnnotations: {}
 
-# Annotations added exclusively to pod templates of Jobs (dbJob, initJob, postSync) and CronJobs.
-# Merged with podAnnotations — values here take precedence.
 jobPodAnnotations: {}
 
-# Secure pod-level defaults: run as a non-root user, enable RuntimeDefault seccomp profile.
-# Meets Kubernetes Pod Security Standards "Restricted" level.
+jobCompletionImage: alpine:3.21
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
@@ -231,8 +147,6 @@ podSecurityContext:
   seccompProfile:
     type: RuntimeDefault
 
-# Secure container-level defaults: drop all Linux capabilities, no privilege escalation,
-# read-only root filesystem. Override per-workload via deployments.<name>.securityContext.
 securityContext:
   allowPrivilegeEscalation: false
   readOnlyRootFilesystem: true
@@ -240,433 +154,75 @@ securityContext:
     drop:
       - ALL
 
-# Disable ServiceAccount token auto-mount for workloads that don't need K8s API access.
-# Override per-workload via deployments.<name>.automountServiceAccountToken: true.
 automountServiceAccountToken: false
 
-# Give pods time for graceful shutdown before SIGKILL.
-# Override per-workload via deployments.<name>.terminationGracePeriodSeconds.
 terminationGracePeriodSeconds: 30
 
-# minReadySeconds: seconds a pod must be ready before it is considered available.
-# 0 means immediately (Kubernetes default). Override per-workload.
 minReadySeconds: 0
 
-volumes: []
+volumes: {}
 
 volumeMounts: {}
 
-# Chart-level ConfigMaps. Each entry creates a separate ConfigMap resource.
-# mountPath: if set, the ConfigMap is automatically mounted into all containers at that path.
-# Each key in data becomes a separate file under mountPath.
-# Disable auto-mount per-workload with inherit.configMapMount: false.
 configMaps: {}
-# Example:
-# configMaps:
-#   app-config:
-#     enabled: true
-#     mountPath: /etc/config        # optional: auto-mount into all containers
-#     readOnly: true                # default true; set false to allow writes
-#     data:
-#       config.json: |
-#         {"broker": "mqtt://broker:1883"}
-#   scripts:
-#     enabled: true
-#     mountPath: /scripts
-#     defaultMode: 0755             # make files executable (e.g. shell scripts)
-#     data:
-#       entrypoint.sh: |
-#         #!/bin/sh
-#         exec java -jar app.jar
-#   nginx-config:
-#     enabled: true
-#     mountPath: /etc/nginx/conf.d
-#     data:
-#       default.conf: |
-#         server { listen 80; }
-#   env-config:
-#     enabled: true
-#     data:                         # no mountPath — use via envConfigMaps
-#       LOG_LEVEL: info
 
-# Init job — runs after dbJob but before Deployments (Sync hook).
-initJob:
-  enabled: false
-  backoffLimit: 3
-  # activeDeadlineSeconds: abort the job if it runs longer than this (prevents infinite hangs).
-  activeDeadlineSeconds: null
-  # ttlSecondsAfterFinished: auto-delete completed jobs after this many seconds.
-  ttlSecondsAfterFinished: 3600
-  env: {}
-  # Sequential tasks executed as initContainers.
-  tasks: {}
-  # Extra annotations merged onto the Job metadata (ArgoCD defaults are always set).
-  metadataAnnotations: {}
-  # Image used for the completion container (signals job success to Kubernetes).
-  completionImage: alpine:3.21
-
-# PostSync hook jobs — run after a successful ArgoCD Sync.
-# Each job has its own image and command.
-# https://argo-cd.readthedocs.io/en/stable/user-guide/sync-waves/
-postSync:
-  enabled: false
-  syncWave: "0"
-  backoffLimit: 1
-  hookDeletePolicy: HookSucceeded
-  # ttlSecondsAfterFinished: fallback cleanup for non-ArgoCD environments.
-  ttlSecondsAfterFinished: 600
-  env: {}
-  metadataAnnotations: {}
-  jobs: {}
-  # Example:
-  # jobs:
-  #   notify-slack:
-  #     enabled: true
-  #     image:
-  #       repository: curlimages/curl
-  #       tag: latest
-  #       pullPolicy: IfNotPresent
-  #     command: |
-  #       curl -sS -X POST -H 'Content-type: application/json' \
-  #         --data '{"text":"Deploy OK"}' https://hooks.slack.com/...
-  #   smoke-check:
-  #     enabled: true
-  #     image:
-  #       repository: alpine
-  #       tag: "3"
-  #     command: wget -q -O- http://myapp-web:80/health || exit 1
+jobGroups: {}
 
 ingress:
   enabled: false
-  # ingressClassName: if set, maps to spec.ingressClassName on the Ingress resource.
-  # Leave empty ("") to omit the field and let the cluster use its default IngressClass.
-  # Example values: nginx, traefik, alb, haproxy, kong
   ingressClassName: ""
   annotations: {}
-  hosts: []
+  hosts: {}
   tls: []
+  defaultBackend: {}
 
-# Multi-ingress map: each key becomes a separate Ingress named <fullname>-<key>.
-# Useful when a single release needs multiple ingress controllers (e.g. internal + external).
-# Falls back to ingress.ingressClassName when ingressClassName is not specified per entry.
 ingresses: {}
-# Example:
-# ingresses:
-#   internal:
-#     enabled: true
-#     ingressClassName: nginx-internal
-#     annotations:
-#       nginx.ingress.kubernetes.io/rewrite-target: /
-#     hosts:
-#       - host: "app.internal.example.com"
-#         paths:
-#           - path: /
-#             pathType: Prefix
-#             serviceName: my-release-web
-#             servicePort: 80
-#     tls: []
-#   external:
-#     enabled: true
-#     ingressClassName: nginx
-#     annotations:
-#       cert-manager.io/cluster-issuer: letsencrypt-prod
-#     hosts:
-#       - host: "app.example.com"
-#         paths:
-#           - path: /api
-#             pathType: Prefix
-#             serviceName: my-release-api
-#             servicePort: 8080
-#     tls:
-#       - hosts:
-#           - app.example.com
-#         secretName: app-tls
 
-# Kubernetes Gateway API — HTTPRoute (gateway.networking.k8s.io/v1).
-# Requires the Gateway API CRDs and a compatible Gateway controller installed in the cluster
-# (e.g. Cilium, Envoy Gateway, Istio, Traefik, Kong).
-# The Gateway itself must be created separately (outside this chart).
-#
-# Singleton HTTPRoute: one resource named <fullname>.
 httpRoute:
   enabled: false
   annotations: {}
 
-  # parentRefs: references to the Gateway(s) this route attaches to.
-  # name and namespace are required; sectionName targets a specific listener.
-  # parentRefs:
-  #   - name: my-gateway
-  #     namespace: gateway-system
-  #     sectionName: https   # optional: target a specific listener by name
   parentRefs: []
 
-  # hostnames: list of hostnames this route serves.
-  # Must match a listener's hostname (or be a subdomain of it).
   hostnames: []
 
-  # rules: list of routing rules.
-  # Each rule matches requests and forwards them to a backend service.
-  #
-  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
-  #   rules:
-  #     - serviceName: my-release-web   # default: chart fullname
-  #       servicePort: 8080             # default: 80
-  #       matches:
-  #         - path:
-  #             type: PathPrefix
-  #             value: /
-  #
-  # Full form — use backendRefs for multiple backends or weights:
-  #   rules:
-  #     - matches:
-  #         - path:
-  #             type: PathPrefix
-  #             value: /api
-  #       backendRefs:
-  #         - name: my-release-api
-  #           port: 8080
-  #           weight: 100
-  #
-  # filters: optional request/response transformations per rule:
-  #   filters:
-  #     - type: RequestRedirect
-  #       requestRedirect:
-  #         scheme: https
   rules: []
 
-# Multi-HTTPRoute map: each key becomes a separate HTTPRoute named <fullname>-<key>.
-# Mirrors the ingresses map — useful when workloads in one release need separate routes
-# (e.g. different parentRefs, hostnames, or listener sections per route).
 httpRoutes: {}
-# Example:
-# httpRoutes:
-#   internal:
-#     enabled: true
-#     parentRefs:
-#       - name: internal-gateway
-#         namespace: gateway-system
-#     hostnames:
-#       - "app.internal.example.com"
-#     rules:
-#       - serviceName: my-release-web
-#         servicePort: 80
-#         matches:
-#           - path:
-#               type: PathPrefix
-#               value: /
-#   external:
-#     enabled: true
-#     parentRefs:
-#       - name: external-gateway
-#         namespace: gateway-system
-#         sectionName: https
-#     hostnames:
-#       - "app.example.com"
-#     rules:
-#       - matches:
-#           - path:
-#               type: PathPrefix
-#               value: /api
-#         backendRefs:
-#           - name: my-release-api
-#             port: 8080
-#       - matches:
-#           - path:
-#               type: PathPrefix
-#               value: /
-#         filters:
-#           - type: RequestRedirect
-#             requestRedirect:
-#               scheme: https
-#               statusCode: 301
-#         backendRefs:
-#           - name: my-release-web
-#             port: 80
 
-# Kubernetes Gateway API — GRPCRoute (gateway.networking.k8s.io/v1).
-# Requires a Gateway with a gRPC-capable listener and controller (e.g. Envoy Gateway, Istio, Cilium).
-# matches use gRPC service/method names instead of HTTP paths.
-# Default servicePort shorthand is 50051 (standard gRPC port).
-#
-# Singleton GRPCRoute: one resource named <fullname>.
 grpcRoute:
   enabled: false
   annotations: {}
   parentRefs: []
   hostnames: []
-  # rules: list of routing rules. Each rule matches gRPC methods and forwards to a backend.
-  #
-  # Shorthand form — use serviceName/servicePort for simple single-backend rules:
-  #   rules:
-  #     - serviceName: my-release-grpc   # default: chart fullname
-  #       servicePort: 50051             # default: 50051
-  #       matches:
-  #         - method:
-  #             type: Exact
-  #             service: com.example.UserService
-  #             method: Login              # optional: omit to match all methods in the service
-  #
-  # Full form — use backendRefs for multiple backends:
-  #   rules:
-  #     - matches:
-  #         - method:
-  #             type: Exact
-  #             service: com.example.UserService
-  #       backendRefs:
-  #         - name: my-release-grpc
-  #           port: 50051
-  #           weight: 100
-  #
-  # filters: same as HTTPRoute (RequestHeaderModifier, ResponseHeaderModifier, etc.)
   rules: []
 
-# Multi-GRPCRoute map: each key becomes a separate GRPCRoute named <fullname>-<key>.
 grpcRoutes: {}
-# Example:
-# grpcRoutes:
-#   user-svc:
-#     enabled: true
-#     parentRefs:
-#       - name: my-gateway
-#         namespace: gateway-system
-#     hostnames:
-#       - "grpc.example.com"
-#     rules:
-#       - matches:
-#           - method:
-#               type: Exact
-#               service: com.example.UserService
-#         serviceName: my-release-user
-#         servicePort: 50051
-#   order-svc:
-#     enabled: true
-#     parentRefs:
-#       - name: my-gateway
-#         namespace: gateway-system
-#     rules:
-#       - matches:
-#           - method:
-#               type: Exact
-#               service: com.example.OrderService
-#         backendRefs:
-#           - name: my-release-order
-#             port: 50051
 
-# Kubernetes Gateway API — TLSRoute (gateway.networking.k8s.io/v1).
-# Operates at L4 — matches on SNI hostnames only, no HTTP-level routing.
-# Requires a Gateway listener with tls.mode: Passthrough or Terminate.
-# hostnames is required and must be FQDN (no IP addresses).
-# Default servicePort shorthand is 443.
-#
-# Singleton TLSRoute: one resource named <fullname>.
 tlsRoute:
   enabled: false
   annotations: {}
   parentRefs: []
-  # hostnames: required — list of FQDN hostnames matched via SNI during TLS handshake.
   hostnames: []
-  # rules: list of routing rules. Each rule forwards matching TLS connections to backends.
-  # No matches or filters — routing is determined entirely by hostnames (SNI).
-  #
-  # Shorthand form:
-  #   rules:
-  #     - serviceName: my-release-tls   # default: chart fullname
-  #       servicePort: 8443             # default: 443
-  #
-  # Full form:
-  #   rules:
-  #     - backendRefs:
-  #         - name: my-release-tls
-  #           port: 8443
-  #           weight: 100
   rules: []
 
-# Multi-TLSRoute map: each key becomes a separate TLSRoute named <fullname>-<key>.
 tlsRoutes: {}
-# Example:
-# tlsRoutes:
-#   external:
-#     enabled: true
-#     parentRefs:
-#       - name: my-gateway
-#         namespace: gateway-system
-#         sectionName: tls-passthrough
-#     hostnames:
-#       - "secure.example.com"
-#     rules:
-#       - serviceName: my-release-web
-#         servicePort: 8443
 
-# Kubernetes Gateway API — ReferenceGrant (gateway.networking.k8s.io/v1beta1).
-# Required when an HTTPRoute in a different namespace needs to reference a Service
-# in this release's namespace (cross-namespace backend reference).
-# The ReferenceGrant is always created in the same namespace as the target Service
-# (i.e. the release namespace).
-#
-# Singleton ReferenceGrant: one resource named <fullname>.
 referenceGrant:
   enabled: false
   annotations: {}
 
-  # from: list of sources allowed to reference resources in this namespace.
-  # group and kind identify the referencing resource type; namespace is required.
-  # from:
-  #   - group: gateway.networking.k8s.io
-  #     kind: HTTPRoute
-  #     namespace: gateway-system   # namespace where the HTTPRoute lives
   from: []
 
-  # to: list of target resource types in THIS namespace that may be referenced.
-  # group: "" means core API group (Services). name is optional — omit to allow
-  # all resources of that kind; set to restrict to a specific resource by name.
-  # to:
-  #   - group: ""
-  #     kind: Service
-  #     # name: my-release-web   # optional: restrict to a single Service
   to: []
 
-# Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
-# Useful when HTTPRoutes from multiple namespaces need access, or when different
-# source kinds (HTTPRoute, GRPCRoute) require separate grants.
 referenceGrants: {}
-# Example:
-# referenceGrants:
-#   from-gateway-ns:
-#     enabled: true
-#     from:
-#       - group: gateway.networking.k8s.io
-#         kind: HTTPRoute
-#         namespace: gateway-system
-#     to:
-#       - group: ""
-#         kind: Service
-#   from-other-app:
-#     enabled: true
-#     annotations:
-#       team: platform
-#     from:
-#       - group: gateway.networking.k8s.io
-#         kind: HTTPRoute
-#         namespace: other-app-ns
-#     to:
-#       - group: ""
-#         kind: Service
-#         name: my-release-api   # restrict to a specific Service
 
 nodeSelector: {}
 
 tolerations: []
 
-# Global host aliases injected into every pod. Override or disable per-workload via:
-#   hostAliases: []            — local aliases only
-#   inheritRootHostAliases: false — skip root aliases entirely
-# https://kubernetes.io/docs/tasks/network/customize-hosts-file-for-pods/
 hostAliases: []
-# Per-workload scheduling inheritance control via inheritRootSchedParams.
-# Each key defaults to true (inherit from root). Set to false to disable:
-#   affinity: true/false
-#   tolerations: true/false
-#   tsc: true/false
 
 affinity: {}
 
@@ -676,215 +232,12 @@ podDisruptionBudget:
   enabled: false
   minAvailable: 1
 
-# Vertical Pod Autoscaler — requires the VPA CRD (autoscaling.k8s.io/v1).
-# Can be overridden per-workload via deployments.<name>.verticalPodAutoscaler.
 verticalPodAutoscaler:
   enabled: false
-  # updateMode: Off | Initial | Recreate | InPlaceOrRecreate
   updateMode: Initial
-  # resourcePolicy:
-  #   containerPolicies:
-  #   - containerName: "*"
-  #     minAllowed:
-  #       cpu: 100m
-  #       memory: 128Mi
-  #     maxAllowed:
-  #       cpu: 2
-  #       memory: 2Gi
 
-# Topology spread constraints — disabled by default to avoid scheduling
-# failures on single-node clusters (kind, k3s, minikube).
-topologySpreadConstraints:
-  enabled: false
-  constraints:
-    - maxSkew: 1
-      topologyKey: topology.kubernetes.io/zone
-      whenUnsatisfiable: ScheduleAnyway
-    - maxSkew: 1
-      topologyKey: kubernetes.io/hostname
-      whenUnsatisfiable: ScheduleAnyway
+topologySpreadConstraints: []
 
-# Map of Deployment workloads. Each key becomes a separate Deployment + Service.
 deployments: {}
-# Example:
-# deployments:
-#   web:
-#     enabled: true
-#     replicaCount: 2
-#     # Per-workload env inheritance control. Each flag defaults to true.
-#     # Set false to exclude that layer from this workload (and its sidecars).
-#     inherit:
-#       env:
-#         application: true
-#         global: true
-#         dev: true
-#         prod: true
-#       configMaps: true          # set false to exclude root envConfigMaps from this workload
-#       configMapMount: true      # set false to skip all auto-mounts, or use map for granular control:
-#       configMapMount:
-#         nginx-config: false     # skip only this configMap's auto-mount
-#     # Sidecars are a map keyed by container name (deterministic sort order).
-#     sidecars:
-#       fluent-bit:
-#         image:
-#           repository: fluent/fluent-bit
-#           tag: "3.1"
-#           pullPolicy: IfNotPresent
-#         args:
-#           - -c
-#           - /fluent-bit/etc/fluent-bit.conf
-#         env: {}
-#         envSecrets: []
-#         volumeMounts: []
-#         resources: {}
-#         ports: []
-#         # Root envSecrets are merged automatically for sidecars.
-#         # volumeMounts.<workload> is NOT inherited by sidecars; define mounts locally.
-#     # Per-workload host aliases (merged with root hostAliases by default).
-#     # Set inheritRootHostAliases: false to use only local aliases.
-#     hostAliases: []
-#     # Gateway API routes — per-workload shorthand.
-#     # Rules from all enabled workloads are merged into the singleton HTTPRoute/GRPCRoute/TLSRoute.
-#     # parentRefs and hostnames are inherited from the root httpRoute/grpcRoute/tlsRoute block.
-#     # servicePort defaults to service.port; serviceName defaults to <fullname>-<workloadName>.
-#     # priority: lower number = earlier in the merged rules list; omit for alphabetical ordering.
-#     httpRoute:
-#       enabled: true
-#       priority: 10              # optional — controls rule order within the merged HTTPRoute
-#       rules:
-#         - matches:
-#             - path:
-#                 type: PathPrefix
-#                 value: /api
-#           # backendRefs: explicit override (optional)
-#     grpcRoute:
-#       enabled: true
-#       priority: 10
-#       rules:
-#         - matches:
-#             - method:
-#                 type: Exact
-#                 service: com.example.MyService
-#     tlsRoute:
-#       enabled: true
-#       priority: 10
-#       rules:
-#         - {}                    # no matches for TLSRoute — routing is SNI-based via root hostnames
 
-# Map of StatefulSet workloads. Each key becomes a separate StatefulSet + headless Service.
 statefulSets: {}
-# Override image per StatefulSet:
-#   image:
-#     repository: myrepo/myimage
-#     tag: v1.0
-#     pullPolicy: IfNotPresent
-# Optional: volumeClaimTemplates. Update strategy uses the same strategy key as Deployments.
-
-# SecretStores — access configuration for external secret backends (Vault, AWS, GCP).
-# JWT auth uses serviceAccount.name by default; override per store via serviceAccountRef.
-# API version (v1 / v1beta1) is auto-detected via .Capabilities at install time.
-secretStores: {}
-# Example:
-# secretStores:
-#   vault-store:
-#     enabled: true
-#     kind: SecretStore          # SecretStore | ClusterSecretStore (default: SecretStore)
-#     provider:
-#       vault:
-#         server: https://vault.example.com
-#         path: secret
-#         version: v2
-#         namespace: ""          # Vault Enterprise namespace (optional)
-#         auth:
-#           jwt:
-#             mountPath: jwt
-#             role: my-app-role
-#             serviceAccountRef: ""   # default: serviceAccount.name
-#             audiences:
-#               - vault
-#             expirationSeconds: 600
-#   aws-store:
-#     enabled: true
-#     provider:
-#       aws:
-#         service: SecretsManager    # SecretsManager | ParameterStore
-#         region: us-east-1
-#         auth:
-#           jwt:
-#             serviceAccountRef: ""  # default: serviceAccount.name
-#             audiences:
-#               - sts.amazonaws.com
-#   gcp-store:
-#     enabled: true
-#     provider:
-#       gcpsm:
-#         projectID: my-gcp-project
-#         auth:
-#           workloadIdentity:
-#             clusterLocation: us-central1
-#             clusterName: my-cluster
-#             clusterProjectID: ""   # default: projectID
-#             serviceAccountRef: ""  # default: serviceAccount.name
-
-# ExternalSecrets — sync secrets from external backends into K8s Secrets.
-# Requires ExternalSecrets Operator. API version is auto-detected via .Capabilities.
-# data[] fetches individual keys; dataFrom[] extracts the entire secret.
-# conversionStrategy/decodingStrategy/metadataPolicy default to Default/None/None.
-externalSecrets: {}
-# Example:
-# externalSecrets:
-#   db-creds:
-#     enabled: true
-#     secretStore: vault-store      # references secretStores key
-#     storeKind: SecretStore        # SecretStore | ClusterSecretStore (default: SecretStore)
-#     refreshInterval: 1h
-#     targetName: db-creds          # K8s Secret name (default: map key)
-#     type: Opaque                  # Opaque | kubernetes.io/tls | kubernetes.io/dockerconfigjson
-#     data:
-#       - remoteKey: my-app/db
-#         secretKey: DB_PASSWORD
-#         property: password
-#         conversionStrategy: Default   # Default | Unicode
-#         decodingStrategy: None        # None | Auto | Base64 | Base64URL
-#         metadataPolicy: None          # None | Fetch
-#     dataFrom:
-#       - remoteKey: my-app/config
-#         conversionStrategy: Default
-#         decodingStrategy: None
-#         metadataPolicy: None
-
-# Map of CronJob workloads. Each key becomes a separate CronJob resource.
-cronJobs: {}
-# Example:
-# cronJobs:
-#   cleanup:
-#     enabled: true
-#     schedule: "0 2 * * *"
-#     timeZone: "UTC"                  # IANA timezone (Kubernetes 1.27+)
-#     concurrencyPolicy: Forbid        # Allow | Forbid | Replace (default: Allow)
-#     successfulJobsHistoryLimit: 3
-#     failedJobsHistoryLimit: 1
-#     startingDeadlineSeconds: 60
-#     backoffLimit: 2
-#     # ttlSecondsAfterFinished: auto-delete completed job pods after this many seconds.
-#     ttlSecondsAfterFinished: 3600
-#     # activeDeadlineSeconds: abort the job if it runs longer than this.
-#     activeDeadlineSeconds: 600
-#     restartPolicy: Never             # Never | OnFailure
-#     command: |
-#       echo "running cleanup"
-#     args: []
-#     env: {}
-#     envSecrets: []
-#     # resources should always be set to prevent BestEffort QoS and enable HPA metrics.
-#     resources:
-#       requests:
-#         cpu: 100m
-#         memory: 128Mi
-#       limits:
-#         memory: 256Mi
-#     # Per-workload image override (falls back to root image.*).
-#     image:
-#       repository: ""
-#       tag: ""
-#       pullPolicy: IfNotPresent

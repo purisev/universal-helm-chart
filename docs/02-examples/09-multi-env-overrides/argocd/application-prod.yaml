@@ -1,0 +1,31 @@
+# Argo CD Application — prod, multi-source: chart from OCI + base/prod values from this repo.
+# Argo CD merges valueFiles in declared order — later wins on key collision.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: orders-prod
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: orders-prod
+  sources:
+    - repoURL: ghcr.io/purisev
+      chart: universal-helm-chart
+      targetRevision: 2.0.0
+      helm:
+        releaseName: orders-prod
+        valueFiles:
+          - $values/docs/02-examples/09-multi-env-overrides/values-base.yaml
+          - $values/docs/02-examples/09-multi-env-overrides/values-prod.yaml
+    - repoURL: https://github.com/purisev/universal-helm-chart.git
+      targetRevision: v2.0.0
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

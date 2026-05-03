@@ -1,0 +1,40 @@
+{{- $ctx := . }}
+{{- $releaseName := include "uhc.fullname" . -}}
+{{- $defaults := $ctx.Values.integrations.monitoring.defaults | default dict -}}
+{{- $allWorkloads := include "uhc.serviceWorkloads" $ctx | fromJson -}}
+{{- range $wlName := keys $allWorkloads | sortAlpha }}
+{{- $wl := index $allWorkloads $wlName -}}
+{{- $metrics := $wl.metrics | default dict -}}
+{{- $metricsType := $metrics.type | default ($defaults.type | default "service") -}}
+{{- $metricsEnabled := eq (include "uhc.metricsEnabled" (dict "ctx" $ctx "wl" $wl)) "true" -}}
+{{- $discovery := include "uhc.metricsDiscovery" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $provider := include "uhc.metricsProvider" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $hasService := or (and $wl.service $wl.service.enabled) (ne $exposeJson "") -}}
+{{- if and $hasService $metricsEnabled (ne $metricsType "pod") (ne $discovery "annotations") }}
+{{- $smName := printf "%s-%s-metrics" $releaseName $wlName }}
+{{- include "uhc.assertSubdomainLength" (dict "name" $smName "kind" (printf "ServiceMonitor for workload %q" $wlName)) }}
+---
+{{- if eq $provider "victoriametrics" }}
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+{{- else }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+{{- end }}
+metadata:
+  name: {{ $smName }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "serviceMonitor") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+  endpoints:
+    {{- include "uhc.scrapeEndpoint" (dict "ctx" $ctx "wl" $wl "provider" $provider) | nindent 4 }}
+{{- end }}
+{{- end }}

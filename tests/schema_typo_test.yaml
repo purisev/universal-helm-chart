@@ -1,0 +1,278 @@
+suite: test schema rejects common typos
+templates:
+  - deployment.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+# Helm runs values-vs-schema validation on render. helm-unittest captures the
+# resulting failure via failedTemplate.errorPattern, which is a regex over the
+# error string. Each test below intentionally introduces a typo and expects the
+# JSON Schema validator to reject it. If a typo silently passes, the test fails.
+tests:
+  - it: should reject hpa.maxReplica (missing 's') under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.hpa.enabled: true
+      deployments.web.hpa.maxReplica: 5
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'maxReplica' not allowed"
+
+  - it: should reject service.targetProt (typo of targetPort) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetProt: 80
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'targetProt' not allowed"
+
+  - it: should reject inherit.configmapMount (lowercase 'm' typo) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.inherit.configmapMount: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'configmapMount' not allowed"
+
+  - it: should reject containerPorts (typo of ports) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.containerPorts:
+        http:
+          containerPort: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'containerPorts' not allowed"
+
+  - it: should reject inherit.env.globall (typo) under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.inherit.env.globall: false
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'globall' not allowed"
+
+  - it: should reject metrics.exposeService.targetPort string (must be integer)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.targetPort: "9090"
+    asserts:
+      - failedTemplate:
+          errorPattern: "metrics/exposeService/targetPort"
+
+  - it: should reject jobGroups.<group>.jobs.<job> with unknown field
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      jobGroups:
+        db:
+          kind: Job
+          jobs:
+            migrate:
+              backoffLimit: 1
+              schedulle: "* * * * *"
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'schedulle' not allowed"
+
+  - it: should reject statefulSets.<name>.maxReplica (typo of maxReplicas via hpa)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.hpa.enabled: true
+      statefulSets.db.hpa.maxReplica: 3
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'maxReplica' not allowed"
+
+  - it: should reject configMaps.<name> with unknown field
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      configMaps.app:
+        enabled: true
+        mountPath: /etc/app
+        contents:
+          foo.conf: bar
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'contents' not allowed"
+
+  - it: should reject statefulSets.<name>.progressDeadlineSeconds (Deployment-only field)
+    # progressDeadlineSeconds is a Deployment.spec field; the k8s StatefulSet API
+    # has no such field, and templates/statefulset.yaml does not render it. The
+    # schema must reflect that — accepting it would be a silent no-op.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.progressDeadlineSeconds: 999
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'progressDeadlineSeconds' not allowed"
+
+  - it: should reject negative httpRoute.priority
+    # The chart sorts per-workload route rules using printf "%09d|..." as a
+    # string sort key. Negative integers print as "-00000001" which ASCII-sorts
+    # ahead of any positive 9-digit number, breaking the documented "lower
+    # priority renders first" contract. Negative priorities are not meaningful
+    # for routes anyway — declare the contract in the schema.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.httpRoute.enabled: true
+      deployments.web.httpRoute.priority: -1
+    asserts:
+      - failedTemplate:
+          errorPattern: "minimum"
+
+  - it: should reject parentRefs on per-workload httpRoute (singleton-only field)
+    # The chart's singleton HTTPRoute model: per-workload entries contribute
+    # only `rules` to the merged singleton. parentRefs / hostnames / annotations
+    # / metadataAnnotations come from the root .Values.httpRoute (or from the
+    # named entry in .Values.httpRoutes for the plural-map shape) and are
+    # shared across every merged rule. The per-workload schema must reject
+    # those fields, otherwise the user's value is silently ignored.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.httpRoute.enabled: true
+      deployments.web.httpRoute.parentRefs:
+        - name: my-gateway
+          namespace: gateway-ns
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'parentRefs' not allowed"
+
+  - it: should reject hostnames on per-workload grpcRoute
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.grpcRoute.enabled: true
+      deployments.web.grpcRoute.hostnames:
+        - api.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'hostnames' not allowed"
+
+  - it: should reject metadataAnnotations on per-workload tlsRoute
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.tlsRoute.enabled: true
+      statefulSets.db.tlsRoute.metadataAnnotations:
+        custom: anno
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'metadataAnnotations' not allowed"
+
+  - it: should still accept parentRefs on the root .Values.httpRoute (singleton)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      httpRoute:
+        enabled: true
+        parentRefs:
+          - name: my-gateway
+            namespace: gateway-ns
+        rules: []
+    asserts:
+      - notFailedTemplate: {}
+
+  - it: should reject metadataAnnotations on the root .Values.httpRoute (silent no-op)
+    # All six route callsites pass `extra: $route.annotations` to the
+    # uhc.metadataAnnotations helper — there is no callsite that passes
+    # `$route.metadataAnnotations`. The field was previously accepted in the
+    # full routeEntry shape but never rendered. Drop it from the schema; users
+    # who actually want chart annotations on the rendered route already have
+    # `annotations` for that.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      httpRoute:
+        enabled: true
+        metadataAnnotations:
+          foo: bar
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'metadataAnnotations' not allowed"
+
+  - it: should reject metadataAnnotations on a plural-map httpRoutes entry (silent no-op)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      httpRoutes:
+        internal:
+          enabled: true
+          metadataAnnotations:
+            foo: bar
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'metadataAnnotations' not allowed"
+
+  - it: should reject typo inside an ESO secretStore vault provider
+    # Closing the ESO secretStore shape catches typos like `serverr` (extra r)
+    # in the provider config — pre-fix schema accepted any object here.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      integrations:
+        eso:
+          enabled: true
+          secretStores:
+            vault:
+              enabled: true
+              provider:
+                vault:
+                  serverr: https://vault.example.com
+                  path: secret
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'serverr' not allowed"
+
+  - it: should reject typo inside an ESO externalSecret data entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      integrations:
+        eso:
+          enabled: true
+          externalSecrets:
+            db:
+              enabled: true
+              secretStore: vault
+              data:
+                PASSWORD:
+                  remoteKeey: my/secret
+                  property: password
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'remoteKeey' not allowed"

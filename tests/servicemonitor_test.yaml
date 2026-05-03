@@ -1,0 +1,601 @@
+suite: test servicemonitor
+templates:
+  - servicemonitor.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  # --- Provider selection ---
+
+  - it: should render ServiceMonitor by default (no provider set)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: apiVersion
+          value: monitoring.coreos.com/v1
+
+  - it: should render ServiceMonitor when provider is explicitly prometheus
+    set:
+      integrations.monitoring.defaults.provider: prometheus
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+      - equal:
+          path: apiVersion
+          value: monitoring.coreos.com/v1
+
+  - it: should render VMServiceScrape when provider is victoriametrics
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: VMServiceScrape
+      - equal:
+          path: apiVersion
+          value: operator.victoriametrics.com/v1beta1
+
+  # --- Negative cases ---
+
+  - it: should not render when workload disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: false
+      deployments.web.service.enabled: true
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when service disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: false
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when metrics disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when metrics.type is pod
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.type: pod
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Global defaults ---
+
+  - it: should use built-in defaults when monitoring.defaults not set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: http
+      - equal:
+          path: spec.endpoints[0].path
+          value: /metrics
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 60s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 10s
+
+  - it: should use global monitoring.defaults when per-workload not set
+    set:
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.path: /custom-metrics
+      integrations.monitoring.defaults.interval: 120s
+      integrations.monitoring.defaults.scrapeTimeout: 30s
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+      - equal:
+          path: spec.endpoints[0].path
+          value: /custom-metrics
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 120s
+      - equal:
+          path: spec.endpoints[0].scrapeTimeout
+          value: 30s
+
+  - it: per-workload metrics values should override global defaults
+    set:
+      integrations.monitoring.defaults.port: metrics
+      integrations.monitoring.defaults.interval: 120s
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.port: custom-port
+      deployments.web.metrics.interval: 15s
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: custom-port
+      - equal:
+          path: spec.endpoints[0].interval
+          value: 15s
+
+  # --- Selectors ---
+
+  - it: should set correct selector matchLabels for Deployment source
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: web
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
+
+  - it: should set correct selector matchLabels for StatefulSet source
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: redis
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-redis
+
+  # --- ArgoCD sync-wave ---
+
+  - it: should set argocd sync-wave annotation from per-kind serviceMonitor wave
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.argocd.syncWaves.serviceMonitor: 11
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "11"
+
+  # --- relabelConfigs mapping ---
+
+  - it: should render relabelings (not relabelConfigs) for prometheus provider
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.relabelConfigs[0].targetLabel: instance
+    asserts:
+      - isNotNull:
+          path: spec.endpoints[0].relabelings
+      - isNull:
+          path: spec.endpoints[0].relabelConfigs
+
+  - it: should render relabelConfigs (not relabelings) for victoriametrics provider
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.relabelConfigs[0].targetLabel: instance
+    asserts:
+      - isNotNull:
+          path: spec.endpoints[0].relabelConfigs
+      - isNull:
+          path: spec.endpoints[0].relabelings
+
+  # --- basicAuth ---
+
+  - it: should render basicAuth when provided
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.basicAuth.password.name: metrics-secret
+      deployments.web.metrics.basicAuth.password.key: password
+      deployments.web.metrics.basicAuth.username.name: metrics-secret
+      deployments.web.metrics.basicAuth.username.key: username
+    asserts:
+      - equal:
+          path: spec.endpoints[0].basicAuth.password.name
+          value: metrics-secret
+      - equal:
+          path: spec.endpoints[0].basicAuth.password.key
+          value: password
+      - equal:
+          path: spec.endpoints[0].basicAuth.username.name
+          value: metrics-secret
+      - equal:
+          path: spec.endpoints[0].basicAuth.username.key
+          value: username
+
+  # --- headers (VM-only) ---
+
+  - it: should render vm_scrape_params headers for victoriametrics provider
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.headers[0]: "X-Custom-Header: value"
+    asserts:
+      - equal:
+          path: spec.endpoints[0].vm_scrape_params.headers[0]
+          value: "X-Custom-Header: value"
+
+  - it: should not render vm_scrape_params for prometheus even when headers set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.headers[0]: "X-Custom-Header: value"
+    asserts:
+      - isNull:
+          path: spec.endpoints[0].vm_scrape_params
+
+  # --- StatefulSet negative cases ---
+
+  - it: should not render for StatefulSet when disabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: false
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render for StatefulSet when service disabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.service.enabled: false
+      statefulSets.redis.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render for StatefulSet when metrics disabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.targetPort: 6379
+      statefulSets.redis.metrics.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when discovery is annotations
+    set:
+      integrations.monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Global default-enable opt-out mode ---
+
+  - it: should render when integrations.monitoring.defaults.enabled=true even without per-workload metrics.enabled
+    set:
+      integrations.monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+
+  - it: per-workload metrics.enabled=false should override integrations.monitoring.defaults.enabled=true
+    set:
+      integrations.monitoring.defaults.enabled: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  # --- Global defaults: type, relabelConfigs, basicAuth, headers ---
+
+  - it: should not render when integrations.monitoring.defaults.type is pod
+    set:
+      integrations.monitoring.defaults.type: pod
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: per-workload metrics.type=service should override defaults.type=pod
+    set:
+      integrations.monitoring.defaults.type: pod
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.type: service
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
+
+  - it: should apply global integrations.monitoring.defaults.relabelConfigs when per-workload not set
+    set:
+      integrations.monitoring.defaults.relabelConfigs[0].targetLabel: instance
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - isNotNull:
+          path: spec.endpoints[0].relabelings
+
+  - it: per-workload metrics.relabelConfigs should override global defaults
+    set:
+      integrations.monitoring.defaults.relabelConfigs[0].targetLabel: from-defaults
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.relabelConfigs[0].targetLabel: from-workload
+    asserts:
+      - equal:
+          path: spec.endpoints[0].relabelings[0].targetLabel
+          value: from-workload
+
+  - it: should apply global integrations.monitoring.defaults.basicAuth when per-workload not set
+    set:
+      integrations.monitoring.defaults.basicAuth.password.name: scrape-secret
+      integrations.monitoring.defaults.basicAuth.password.key: password
+      integrations.monitoring.defaults.basicAuth.username.name: scrape-secret
+      integrations.monitoring.defaults.basicAuth.username.key: username
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].basicAuth.password.name
+          value: scrape-secret
+
+  - it: should apply global integrations.monitoring.defaults.headers for victoriametrics provider
+    set:
+      integrations.monitoring.defaults.provider: victoriametrics
+      integrations.monitoring.defaults.headers[0]: "X-Token: abc"
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].vm_scrape_params.headers[0]
+          value: "X-Token: abc"
+
+  # --- exposeService changes default port name to "metrics" ---
+
+  - it: should default ServiceMonitor port to "metrics" when exposeService is enabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: metrics
+
+  - it: per-workload metrics.port should override exposeService default
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.port: custom
+    asserts:
+      - equal:
+          path: spec.endpoints[0].port
+          value: custom
+
+  # --- Per-workload provider/discovery overrides ---
+
+  - it: per-workload metrics.provider should override default provider
+    set:
+      integrations.monitoring.defaults.provider: prometheus
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.provider: victoriametrics
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: VMServiceScrape
+
+  - it: per-workload metrics.discovery=annotations should skip CRD render even when global is crd
+    set:
+      integrations.monitoring.defaults.discovery: crd
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.discovery: annotations
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: per-workload metrics.discovery=crd should render CRD even when global is annotations
+    set:
+      integrations.monitoring.defaults.discovery: annotations
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.discovery: crd
+    asserts:
+      - hasDocuments:
+          count: 1
+      - isKind:
+          of: ServiceMonitor
