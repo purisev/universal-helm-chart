@@ -48,7 +48,7 @@ Resource name: `<release-fullname>-<group[:8]>-<job>[-<sha8>]`. The `sha8` suffi
 - A migration job and a seed job declared as siblings under one group share image, env, volumes — with concise, override-only difference at the per-job level.
 - A logical task crossing the Job ↔ CronJob boundary is a one-line edit (`kind:`).
 - The hash-suffix idempotency model ([ADR 012](012-job-spec-hashing-for-idempotency.md)) operates uniformly on both kinds.
-- Argo CD / Helm hook annotations (`hooks.argocd.*`, `hooks.helm.*`) live on the group with per-job override — natural for "all jobs in this group are pre-install hooks".
+- Argo CD / Helm hook annotations (`hooks.argocd.*`, `hooks.helm.*`) live on the group with per-job override — natural for "all jobs in this group are pre-install hooks". When `hooks.argocd.hook` is set, `deletePolicy` defaults automatically to `HookFailed` (succeeded jobs stay for idempotent re-sync; failed jobs are deleted so the next sync retries them). Set `deletePolicy` explicitly to override this default.
 
 **What it costs:**
 

@@ -443,6 +443,31 @@ tests:
           path: spec.replicas
           value: 0
 
+  # --- podSecurityContext override ---
+
+  - it: should use root podSecurityContext by default for StatefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      podSecurityContext.runAsUser: 1000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 1000
+
+  - it: should use per-workload podSecurityContext when set for StatefulSet
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      podSecurityContext.runAsUser: 1000
+      statefulSets.db.podSecurityContext.runAsUser: 2000
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.runAsUser
+          value: 2000
+
   # --- podAnnotations merge ---
 
   - it: should render root podAnnotations on StatefulSet pod template

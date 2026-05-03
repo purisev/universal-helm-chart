@@ -54,6 +54,7 @@
           }
         },
         "configMaps": {"type": "boolean"},
+        "envSecrets": {"type": "boolean"},
         "configMapMount": {
           "oneOf": [
             {"type": "boolean"},
