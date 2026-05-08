@@ -183,7 +183,25 @@
         }
       }
     },
-    "routeEntry": {
+    "grpcRouteRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "matches": {"type": "array"},
+        "filters": {"type": "array"},
+        "backendRefs": {"type": "array"},
+        "serviceName": {"type": "string"},
+        "servicePort": {"type": ["integer", "string"]},
+        "sessionPersistence": {"$ref": "#/$defs/httpRouteSessionPersistence"}
+      }
+    },
+    "grpcRouteEntry": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -194,16 +212,66 @@
           "type": "array",
           "items": {"type": "string"}
         },
-        "rules": {"type": "array"}
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/grpcRouteRule"}
+        }
       }
     },
-    "workloadRouteEntry": {
+    "grpcWorkloadRouteEntry": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
         "priority": {"type": "integer", "minimum": 0},
-        "rules": {"type": "array"}
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/grpcRouteRule"}
+        }
+      }
+    },
+    "tlsRouteRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "backendRefs": {"type": "array"},
+        "serviceName": {"type": "string"},
+        "servicePort": {"type": ["integer", "string"]}
+      }
+    },
+    "tlsRouteEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "annotations": {"type": "object"},
+        "parentRefs": {"type": "array"},
+        "hostnames": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/tlsRouteRule"}
+        }
+      }
+    },
+    "tlsWorkloadRouteEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "priority": {"type": "integer", "minimum": 0},
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/tlsRouteRule"}
+        }
       }
     },
     "gatewayApiDuration": {
@@ -562,8 +630,8 @@
           "additionalProperties": {"$ref": "#/$defs/containerEntry"}
         },
         "httpRoute": {"$ref": "#/$defs/httpWorkloadRouteEntry"},
-        "grpcRoute": {"$ref": "#/$defs/workloadRouteEntry"},
-        "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "grpcRoute": {"$ref": "#/$defs/grpcWorkloadRouteEntry"},
+        "tlsRoute": {"$ref": "#/$defs/tlsWorkloadRouteEntry"},
         "strategy": {"$ref": "#/$defs/strategyShape"},
         "progressDeadlineSeconds": {"type": "integer", "minimum": 1},
         "minReadySeconds": {"type": "integer", "minimum": 0},
@@ -644,8 +712,8 @@
           "additionalProperties": {"$ref": "#/$defs/containerEntry"}
         },
         "httpRoute": {"$ref": "#/$defs/httpWorkloadRouteEntry"},
-        "grpcRoute": {"$ref": "#/$defs/workloadRouteEntry"},
-        "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "grpcRoute": {"$ref": "#/$defs/grpcWorkloadRouteEntry"},
+        "tlsRoute": {"$ref": "#/$defs/tlsWorkloadRouteEntry"},
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
         "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
         "volumeClaimTemplates": {"type": "array"},
@@ -1023,15 +1091,15 @@
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/httpRouteEntry"}
     },
-    "grpcRoute": {"$ref": "#/$defs/routeEntry"},
+    "grpcRoute": {"$ref": "#/$defs/grpcRouteEntry"},
     "grpcRoutes": {
       "type": "object",
-      "additionalProperties": {"$ref": "#/$defs/routeEntry"}
+      "additionalProperties": {"$ref": "#/$defs/grpcRouteEntry"}
     },
-    "tlsRoute": {"$ref": "#/$defs/routeEntry"},
+    "tlsRoute": {"$ref": "#/$defs/tlsRouteEntry"},
     "tlsRoutes": {
       "type": "object",
-      "additionalProperties": {"$ref": "#/$defs/routeEntry"}
+      "additionalProperties": {"$ref": "#/$defs/tlsRouteEntry"}
     },
     "referenceGrant": {"$ref": "#/$defs/referenceGrantShape"},
     "referenceGrants": {

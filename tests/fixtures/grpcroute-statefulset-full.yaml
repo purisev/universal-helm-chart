@@ -1,0 +1,38 @@
+grpcRoute:
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+  hostnames:
+    - grpc.example.com
+
+statefulSets:
+  user:
+    service:
+      port: 50051
+    grpcRoute:
+      enabled: true
+      priority: 5
+      rules:
+        - name: user-rule
+          matches:
+            - method:
+                type: Exact
+                service: com.example.UserService
+          sessionPersistence:
+            sessionName: sticky-user
+            type: Cookie
+            absoluteTimeout: 1h
+            idleTimeout: 10m
+            cookieConfig:
+              lifetimeType: Permanent
+  order:
+    service:
+      port: 50051
+    grpcRoute:
+      enabled: true
+      priority: 10
+      rules:
+        - matches:
+            - method:
+                type: Exact
+                service: com.example.OrderService

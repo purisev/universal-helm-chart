@@ -1,0 +1,23 @@
+tlsRoutes:
+  ext:
+    enabled: true
+    parentRefs:
+      - name: my-gateway
+        namespace: gateway-system
+    hostnames:
+      - secure.example.com
+    rules:
+      - name: ext-rule
+        backendRefs:
+          - name: my-release-web
+            port: 8443
+  int:
+    enabled: true
+    parentRefs:
+      - name: my-gateway
+        namespace: gateway-system
+    hostnames:
+      - internal.example.com
+    rules:
+      - serviceName: my-release-api
+        servicePort: 9443

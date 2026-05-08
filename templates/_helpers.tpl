@@ -125,6 +125,80 @@ the dash (e.g. `- name: foo` rather than an orphan dash on its own line).
 {{- end }}
 
 {{/*
+Renders a single GRPCRoute rule body (without the leading `-`). Mirrors
+uhc.httpRouteRuleSpec but for GRPCRouteRule, whose Gateway API spec defines
+only: name, matches, filters, backendRefs, sessionPersistence (no timeouts,
+no retry — those are HTTPRoute-only fields).
+
+Input dict:
+  ctx              — root template context (for capability assertions)
+  rule             — the rule entry (map)
+  defaultBackend   — fallback backend name (string, used when rule.backendRefs is empty)
+  defaultPort      — fallback backend port (int, typically 50051 for gRPC)
+
+Output is the joined rule fields as multi-line YAML with no leading or trailing
+newline. The caller wraps it under a list-item dash via the standard
+`nindent N | trimPrefix "\n<N spaces>"` idiom.
+*/}}
+{{- define "uhc.grpcRouteRuleSpec" -}}
+{{- $ctx := .ctx -}}
+{{- $rule := .rule -}}
+{{- $defaultBackend := .defaultBackend -}}
+{{- $defaultPort := .defaultPort -}}
+{{- $blocks := list -}}
+{{- if $rule.name -}}
+{{- include "uhc.assertGatewayApiSupportsRuleName" $ctx -}}
+{{- $blocks = append $blocks (printf "name: %s" ($rule.name | quote)) -}}
+{{- end -}}
+{{- with $rule.matches -}}
+{{- $blocks = append $blocks (printf "matches:\n%s" (toYaml . | indent 2 | trimSuffix "\n")) -}}
+{{- end -}}
+{{- with $rule.filters -}}
+{{- $blocks = append $blocks (printf "filters:\n%s" (toYaml . | indent 2 | trimSuffix "\n")) -}}
+{{- end -}}
+{{- if $rule.sessionPersistence -}}
+{{- include "uhc.assertGatewayApiSupportsSessionPersistence" $ctx -}}
+{{- $blocks = append $blocks (printf "sessionPersistence:\n%s" (toYaml $rule.sessionPersistence | indent 2 | trimSuffix "\n")) -}}
+{{- end -}}
+{{- if $rule.backendRefs -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n%s" (toYaml $rule.backendRefs | indent 2 | trimSuffix "\n")) -}}
+{{- else -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n  - name: %s\n    port: %v" ($rule.serviceName | default $defaultBackend) ($rule.servicePort | default $defaultPort)) -}}
+{{- end -}}
+{{- join "\n" $blocks -}}
+{{- end }}
+
+{{/*
+Renders a single TLSRoute rule body (without the leading `-`). TLSRouteRule
+in the Gateway API spec is minimal: only name and backendRefs. TLS is L4 —
+matches/filters/timeouts/retry/sessionPersistence are not defined.
+
+TLSRoute itself is Experimental-only (still v1alpha2 in Gateway API v1.5.x),
+so any use of TLSRoute presupposes the Experimental channel; no separate
+field-level capability guard is needed for `name`.
+
+Input dict:
+  rule             — the rule entry (map)
+  defaultBackend   — fallback backend name (string, used when rule.backendRefs is empty)
+  defaultPort      — fallback backend port (int, typically 443 for TLS passthrough)
+*/}}
+{{- define "uhc.tlsRouteRuleSpec" -}}
+{{- $rule := .rule -}}
+{{- $defaultBackend := .defaultBackend -}}
+{{- $defaultPort := .defaultPort -}}
+{{- $blocks := list -}}
+{{- if $rule.name -}}
+{{- $blocks = append $blocks (printf "name: %s" ($rule.name | quote)) -}}
+{{- end -}}
+{{- if $rule.backendRefs -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n%s" (toYaml $rule.backendRefs | indent 2 | trimSuffix "\n")) -}}
+{{- else -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n  - name: %s\n    port: %v" ($rule.serviceName | default $defaultBackend) ($rule.servicePort | default $defaultPort)) -}}
+{{- end -}}
+{{- join "\n" $blocks -}}
+{{- end }}
+
+{{/*
 Create the name of the service account to use
 */}}
 {{- define "uhc.serviceAccountName" -}}

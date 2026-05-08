@@ -106,6 +106,46 @@ If your cluster runs **Standard** channel CRDs older than v1.4 and you need `nam
 
 See the [`04-gateway-api` example](../02-examples/04-gateway-api/) for a working configuration and Gateway API's [release channels](https://gateway-api.sigs.k8s.io/concepts/versioning/#release-channels) for installation guidance.
 
+### GRPCRoute rule fields (`name`, `sessionPersistence`)
+
+Every GRPCRoute rule (in `grpcRoute.rules`, `grpcRoutes.<n>.rules`, and per-workload `deployments.<w>.grpcRoute.rules` / `statefulSets.<w>.grpcRoute.rules`) accepts two optional field groups beyond `matches`, `filters`, and `backendRefs`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` (`SectionName`: lowercase RFC 1123 label, optionally dotted, max 253 chars) | Identifies the rule. Surfaced in Gateway API status conditions and traces. MUST be unique within the route. |
+| `sessionPersistence.sessionName` | `string` (1–128 chars) | Identifier the implementation uses for the persistence value (cookie name or header name, depending on `type`). |
+| `sessionPersistence.type` | `enum`: `Cookie` \| `Header` | Persistence mechanism. Defaults to `Cookie` server-side when omitted. |
+| `sessionPersistence.absoluteTimeout` | `string` (Gateway API Duration) | Maximum lifetime of the session, regardless of activity. Example: `"1h"`. |
+| `sessionPersistence.idleTimeout` | `string` (Gateway API Duration) | Maximum idle time before the session expires. Example: `"10m"`. |
+| `sessionPersistence.cookieConfig.lifetimeType` | `enum`: `Permanent` \| `Session` | Cookie lifetime style (relevant only when `type: Cookie`). |
+
+Both groups are independently optional. **GRPCRouteRule has no `timeouts` or `retry`** — those are HTTPRoute-only fields in the Gateway API spec.
+
+> **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only `name`, `matches`, `filters`, `backendRefs`, `serviceName`, `servicePort`, and `sessionPersistence`. Unknown keys fail at `helm template` time.
+
+#### Gateway API channel and version requirements
+
+| Field | Minimum Gateway API | Channel | Detection marker |
+|-------|---------------------|---------|------------------|
+| `name` | v1.4.0 (Standard) **or** v1.2.0+ (Experimental) | Standard since v1.4.0; Experimental from v1.2 to v1.3 | `gateway.networking.k8s.io/v1/BackendTLSPolicy` (Standard, graduated in v1.4.0) **or** `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+| `sessionPersistence.*` | v1.2.0 | **Experimental only** (still Experimental as of v1.5.1) | `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+
+The chart fails fast at `helm template` time when `gateway.networking.k8s.io/v1` is present but the required channel marker is not. Detection is skipped offline (`helm template` without `--api-versions`).
+
+### TLSRoute rule fields (`name`)
+
+Every TLSRoute rule (in `tlsRoute.rules`, `tlsRoutes.<n>.rules`, and per-workload `deployments.<w>.tlsRoute.rules` / `statefulSets.<w>.tlsRoute.rules`) accepts one optional field beyond `backendRefs`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` (`SectionName`: lowercase RFC 1123 label, optionally dotted, max 253 chars) | Identifies the rule. MUST be unique within the route. |
+
+**TLSRouteRule has no `matches`, `filters`, `timeouts`, `retry`, or `sessionPersistence`** — TLS is L4 passthrough; the spec defines only `name` and `backendRefs`.
+
+> **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only `name`, `backendRefs`, `serviceName`, and `servicePort`. Unknown keys fail at `helm template` time.
+
+TLSRoute itself is in the Gateway API Experimental channel (`gateway.networking.k8s.io/v1alpha2`), so any use of TLSRoute already presupposes Experimental CRDs — `name` adds no further channel requirement beyond TLSRoute itself.
+
 ### Autoscaler mutual exclusion
 
 - `hpa.enabled: true` and `keda.enabled: true` on the same workload is fail-fast. Both manage `spec.replicas`; both running is undefined behaviour.
