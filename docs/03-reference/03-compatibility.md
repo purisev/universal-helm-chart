@@ -29,7 +29,8 @@ Each integration is opt-in; install only the CRDs for the integrations you enabl
 
 | Feature | API group / version chart renders |
 |---------|-----------------------------------|
-| Gateway API routes — HTTPRoute, GRPCRoute, TLSRoute | `gateway.networking.k8s.io/v1` |
+| Gateway API routes — HTTPRoute, GRPCRoute | `gateway.networking.k8s.io/v1` |
+| Gateway API TLSRoute | `gateway.networking.k8s.io/v1alpha2` ([Experimental channel](https://gateway-api.sigs.k8s.io/concepts/versioning/#release-channels) only — not in Standard as of Gateway API v1.5.x) |
 | Gateway API ReferenceGrant | `gateway.networking.k8s.io/v1beta1` |
 | External Secrets Operator | `external-secrets.io/v1` (auto-detects `v1beta1` fallback via `.Capabilities`) |
 | KEDA `ScaledObject` | `keda.sh/v1alpha1` |
