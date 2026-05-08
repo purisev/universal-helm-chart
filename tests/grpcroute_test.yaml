@@ -193,3 +193,235 @@ tests:
       - equal:
           path: spec.hostnames[0]
           value: grpc.example.com
+
+  # --- rules: name field ---
+
+  - it: should render rule name in root rules
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+
+  - it: should omit rule name when not set
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render rule name in per-workload deployment rules
+    values:
+      - fixtures/grpcroute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render rule name in per-workload statefulSet rules
+    values:
+      - fixtures/grpcroute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render rule name in plural-map rules
+    values:
+      - fixtures/grpcroute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+
+  - it: should omit rule name when not set in plural-map rules
+    values:
+      - fixtures/grpcroute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - isNull:
+          path: spec.rules[0].name
+
+  # --- rules: sessionPersistence ---
+
+  - it: should render sessionPersistence in root rules
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-user
+      - equal:
+          path: spec.rules[0].sessionPersistence.type
+          value: Cookie
+      - equal:
+          path: spec.rules[0].sessionPersistence.absoluteTimeout
+          value: 1h
+      - equal:
+          path: spec.rules[0].sessionPersistence.idleTimeout
+          value: 10m
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+
+  - it: should omit sessionPersistence when not set
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].sessionPersistence
+
+  - it: should render sessionPersistence in per-workload deployment rules
+    values:
+      - fixtures/grpcroute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-user
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+      - isNull:
+          path: spec.rules[1].sessionPersistence
+
+  - it: should render sessionPersistence in per-workload statefulSet rules
+    values:
+      - fixtures/grpcroute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-user
+      - isNull:
+          path: spec.rules[1].sessionPersistence
+
+  - it: should render sessionPersistence in plural-map rules
+    values:
+      - fixtures/grpcroute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-user
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+
+  - it: should omit sessionPersistence in plural-map rules when not set
+    values:
+      - fixtures/grpcroute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - isNull:
+          path: spec.rules[0].sessionPersistence
+
+  # --- Gateway API channel guards: rule.name (v1.4+ Standard or Experimental) ---
+
+  - it: should render rule name when v1.4+ Standard CRDs present (BackendTLSPolicy v1)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1/BackendTLSPolicy
+        # also needed because the full fixture uses sessionPersistence (Experimental-only):
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+
+  - it: should render rule name when Experimental CRDs present (TCPRoute v1alpha2)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+
+  - it: should fail when v1 group present but neither v1.4 Standard nor Experimental marker (pre-v1.4 Standard cluster)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      grpcRoute.rules:
+        - name: my-rule
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: "rule.name requires Gateway API v1.4\\+ Standard"
+
+  - it: should render rule name without capability check when gateway.networking.k8s.io/v1 absent (offline)
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: user-rule
+
+  # --- Gateway API channel guards: rule.sessionPersistence (Experimental only) ---
+
+  - it: should render sessionPersistence when Experimental CRDs present (TCPRoute v1alpha2)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-user
+
+  - it: should fail when sessionPersistence is set but cluster has only Standard CRDs (BackendTLSPolicy v1, no Experimental)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1/BackendTLSPolicy
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      grpcRoute.rules:
+        - sessionPersistence:
+            sessionName: sticky
+            type: Cookie
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: "rule.sessionPersistence requires Gateway API Experimental"
+
+  - it: should render sessionPersistence without capability check when gateway.networking.k8s.io/v1 absent (offline)
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-user
+
+  # --- Schema strictness: rule schema rejects unknown keys ---
+
+  - it: should reject unknown keys in grpcRoute rules
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      grpcRoute.rules:
+        - name: my-rule
+          unknownKey: foo
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'unknownKey' not allowed"

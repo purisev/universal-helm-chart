@@ -1,0 +1,24 @@
+tlsRoute:
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+  hostnames:
+    - secure.example.com
+
+statefulSets:
+  web:
+    service:
+      port: 8443
+    tlsRoute:
+      enabled: true
+      priority: 5
+      rules:
+        - name: web-rule
+  api:
+    service:
+      port: 9443
+    tlsRoute:
+      enabled: true
+      priority: 10
+      rules:
+        - {}

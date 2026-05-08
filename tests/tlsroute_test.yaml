@@ -202,3 +202,85 @@ tests:
       - equal:
           path: spec.hostnames[0]
           value: secure.example.com
+
+  # --- rules: name field ---
+
+  - it: should render rule name in root rules
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: web-rule
+
+  - it: should omit rule name when not set in root rules
+    values:
+      - fixtures/tlsroute-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render rule name in per-workload deployment rules
+    values:
+      - fixtures/tlsroute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: web-rule
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should default backendRefs when only name is set in per-workload rules
+    values:
+      - fixtures/tlsroute-workload-full.yaml
+    asserts:
+      - matchRegex:
+          path: spec.rules[0].backendRefs[0].name
+          pattern: -web$
+      - equal:
+          path: spec.rules[0].backendRefs[0].port
+          value: 8443
+
+  - it: should render rule name in per-workload statefulSet rules
+    values:
+      - fixtures/tlsroute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: web-rule
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render rule name in plural-map rules
+    values:
+      - fixtures/tlsroute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: ext-rule
+
+  - it: should omit rule name when not set in plural-map rules
+    values:
+      - fixtures/tlsroute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - isNull:
+          path: spec.rules[0].name
+
+  # --- Schema strictness: rule schema rejects unknown keys ---
+
+  - it: should reject unknown keys in tlsRoute rules
+    set:
+      tlsRoute.enabled: true
+      tlsRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      tlsRoute.hostnames:
+        - secure.example.com
+      tlsRoute.rules:
+        - name: web-rule
+          unknownKey: foo
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'unknownKey' not allowed"

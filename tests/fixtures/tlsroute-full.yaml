@@ -9,7 +9,8 @@ tlsRoute:
   hostnames:
     - "secure.example.com"
   rules:
-    - backendRefs:
+    - name: web-rule
+      backendRefs:
         - name: my-release-web
           port: 8443
     - serviceName: my-release-api
