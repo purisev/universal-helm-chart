@@ -2,7 +2,8 @@
 {{- $releaseName := include "uhc.fullname" . -}}
 {{- /*
 Singleton TLSRoute.
-Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1).
+Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1alpha2 — Experimental
+channel only; TLSRoute is not part of Standard in Gateway API v1.5.x).
 Renders when tlsRoute.enabled: true OR when any deployment/statefulSet has tlsRoute.enabled: true.
 Per-workload rules are merged in priority order (lower number first), then alphabetically.
 serviceName defaults to <fullname>-<workloadName>; servicePort defaults to workload service.port or 443.
@@ -27,7 +28,7 @@ hostnames is required — must be set at root tlsRoute level.
 {{- fail "tlsRoute is enabled (root or by a workload) but .Values.tlsRoute.hostnames is empty. TLSRoute matches purely by SNI hostname — without hostnames the rendered TLSRoute terminates nothing. Set .Values.tlsRoute.hostnames to the SNI value(s) the route should match." -}}
 {{- end -}}
 ---
-apiVersion: gateway.networking.k8s.io/v1
+apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TLSRoute
 metadata:
   name: {{ $releaseName }}
@@ -101,7 +102,7 @@ Useful when multiple hostnames or listeners require separate TLS routes.
 {{- $tlsFullName := printf "%s-%s" $releaseName $routeName }}
 {{- include "uhc.assertSubdomainLength" (dict "name" $tlsFullName "kind" (printf "TLSRoute %q" $routeName)) }}
 ---
-apiVersion: gateway.networking.k8s.io/v1
+apiVersion: gateway.networking.k8s.io/v1alpha2
 kind: TLSRoute
 metadata:
   name: {{ $tlsFullName }}

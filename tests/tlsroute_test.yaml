@@ -23,7 +23,7 @@ tests:
           of: TLSRoute
       - equal:
           path: apiVersion
-          value: gateway.networking.k8s.io/v1
+          value: gateway.networking.k8s.io/v1alpha2
 
   - it: should use release name for tlsroute name
     values:
