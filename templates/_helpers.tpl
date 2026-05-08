@@ -148,7 +148,7 @@ newline. The caller wraps it under a list-item dash via the standard
 {{- $blocks := list -}}
 {{- if $rule.name -}}
 {{- include "uhc.assertGatewayApiSupportsRuleName" $ctx -}}
-{{- $blocks = append $blocks (printf "name: %s" $rule.name) -}}
+{{- $blocks = append $blocks (printf "name: %s" ($rule.name | quote)) -}}
 {{- end -}}
 {{- with $rule.matches -}}
 {{- $blocks = append $blocks (printf "matches:\n%s" (toYaml . | indent 2 | trimSuffix "\n")) -}}
@@ -188,7 +188,7 @@ Input dict:
 {{- $defaultPort := .defaultPort -}}
 {{- $blocks := list -}}
 {{- if $rule.name -}}
-{{- $blocks = append $blocks (printf "name: %s" $rule.name) -}}
+{{- $blocks = append $blocks (printf "name: %s" ($rule.name | quote)) -}}
 {{- end -}}
 {{- if $rule.backendRefs -}}
 {{- $blocks = append $blocks (printf "backendRefs:\n%s" (toYaml $rule.backendRefs | indent 2 | trimSuffix "\n")) -}}
