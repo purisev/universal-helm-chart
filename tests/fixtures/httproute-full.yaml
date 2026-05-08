@@ -9,10 +9,27 @@ httpRoute:
   hostnames:
     - "app.example.com"
   rules:
-    - matches:
+    - name: api-rule
+      matches:
         - path:
             type: PathPrefix
             value: /api
+      timeouts:
+        request: 30s
+        backendRequest: 10s
+      retry:
+        attempts: 3
+        codes:
+          - 503
+          - 504
+        backoff: 1s
+      sessionPersistence:
+        sessionName: sticky-api
+        type: Cookie
+        absoluteTimeout: 1h
+        idleTimeout: 10m
+        cookieConfig:
+          lifetimeType: Permanent
       backendRefs:
         - name: my-release-api
           port: 8080

@@ -2,11 +2,7 @@
 
 `values.yaml` at the chart root carries machine-readable defaults only — no inline comments. This page is the annotated reference: a topical index of every top-level key grouped by feature, with cross-links to the relevant ADR and example folder, plus a cross-cutting rules cheatsheet for behaviours that span multiple keys.
 
-<<<<<<< HEAD
-For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). For supported Kubernetes / CRD versions, see [`03-compatibility.md`](03-compatibility.md).
-=======
 For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). For supported Kubernetes / CRD versions, see [`03-compatibility.md`](03-compatibility.md). For a complete working example with every chart feature enabled (passes `helm template`), see [`values.yaml.example`](../../values.yaml.example) at the chart root.
->>>>>>> 417e14c (refactor: multiple changes on v2 structure)
 
 ## Topical index
 
@@ -72,6 +68,83 @@ For each per-job field:
 - **volumes / volumeMounts** — replace by name (a volume can't be partially `emptyDir` and partially `configMap`).
 
 `hashSuffix: true` together with a delete-policy that removes the Job after success is rejected fail-fast — the Job would re-run on every sync. See [ADR 005](../05-adr/005-jobgroups-unification.md) and [ADR 012](../05-adr/012-job-spec-hashing-for-idempotency.md).
+
+### HTTPRoute rule fields (`name`, `timeouts`, `retry`, `sessionPersistence`)
+
+Every HTTPRoute rule (in `httpRoute.rules`, `httpRoutes.<n>.rules`, and per-workload `deployments.<w>.httpRoute.rules` / `statefulSets.<w>.httpRoute.rules`) accepts four optional field groups beyond `matches`, `filters`, and `backendRefs`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` (`SectionName`: lowercase RFC 1123 label, optionally dotted, max 253 chars) | Identifies the rule. Surfaced in Gateway API status conditions, access logs, and distributed traces. MUST be unique within the route. |
+| `timeouts.request` | `string` (Gateway API Duration, [GEP-2257](https://gateway-api.sigs.k8s.io/geps/gep-2257/)) | Total time budget for the complete HTTP request/response cycle, measured from when the gateway forwards the request. `"0s"` disables the timeout. Example: `"30s"`. |
+| `timeouts.backendRequest` | `string` (Gateway API Duration) | Time budget for the backend to process the request. Must be ≤ `timeouts.request`. Example: `"10s"`. |
+| `retry.attempts` | `integer (≥ 0)` | Maximum number of retry attempts. |
+| `retry.codes` | `array of integer (400–599)` | HTTP status codes that trigger a retry (e.g. `[503, 504]`). Implementations MUST support 500/502/503/504 as retriable. |
+| `retry.backoff` | `string` (Gateway API Duration) | Minimum wait between retry attempts. Example: `"1s"`. |
+| `sessionPersistence.sessionName` | `string` (1–128 chars) | Identifier the implementation uses for the persistence value (cookie name or header name, depending on `type`). |
+| `sessionPersistence.type` | `enum`: `Cookie` \| `Header` | Persistence mechanism. Defaults to `Cookie` server-side when omitted. |
+| `sessionPersistence.absoluteTimeout` | `string` (Gateway API Duration) | Maximum lifetime of the session, regardless of activity. Example: `"1h"`. |
+| `sessionPersistence.idleTimeout` | `string` (Gateway API Duration) | Maximum idle time before the session expires. Example: `"10m"`. |
+| `sessionPersistence.cookieConfig.lifetimeType` | `enum`: `Permanent` \| `Session` | Cookie lifetime style (relevant only when `type: Cookie`). |
+
+All four field groups are optional and independently combinable — you can set `timeouts` without `retry`, or `name` without either. Fields absent from a rule are omitted from the rendered manifest; they do not inherit from sibling rules or the route root.
+
+> **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only the fields above plus `matches`, `filters`, `backendRefs`, `serviceName`, and `servicePort`. Unknown keys (typos, deprecated fields, or Gateway API fields not yet wired into the chart) fail at `helm template` time with a clear validation error rather than being silently dropped. If you depend on a Gateway API HTTPRouteRule field not in this list, open an issue or submit a PR — see [ADR 009](../05-adr/009-dual-networking-stack.md).
+
+#### Gateway API channel and version requirements
+
+The chart's CRD-channel detection runs at template time when `gateway.networking.k8s.io/v1` is present in `Capabilities.APIVersions` and emits a fail-fast error if the field's required CRD channel is missing. Detection is skipped when rendering offline (`helm template` without `--api-versions`).
+
+| Field | Minimum Gateway API | Channel | Detection marker |
+|-------|---------------------|---------|------------------|
+| `name` | v1.4.0 (Standard) **or** v1.2.0+ (Experimental) | Standard since v1.4.0; Experimental from v1.2 to v1.3 | `gateway.networking.k8s.io/v1/BackendTLSPolicy` (Standard, graduated in v1.4.0) **or** `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+| `timeouts.*` | v1.2.0 | Standard | none — implied by `gateway.networking.k8s.io/v1` |
+| `retry.*` | v1.2.0 | **Experimental only** (still Experimental as of v1.5.1) | `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+| `sessionPersistence.*` | v1.2.0 | **Experimental only** (still Experimental as of v1.5.1) | `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+
+If your cluster runs **Standard** channel CRDs older than v1.4 and you need `name`, you must install the Experimental channel; if you need `retry` or `sessionPersistence` at all, you must install the Experimental channel — Standard CRDs reject those fields.
+
+See the [`04-gateway-api` example](../02-examples/04-gateway-api/) for a working configuration and Gateway API's [release channels](https://gateway-api.sigs.k8s.io/concepts/versioning/#release-channels) for installation guidance.
+
+### GRPCRoute rule fields (`name`, `sessionPersistence`)
+
+Every GRPCRoute rule (in `grpcRoute.rules`, `grpcRoutes.<n>.rules`, and per-workload `deployments.<w>.grpcRoute.rules` / `statefulSets.<w>.grpcRoute.rules`) accepts two optional field groups beyond `matches`, `filters`, and `backendRefs`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` (`SectionName`: lowercase RFC 1123 label, optionally dotted, max 253 chars) | Identifies the rule. Surfaced in Gateway API status conditions and traces. MUST be unique within the route. |
+| `sessionPersistence.sessionName` | `string` (1–128 chars) | Identifier the implementation uses for the persistence value (cookie name or header name, depending on `type`). |
+| `sessionPersistence.type` | `enum`: `Cookie` \| `Header` | Persistence mechanism. Defaults to `Cookie` server-side when omitted. |
+| `sessionPersistence.absoluteTimeout` | `string` (Gateway API Duration) | Maximum lifetime of the session, regardless of activity. Example: `"1h"`. |
+| `sessionPersistence.idleTimeout` | `string` (Gateway API Duration) | Maximum idle time before the session expires. Example: `"10m"`. |
+| `sessionPersistence.cookieConfig.lifetimeType` | `enum`: `Permanent` \| `Session` | Cookie lifetime style (relevant only when `type: Cookie`). |
+
+Both groups are independently optional. **GRPCRouteRule has no `timeouts` or `retry`** — those are HTTPRoute-only fields in the Gateway API spec.
+
+> **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only `name`, `matches`, `filters`, `backendRefs`, `serviceName`, `servicePort`, and `sessionPersistence`. Unknown keys fail at `helm template` time.
+
+#### Gateway API channel and version requirements
+
+| Field | Minimum Gateway API | Channel | Detection marker |
+|-------|---------------------|---------|------------------|
+| `name` | v1.4.0 (Standard) **or** v1.2.0+ (Experimental) | Standard since v1.4.0; Experimental from v1.2 to v1.3 | `gateway.networking.k8s.io/v1/BackendTLSPolicy` (Standard, graduated in v1.4.0) **or** `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+| `sessionPersistence.*` | v1.2.0 | **Experimental only** (still Experimental as of v1.5.1) | `gateway.networking.k8s.io/v1alpha2/TCPRoute` (Experimental) |
+
+The chart fails fast at `helm template` time when `gateway.networking.k8s.io/v1` is present but the required channel marker is not. Detection is skipped offline (`helm template` without `--api-versions`).
+
+### TLSRoute rule fields (`name`)
+
+Every TLSRoute rule (in `tlsRoute.rules`, `tlsRoutes.<n>.rules`, and per-workload `deployments.<w>.tlsRoute.rules` / `statefulSets.<w>.tlsRoute.rules`) accepts one optional field beyond `backendRefs`:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | `string` (`SectionName`: lowercase RFC 1123 label, optionally dotted, max 253 chars) | Identifies the rule. MUST be unique within the route. |
+
+**TLSRouteRule has no `matches`, `filters`, `timeouts`, `retry`, or `sessionPersistence`** — TLS is L4 passthrough; the spec defines only `name` and `backendRefs`.
+
+> **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only `name`, `backendRefs`, `serviceName`, and `servicePort`. Unknown keys fail at `helm template` time.
+
+TLSRoute itself is in the Gateway API Experimental channel (`gateway.networking.k8s.io/v1alpha2`), so any use of TLSRoute already presupposes Experimental CRDs — `name` adds no further channel requirement beyond TLSRoute itself.
 
 ### Autoscaler mutual exclusion
 

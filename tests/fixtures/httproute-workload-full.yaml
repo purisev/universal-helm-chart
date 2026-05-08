@@ -1,0 +1,47 @@
+httpRoute:
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+  hostnames:
+    - app.example.com
+
+deployments:
+  api:
+    service:
+      port: 8080
+    httpRoute:
+      enabled: true
+      priority: 5
+      rules:
+        - name: api-rule
+          matches:
+            - path:
+                type: PathPrefix
+                value: /api
+          timeouts:
+            request: 30s
+            backendRequest: 10s
+          retry:
+            attempts: 3
+            codes:
+              - 503
+              - 504
+            backoff: 1s
+          sessionPersistence:
+            sessionName: sticky-api
+            type: Cookie
+            absoluteTimeout: 1h
+            idleTimeout: 10m
+            cookieConfig:
+              lifetimeType: Permanent
+  web:
+    service:
+      port: 80
+    httpRoute:
+      enabled: true
+      priority: 10
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
