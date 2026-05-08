@@ -328,3 +328,611 @@ tests:
       - equal:
           path: spec.hostnames[0]
           value: api.example.com
+
+  # --- rules: name field ---
+
+  - it: should render rule name when set in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  - it: should omit rule name when not set
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      httpRoute.rules:
+        - serviceName: my-svc
+          servicePort: 80
+    asserts:
+      - isNull:
+          path: spec.rules[0].name
+
+  - it: should render rule name in per-workload rules
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  - it: should omit rule name when not set in per-workload rules
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render rule name in plural-map rules
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  - it: should omit rule name when not set in plural-map rules
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - isNull:
+          path: spec.rules[0].name
+
+  # --- rules: timeouts ---
+
+  - it: should render timeouts.request in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+
+  - it: should render timeouts.backendRequest in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+
+  - it: should omit timeouts when not set
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      httpRoute.rules:
+        - serviceName: my-svc
+          servicePort: 80
+    asserts:
+      - isNull:
+          path: spec.rules[0].timeouts
+
+  - it: should render only request timeout when backendRequest not set
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      httpRoute.rules:
+        - timeouts:
+            request: 60s
+          serviceName: my-svc
+          servicePort: 80
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 60s
+      - isNull:
+          path: spec.rules[0].timeouts.backendRequest
+
+  - it: should render timeouts in per-workload rules
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+
+  - it: should omit timeouts in per-workload rules when not set
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].timeouts
+
+  - it: should render timeouts in plural-map rules
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+
+  - it: should omit timeouts in plural-map rules when not set
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - isNull:
+          path: spec.rules[0].timeouts
+
+  # --- rules: retry ---
+
+  - it: should render retry.attempts in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+
+  - it: should render retry.codes in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.codes[0]
+          value: 503
+      - equal:
+          path: spec.rules[0].retry.codes[1]
+          value: 504
+
+  - it: should render retry.backoff in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  - it: should omit retry when not set
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      httpRoute.rules:
+        - serviceName: my-svc
+          servicePort: 80
+    asserts:
+      - isNull:
+          path: spec.rules[0].retry
+
+  - it: should render retry in per-workload rules
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.codes[0]
+          value: 503
+      - equal:
+          path: spec.rules[0].retry.codes[1]
+          value: 504
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  - it: should omit retry in per-workload rules when not set
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].retry
+
+  - it: should render retry in plural-map rules
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.codes[0]
+          value: 503
+      - equal:
+          path: spec.rules[0].retry.codes[1]
+          value: 504
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  - it: should omit retry in plural-map rules when not set
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - isNull:
+          path: spec.rules[0].retry
+
+  # --- rules: name + timeouts + retry combined ---
+
+  - it: should render all three new fields together on a single rule
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  - it: should not affect rule without new fields when mixed rules are present
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].name
+      - isNull:
+          path: spec.rules[1].timeouts
+      - isNull:
+          path: spec.rules[1].retry
+
+  - it: should render name+timeouts+retry combined in per-workload rules
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  - it: should render name+timeouts+retry combined in plural-map rules
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  # --- statefulSets per-workload rules: name, timeouts, retry ---
+
+  - it: should render rule name in statefulSet per-workload rules
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  - it: should omit rule name when not set in statefulSet per-workload rules
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].name
+
+  - it: should render timeouts in statefulSet per-workload rules
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+
+  - it: should omit timeouts in statefulSet per-workload rules when not set
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].timeouts
+
+  - it: should render retry in statefulSet per-workload rules
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.codes[0]
+          value: 503
+      - equal:
+          path: spec.rules[0].retry.codes[1]
+          value: 504
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  - it: should omit retry in statefulSet per-workload rules when not set
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].retry
+
+  - it: should render name+timeouts+retry combined in statefulSet per-workload rules
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+      - equal:
+          path: spec.rules[0].timeouts.request
+          value: 30s
+      - equal:
+          path: spec.rules[0].timeouts.backendRequest
+          value: 10s
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+      - equal:
+          path: spec.rules[0].retry.backoff
+          value: 1s
+
+  # --- Gateway API channel guards: rule.name (v1.4+ Standard or Experimental) ---
+
+  - it: should render rule name when v1.4+ Standard CRDs present (BackendTLSPolicy v1)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1/BackendTLSPolicy
+        # also needed because the full fixture uses retry (Experimental-only):
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  - it: should render rule name when Experimental CRDs present (TCPRoute v1alpha2)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  - it: should fail when v1 group present but neither v1.4 Standard nor Experimental marker (pre-v1.4 Standard cluster)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "rule.name requires Gateway API v1.4\\+ Standard"
+
+  - it: should render rule name without capability check when gateway.networking.k8s.io/v1 absent (offline)
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].name
+          value: api-rule
+
+  # --- Gateway API channel guards: rule.retry (Experimental only) ---
+
+  - it: should render retry when Experimental CRDs present (TCPRoute v1alpha2)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+
+  - it: should fail when retry is set but cluster has only Standard CRDs (BackendTLSPolicy v1, no Experimental)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1/BackendTLSPolicy
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - failedTemplate:
+          errorPattern: "rule.retry requires Gateway API Experimental"
+
+  - it: should render retry without capability check when gateway.networking.k8s.io/v1 absent (offline)
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].retry.attempts
+          value: 3
+
+  # --- rules: sessionPersistence ---
+
+  - it: should render sessionPersistence.sessionName in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-api
+
+  - it: should render sessionPersistence.type in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.type
+          value: Cookie
+
+  - it: should render sessionPersistence timeouts in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.absoluteTimeout
+          value: 1h
+      - equal:
+          path: spec.rules[0].sessionPersistence.idleTimeout
+          value: 10m
+
+  - it: should render sessionPersistence.cookieConfig.lifetimeType in root rules
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+
+  - it: should omit sessionPersistence when not set
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      httpRoute.rules:
+        - serviceName: my-svc
+          servicePort: 80
+    asserts:
+      - isNull:
+          path: spec.rules[0].sessionPersistence
+
+  - it: should render sessionPersistence in per-workload rules
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-api
+      - equal:
+          path: spec.rules[0].sessionPersistence.type
+          value: Cookie
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+
+  - it: should omit sessionPersistence in per-workload rules when not set
+    values:
+      - fixtures/httproute-workload-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].sessionPersistence
+
+  - it: should render sessionPersistence in statefulSet per-workload rules
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-api
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+
+  - it: should omit sessionPersistence in statefulSet per-workload rules when not set
+    values:
+      - fixtures/httproute-statefulset-full.yaml
+    asserts:
+      - isNull:
+          path: spec.rules[1].sessionPersistence
+
+  - it: should render sessionPersistence in plural-map rules
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-api
+      - equal:
+          path: spec.rules[0].sessionPersistence.cookieConfig.lifetimeType
+          value: Permanent
+
+  - it: should omit sessionPersistence in plural-map rules when not set
+    values:
+      - fixtures/httproute-plural-full.yaml
+    documentIndex: 1
+    asserts:
+      - isNull:
+          path: spec.rules[0].sessionPersistence
+
+  # --- Gateway API channel guards: rule.sessionPersistence (Experimental only) ---
+
+  - it: should render sessionPersistence when Experimental CRDs present (TCPRoute v1alpha2)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1alpha2/TCPRoute
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-api
+
+  - it: should fail when sessionPersistence is set but cluster has only Standard CRDs (BackendTLSPolicy v1, no Experimental)
+    capabilities:
+      apiVersions:
+        - gateway.networking.k8s.io/v1
+        - gateway.networking.k8s.io/v1/BackendTLSPolicy
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      httpRoute.rules:
+        - sessionPersistence:
+            sessionName: sticky
+            type: Cookie
+          serviceName: my-svc
+          servicePort: 80
+    asserts:
+      - failedTemplate:
+          errorPattern: "rule.sessionPersistence requires Gateway API Experimental"
+
+  - it: should render sessionPersistence without capability check when gateway.networking.k8s.io/v1 absent (offline)
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].sessionPersistence.sessionName
+          value: sticky-api

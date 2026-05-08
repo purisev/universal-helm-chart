@@ -39,10 +39,20 @@ deployments:
       enabled: true
       priority: 10                   # routed first when paths overlap
       rules:
-        - matches:
+        - name: api-traffic          # optional; surfaced in Gateway API status and traces
+          matches:
             - path:
                 type: PathPrefix
                 value: /api
+          timeouts:
+            request: 30s             # total round-trip budget (request + response)
+            backendRequest: 10s      # backend processing budget (subset of request)
+          retry:
+            attempts: 3
+            codes:
+              - 503                  # upstream unavailable
+              - 504                  # gateway timeout
+            backoff: 1s
         # backendRefs default to this workload's Service + service.ports.http
     resources:
       requests:
