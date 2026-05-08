@@ -51,21 +51,7 @@ spec:
   rules:
   {{- /* Root-level rules (backward-compatible, rendered first) */}}
   {{- range .Values.httpRoute.rules }}
-    - {{- if .matches }}
-      matches:
-        {{- toYaml .matches | nindent 8 }}
-      {{- end }}
-      {{- if .filters }}
-      filters:
-        {{- toYaml .filters | nindent 8 }}
-      {{- end }}
-      backendRefs:
-      {{- if .backendRefs }}
-        {{- toYaml .backendRefs | nindent 8 }}
-      {{- else }}
-        - name: {{ .serviceName | default $releaseName }}
-          port: {{ .servicePort | default 80 }}
-      {{- end }}
+    - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" . "defaultBackend" $releaseName "defaultPort" 80) | nindent 6 | trimPrefix "\n      " }}
   {{- end }}
   {{- /* Per-workload rules: sorted by priority (asc) then alphabetically by workload name */}}
   {{- $sortKeys := list }}
@@ -94,21 +80,7 @@ spec:
     {{- $svcName := printf "%s-%s" $releaseName $wlName }}
     {{- $svcPort := int (($wl.service | default dict).port | default 80) }}
     {{- range $wl.httpRoute.rules }}
-    - {{- if .matches }}
-      matches:
-        {{- toYaml .matches | nindent 8 }}
-      {{- end }}
-      {{- if .filters }}
-      filters:
-        {{- toYaml .filters | nindent 8 }}
-      {{- end }}
-      backendRefs:
-      {{- if .backendRefs }}
-        {{- toYaml .backendRefs | nindent 8 }}
-      {{- else }}
-        - name: {{ $svcName }}
-          port: {{ $svcPort }}
-      {{- end }}
+    - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" . "defaultBackend" $svcName "defaultPort" $svcPort) | nindent 6 | trimPrefix "\n      " }}
     {{- end }}
   {{- end }}
 {{- end }}
@@ -152,21 +124,7 @@ spec:
   {{- end }}
   rules:
   {{- range $route.rules }}
-    - {{- if .matches }}
-      matches:
-        {{- toYaml .matches | nindent 8 }}
-      {{- end }}
-      {{- if .filters }}
-      filters:
-        {{- toYaml .filters | nindent 8 }}
-      {{- end }}
-      backendRefs:
-      {{- if .backendRefs }}
-        {{- toYaml .backendRefs | nindent 8 }}
-      {{- else }}
-        - name: {{ .serviceName | default $releaseName }}
-          port: {{ .servicePort | default 80 }}
-      {{- end }}
+    - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" . "defaultBackend" $releaseName "defaultPort" 80) | nindent 6 | trimPrefix "\n      " }}
   {{- end }}
 {{- end }}
 {{- end }}

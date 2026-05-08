@@ -1,0 +1,47 @@
+httpRoutes:
+  api:
+    enabled: true
+    parentRefs:
+      - name: my-gateway
+        namespace: gateway-system
+    hostnames:
+      - api.example.com
+    rules:
+      - name: api-rule
+        matches:
+          - path:
+              type: PathPrefix
+              value: /api
+        timeouts:
+          request: 30s
+          backendRequest: 10s
+        retry:
+          attempts: 3
+          codes:
+            - 503
+            - 504
+          backoff: 1s
+        sessionPersistence:
+          sessionName: sticky-api
+          type: Cookie
+          absoluteTimeout: 1h
+          idleTimeout: 10m
+          cookieConfig:
+            lifetimeType: Permanent
+        backendRefs:
+          - name: my-release-api
+            port: 8080
+  web:
+    enabled: true
+    parentRefs:
+      - name: my-gateway
+        namespace: gateway-system
+    hostnames:
+      - web.example.com
+    rules:
+      - matches:
+          - path:
+              type: PathPrefix
+              value: /
+        serviceName: my-release-web
+        servicePort: 80

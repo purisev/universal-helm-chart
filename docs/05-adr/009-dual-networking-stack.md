@@ -31,6 +31,10 @@ Support **both** Ingress and Gateway API, with **both** singleton and multi-reso
 
 **Per-workload route shorthand.** When a workload at `deployments.<w>.httpRoute.enabled: true` is set, its rules merge into the **singleton** `httpRoute` (or `grpcRoute` / `tlsRoute`). `parentRefs` and `hostnames` are inherited from the singleton; `serviceName` and `servicePort` default to the workload's Service. A `priority` integer controls rule order in the merged list (lower = earlier; ties broken alphabetically by workload name). The same shorthand works for grpcRoute and tlsRoute.
 
+**HTTPRoute rule-level fields.** Each rule in `httpRoute.rules` (root, per-workload, or plural-map) supports four optional field groups from the Gateway API spec: `name` (identifies the rule in status and traces), `timeouts` (`request` and `backendRequest` as Gateway API Duration strings — [GEP-2257](https://gateway-api.sigs.k8s.io/geps/gep-2257/)), `retry` (`attempts`, `codes` status-code list 400–599, `backoff`), and `sessionPersistence` (`sessionName`, `type` (`Cookie`/`Header`), `absoluteTimeout`, `idleTimeout`, `cookieConfig.lifetimeType`). All four are independently optional and are omitted from the rendered manifest when not set. Channel/version requirements: `name` needs Gateway API v1.4+ Standard or v1.2+ Experimental CRDs; `timeouts` is Standard since v1.2; `retry` and `sessionPersistence` are **Experimental only** as of Gateway API v1.5.1. The chart fails fast when a field is set but the cluster's installed CRD channel does not support it (detection skipped during offline `helm template`).
+
+**HTTPRoute rule schema strictness.** Each entry in `httpRoute.rules` (and the equivalent under `httpRoutes.<n>.rules` and per-workload route maps) is validated against a strict schema (`additionalProperties: false`) listing only the supported fields: `name`, `matches`, `filters`, `backendRefs`, `serviceName`, `servicePort`, `timeouts`, `retry`, `sessionPersistence`. Unknown keys — typos, deprecated fields, or Gateway API fields not yet wired into the chart — now fail at `helm template` time instead of being silently dropped. This is a behaviour change relative to the previous loose `type: array` validation on `httpRoute.rules`; if you depend on a Gateway API HTTPRouteRule field not in the list above, file an issue or submit a PR. (GRPCRoute and TLSRoute rules remain loosely validated until they grow analogous rule-level fields in the spec.)
+
 **ReferenceGrant** lives in the namespace of the *target* (the Service being referenced), so the chart always emits it in the release namespace. It supports cross-namespace HTTPRoute → Service references without RBAC complexity.
 
 **Singleton vs multi-resource.** The singleton exists for the common case (one chart instance, one external entry point). The multi-map exists when the same release exposes routes via different controllers / parents / hostnames (e.g. `nginx-internal` Ingress for east-west traffic, `nginx-external` Ingress for north-south).
@@ -73,10 +77,18 @@ deployments:
       enabled: true
       priority: 10
       rules:
-        - matches:
+        - name: api-traffic
+          matches:
             - path:
                 type: PathPrefix
                 value: /api
+          timeouts:
+            request: 30s
+            backendRequest: 10s
+          retry:
+            attempts: 3
+            codes: [503, 504]
+            backoff: 1s
   web:
     service:
       ports:
@@ -93,7 +105,7 @@ deployments:
                 value: /
 ```
 
-Renders one HTTPRoute with two merged rules: API first, web second. `serviceName` defaults to `<release-fullname>-api` / `-web`; `servicePort` defaults to the workload's `service.port`.
+Renders one HTTPRoute with two merged rules: API first (with name, timeouts, retry), web second (minimal catch-all). `serviceName` defaults to `<release-fullname>-api` / `-web`; `servicePort` defaults to the workload's `service.port`.
 
 ## Alternatives considered
 

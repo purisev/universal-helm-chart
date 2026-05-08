@@ -9,6 +9,9 @@ Two Deployments (`api`, `web`) routed by a singleton HTTPRoute. The Gateway live
 - `serviceName` and `servicePort` default to the workload's own Service — no manual cross-reference.
 - `referenceGrant` allows the gateway-system namespace to reference Services in this release's namespace. Without it, Gateway API rejects the cross-namespace backend ref.
 - Path-based routing: `/api/*` → `api` workload, everything else → `web` workload.
+- **Rule-level `name`**: optional string (lowercase RFC 1123 label) identifying a rule in Gateway API status, traces, and access logs. Requires Gateway API **v1.4+ Standard** or **v1.2+ Experimental** CRDs.
+- **Rule-level `timeouts`**: `request` caps the full round-trip budget; `backendRequest` caps backend processing time (must be ≤ `request`). Both accept Gateway API Duration strings (`30s`, `1h30m`, `100ms`). Standard since Gateway API v1.2.
+- **Rule-level `retry`**: `attempts` sets the attempt limit; `codes` lists HTTP status codes 400–599 that trigger a retry (implementations MUST support 500/502/503/504); `backoff` sets the minimum delay between attempts. **Requires Gateway API Experimental channel CRDs** — Standard CRDs reject the field.
 
 ## Delta from `02-web-app-ingress`
 
@@ -19,6 +22,7 @@ Two Deployments (`api`, `web`) routed by a singleton HTTPRoute. The Gateway live
 | `referenceGrant` block | Required for cross-namespace Service references in Gateway API. |
 | Multiple workloads | Two Deployments serving different paths under one host. |
 | Removed cert-manager annotation | TLS is handled at the Gateway listener level, outside this chart. |
+| `name`, `timeouts`, `retry` on `api` rule | Shows rule identification, timeout budgets, and retry policy — absent from the `web` catch-all to contrast optional vs. omitted. |
 
 ## Files
 

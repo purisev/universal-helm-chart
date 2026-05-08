@@ -206,6 +206,97 @@
         "rules": {"type": "array"}
       }
     },
+    "gatewayApiDuration": {
+      "type": "string",
+      "pattern": "^([0-9]{1,5}(h|m|s|ms)){1,4}$"
+    },
+    "httpRouteTimeouts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "request": {"$ref": "#/$defs/gatewayApiDuration"},
+        "backendRequest": {"$ref": "#/$defs/gatewayApiDuration"}
+      }
+    },
+    "httpRouteRetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {"type": "integer", "minimum": 0},
+        "codes": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 400, "maximum": 599},
+          "minItems": 1
+        },
+        "backoff": {"$ref": "#/$defs/gatewayApiDuration"}
+      }
+    },
+    "httpRouteSessionPersistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sessionName": {"type": "string", "minLength": 1, "maxLength": 128},
+        "absoluteTimeout": {"$ref": "#/$defs/gatewayApiDuration"},
+        "idleTimeout": {"$ref": "#/$defs/gatewayApiDuration"},
+        "type": {"enum": ["Cookie", "Header"]},
+        "cookieConfig": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "lifetimeType": {"enum": ["Permanent", "Session"]}
+          }
+        }
+      }
+    },
+    "httpRouteRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "matches": {"type": "array"},
+        "filters": {"type": "array"},
+        "backendRefs": {"type": "array"},
+        "serviceName": {"type": "string"},
+        "servicePort": {"type": ["integer", "string"]},
+        "timeouts": {"$ref": "#/$defs/httpRouteTimeouts"},
+        "retry": {"$ref": "#/$defs/httpRouteRetry"},
+        "sessionPersistence": {"$ref": "#/$defs/httpRouteSessionPersistence"}
+      }
+    },
+    "httpRouteEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "annotations": {"type": "object"},
+        "parentRefs": {"type": "array"},
+        "hostnames": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/httpRouteRule"}
+        }
+      }
+    },
+    "httpWorkloadRouteEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "priority": {"type": "integer", "minimum": 0},
+        "rules": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/httpRouteRule"}
+        }
+      }
+    },
     "esoSecretStoreEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -470,7 +561,7 @@
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/containerEntry"}
         },
-        "httpRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "httpRoute": {"$ref": "#/$defs/httpWorkloadRouteEntry"},
         "grpcRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "strategy": {"$ref": "#/$defs/strategyShape"},
@@ -552,7 +643,7 @@
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/containerEntry"}
         },
-        "httpRoute": {"$ref": "#/$defs/workloadRouteEntry"},
+        "httpRoute": {"$ref": "#/$defs/httpWorkloadRouteEntry"},
         "grpcRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "tlsRoute": {"$ref": "#/$defs/workloadRouteEntry"},
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
@@ -927,10 +1018,10 @@
       "additionalProperties": {"$ref": "#/$defs/jobGroupEntry"}
     },
     "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
-    "httpRoute": {"$ref": "#/$defs/routeEntry"},
+    "httpRoute": {"$ref": "#/$defs/httpRouteEntry"},
     "httpRoutes": {
       "type": "object",
-      "additionalProperties": {"$ref": "#/$defs/routeEntry"}
+      "additionalProperties": {"$ref": "#/$defs/httpRouteEntry"}
     },
     "grpcRoute": {"$ref": "#/$defs/routeEntry"},
     "grpcRoutes": {
