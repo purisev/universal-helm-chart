@@ -1600,6 +1600,30 @@ tests:
               source:
                 resourceClaimTemplateName: gpu-template
 
+  - it: should render paused when set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          paused: true
+    asserts:
+      - equal:
+          path: spec.paused
+          value: true
+
+  - it: should not render paused when unset
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.paused
+
   - it: should pass container-level resources.claims through unchanged (DRA)
     set:
       image.repository: nginx
