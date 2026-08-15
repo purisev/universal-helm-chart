@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ingress-routing
+spec:
+  steps:
+    - name: the ingress renders correctly and ingress-nginx actually routes to it
+      try:
+        - assert:
+            resource:
+              apiVersion: networking.k8s.io/v1
+              kind: Ingress
+              metadata:
+                name: e2e
+              spec:
+                ingressClassName: nginx
+                rules:
+                  - host: e2e.local
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              CONTROLLER_SVC=$(kubectl get svc -n ingress-nginx \
+                -l app.kubernetes.io/component=controller \
+                -o jsonpath='{.items[0].metadata.name}')
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -q -O- --timeout=5 --header="Host: e2e.local" \
+                "http://${CONTROLLER_SVC}.ingress-nginx.svc.cluster.local/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true

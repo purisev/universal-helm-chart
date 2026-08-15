@@ -1,0 +1,94 @@
+fullnameOverride: e2e
+
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  api:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
+deployments:
+  api:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # Adds this workload's rule to the singleton HTTPRoute below, backed by
+    # its own Service/port. An empty rule object is a deliberate catch-all:
+    # it gets its backendRef/port filled in from this workload's Service.
+    httpRoute:
+      enabled: true
+      rules:
+        - {}
+
+# Classic networking.k8s.io/v1 Ingress, routed through ingress-nginx.
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    e2e.local:
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: e2e-api
+          servicePort: 80
+
+# Gateway API HTTPRoute, routed through the agentgateway-backed Gateway the
+# workflow applies as a fixture (the chart only renders *Route kinds, never
+# the Gateway itself).
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: e2e-gateway
+  hostnames:
+    - httproute.e2e.local
+
+# CRD-admission only below: no listener on the fixture Gateway actually
+# serves gRPC or TLS-passthrough traffic, so these just prove the chart
+# renders a schema-valid object the API server accepts.
+grpcRoute:
+  enabled: true
+  parentRefs:
+    - name: e2e-gateway
+  hostnames:
+    - grpcroute.e2e.local
+  rules:
+    - matches:
+        - method:
+            type: Exact
+            service: com.example.ApiService
+      backendRefs:
+        - name: e2e-api
+          port: 80
+
+tlsRoute:
+  enabled: true
+  parentRefs:
+    - name: e2e-gateway
+  hostnames:
+    - tlsroute.e2e.local
+  rules:
+    - backendRefs:
+        - name: e2e-api
+          port: 80
