@@ -1,0 +1,39 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pdb-eviction
+spec:
+  steps:
+    - name: minAvailable 1 on a 2-replica deployment allows exactly one voluntary eviction at a time
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              kubectl proxy --port=18001 &
+              PROXY_PID=$!
+              trap 'kill $PROXY_PID' EXIT
+              sleep 2
+
+              PODS=$(kubectl get pods -n "$NAMESPACE" \
+                -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
+                -o jsonpath='{.items[*].metadata.name}')
+              POD1=$(echo "$PODS" | awk '{print $1}')
+              POD2=$(echo "$PODS" | awk '{print $2}')
+
+              evict() {
+                curl -s -o /dev/null -w '%{http_code}' \
+                  -H 'Content-Type: application/json' -X POST \
+                  "http://127.0.0.1:18001/api/v1/namespaces/$NAMESPACE/pods/$1/eviction" \
+                  -d "{\"apiVersion\":\"policy/v1\",\"kind\":\"Eviction\",\"metadata\":{\"name\":\"$1\",\"namespace\":\"$NAMESPACE\"}}"
+              }
+
+              CODE1=$(evict "$POD1")
+              sleep 3
+              CODE2=$(evict "$POD2")
+
+              echo "first-eviction=$CODE1 second-eviction=$CODE2"
+            check:
+              ($error): ~
+              (contains($stdout, 'first-eviction=200')): true
+              (contains($stdout, 'second-eviction=429')): true

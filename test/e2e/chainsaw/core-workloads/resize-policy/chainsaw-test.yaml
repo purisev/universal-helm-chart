@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: resize-policy
+spec:
+  steps:
+    - name: a cpu-only in-place resize with restartPolicy NotRequired does not restart the container
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              POD=$(kubectl get pods -n "$NAMESPACE" \
+                -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
+                --field-selector=status.phase=Running \
+                -o jsonpath='{.items[0].metadata.name}')
+
+              UID_BEFORE=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.metadata.uid}')
+              RESTARTS_BEFORE=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}')
+
+              kubectl patch pod "$POD" -n "$NAMESPACE" --subresource resize --type merge -p \
+                '{"spec":{"containers":[{"name":"api","resources":{"requests":{"cpu":"150m"},"limits":{"cpu":"250m"}}}]}}'
+
+              # Give the kubelet a moment to apply the resize in place.
+              sleep 5
+
+              UID_AFTER=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.metadata.uid}')
+              RESTARTS_AFTER=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}')
+              CPU_AFTER=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.spec.containers[0].resources.requests.cpu}')
+
+              SAME_POD=no
+              [ "$UID_BEFORE" = "$UID_AFTER" ] && SAME_POD=yes
+              NOT_RESTARTED=no
+              [ "$RESTARTS_BEFORE" = "$RESTARTS_AFTER" ] && NOT_RESTARTED=yes
+
+              echo "same-pod=$SAME_POD not-restarted=$NOT_RESTARTED cpu-request=$CPU_AFTER"
+            check:
+              ($error): ~
+              (contains($stdout, 'same-pod=yes')): true
+              (contains($stdout, 'not-restarted=yes')): true
+              (contains($stdout, 'cpu-request=150m')): true

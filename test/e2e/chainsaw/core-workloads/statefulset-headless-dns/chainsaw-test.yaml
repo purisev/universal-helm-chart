@@ -1,0 +1,54 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: statefulset-headless-dns
+spec:
+  steps:
+    - name: statefulset pods are ready and stably named
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: e2e-web
+              status:
+                replicas: 2
+                readyReplicas: 2
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: e2e-web-0
+              status:
+                phase: Running
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: e2e-web-1
+              status:
+                phase: Running
+
+    - name: each pod resolves its sibling by name through the headless service
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            file: ../_shared/prober-pod.yaml
+        - script:
+            content: >-
+              kubectl exec prober -n $NAMESPACE --
+              nslookup e2e-web-0.e2e-web-headless.$NAMESPACE.svc.cluster.local
+            check:
+              ($error): ~
+              (contains($stdout, 'e2e-web-0.e2e-web-headless')): true
+        - script:
+            content: >-
+              kubectl exec prober -n $NAMESPACE --
+              nslookup e2e-web-1.e2e-web-headless.$NAMESPACE.svc.cluster.local
+            check:
+              ($error): ~
+              (contains($stdout, 'e2e-web-1.e2e-web-headless')): true
