@@ -1,0 +1,75 @@
+fullnameOverride: e2e
+
+jobGroups:
+  basic:
+    kind: Job
+    hashSuffix: false
+    image:
+      repository: busybox
+      tag: "1.36"
+    jobs:
+      completion:
+        command: ["sh", "-c", "echo done"]
+        backoffLimit: 0
+        ttlSecondsAfterFinished: 300
+
+  indexed:
+    kind: Job
+    hashSuffix: false
+    image:
+      repository: busybox
+      tag: "1.36"
+    jobs:
+      fanout:
+        completionMode: Indexed
+        completions: 3
+        parallelism: 3
+        backoffLimit: 0
+        command: ["sh", "-c", "echo index=$JOB_COMPLETION_INDEX"]
+
+  # Group names longer than 8 chars are truncated by the chart (see
+  # uhc.jobGroupTruncSegment) to keep resource names within the 63-char DNS
+  # limit, so e2e group names are kept short and unambiguous on purpose.
+  suspend:
+    kind: Job
+    hashSuffix: false
+    image:
+      repository: busybox
+      tag: "1.36"
+    jobs:
+      pausable:
+        suspend: true
+        backoffLimit: 0
+        command: ["sh", "-c", "echo done"]
+
+  podfail:
+    kind: Job
+    hashSuffix: false
+    image:
+      repository: busybox
+      tag: "1.36"
+    jobs:
+      policy-demo:
+        backoffLimit: 3
+        command: ["sh", "-c", "exit 42"]
+        podFailurePolicy:
+          rules:
+            - action: FailJob
+              onExitCodes:
+                containerName: policy-demo
+                operator: In
+                values: [42]
+
+  cleanup:
+    kind: CronJob
+    hashSuffix: false
+    image:
+      repository: busybox
+      tag: "1.36"
+    jobs:
+      nightly:
+        # Once a year: this cron never fires on its own during the test; the
+        # test manually triggers a Job from this CronJob's template instead.
+        schedule: "0 3 1 1 *"
+        command: ["sh", "-c", "echo cron-ran"]
+        backoffLimit: 0

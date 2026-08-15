@@ -1,0 +1,16 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: basic-completion
+spec:
+  steps:
+    - name: a plain job runs to completion
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-basic-completion
+              status:
+                succeeded: 1

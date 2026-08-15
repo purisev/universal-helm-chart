@@ -1,0 +1,19 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-failure-policy
+spec:
+  steps:
+    - name: a FailJob rule on exit code 42 fails the job without exhausting backoffLimit retries
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-podfail-policy-demo
+              status:
+                failed: 1
+                conditions:
+                  - type: Failed
+                    status: "True"
