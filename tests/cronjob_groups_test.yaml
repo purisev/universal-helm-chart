@@ -336,3 +336,20 @@ tests:
           value: true
       - isNull:
           path: spec.jobTemplate.spec.suspend
+
+  - it: should render podReplacementPolicy inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.podReplacementPolicy: TerminatingOrFailed
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.podReplacementPolicy
+          value: TerminatingOrFailed
+      - isNull:
+          path: spec.podReplacementPolicy

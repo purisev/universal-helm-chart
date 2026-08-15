@@ -50,6 +50,9 @@ spec:
   podFailurePolicy:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $merged.podReplacementPolicy }}
+  podReplacementPolicy: {{ . }}
+  {{- end }}
   template:
     metadata:
       {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}
