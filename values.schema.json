@@ -56,6 +56,21 @@
         "start": {"type": "integer", "minimum": 0}
       }
     },
+    "podResourceClaimEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resourceClaimName": {"type": "string"},
+            "resourceClaimTemplateName": {"type": "string"}
+          }
+        }
+      }
+    },
     "inheritShape": {
       "type": "object",
       "additionalProperties": false,
@@ -729,6 +744,10 @@
         "tolerations": {"type": "array"},
         "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
         "hostAliases": {"type": "array"},
+        "resourceClaims": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/podResourceClaimEntry"}
+        },
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
         "resizePolicy": {
@@ -825,6 +844,10 @@
         "tolerations": {"type": "array"},
         "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
         "hostAliases": {"type": "array"},
+        "resourceClaims": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/podResourceClaimEntry"}
+        },
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
         "resizePolicy": {

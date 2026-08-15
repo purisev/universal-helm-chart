@@ -1580,3 +1580,40 @@ tests:
     asserts:
       - isNull:
           path: spec.template.spec.containers[0].resizePolicy
+
+  - it: should render pod-level resourceClaims (DRA)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          resourceClaims:
+            - name: gpu-claim
+              source:
+                resourceClaimTemplateName: gpu-template
+    asserts:
+      - equal:
+          path: spec.template.spec.resourceClaims
+          value:
+            - name: gpu-claim
+              source:
+                resourceClaimTemplateName: gpu-template
+
+  - it: should pass container-level resources.claims through unchanged (DRA)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          resources:
+            requests:
+              cpu: 100m
+            claims:
+              - name: gpu-claim
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.claims
+          value:
+            - name: gpu-claim

@@ -303,6 +303,10 @@ terminationGracePeriodSeconds: {{ . | int }}
 hostAliases:
   {{- toYaml $allAliases | nindent 2 }}
 {{- end }}
+{{- with $wl.resourceClaims }}
+resourceClaims:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 {{- end }}
 
 {{/*
