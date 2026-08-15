@@ -1,0 +1,27 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: pod-failure-policy
+spec:
+  steps:
+    - name: a FailJob rule on exit code 42 fails the job without exhausting backoffLimit retries
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-podfail-policy-demo
+              status:
+                failed: 1
+        # Kubernetes sets two conditions when a FailJob rule fires
+        # (FailureTarget, then Failed), so asserting the conditions list
+        # by literal contents needs an exact-length match. Query for the
+        # one condition that matters instead of listing both.
+        - script:
+            content: >-
+              kubectl get job e2e-podfail-policy-demo -n "$NAMESPACE"
+              -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}'
+            check:
+              ($error): ~
+              ($stdout): "True"

@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: suspend-resume
+spec:
+  steps:
+    - name: a suspended job creates no pods
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-suspend-pausable
+              spec:
+                suspend: true
+        - script:
+            content: >-
+              kubectl get pods -n "$NAMESPACE"
+              -l batch.kubernetes.io/job-name=e2e-suspend-pausable
+              -o jsonpath='{.items}'
+            check:
+              ($error): ~
+              ($stdout): "[]"
+
+    - name: resuming the job lets it run to completion
+      try:
+        - script:
+            content: >-
+              kubectl patch job e2e-suspend-pausable -n "$NAMESPACE"
+              --type merge -p '{"spec":{"suspend":false}}'
+            check:
+              ($error): ~
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-suspend-pausable
+              status:
+                succeeded: 1

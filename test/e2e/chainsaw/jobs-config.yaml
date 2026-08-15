@@ -1,0 +1,17 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Configuration
+metadata:
+  name: universal-helm-chart-e2e-jobs
+spec:
+  # All e2e-jobs scenarios assert against the single chart release that the
+  # CI job installs before `chainsaw test` runs, so every test is pinned to
+  # that release's namespace instead of an ephemeral random one.
+  namespace: e2e-jobs
+  parallel: 1
+  timeouts:
+    apply: 30s
+    assert: 60s
+    cleanup: 30s
+    delete: 30s
+    error: 30s
+    exec: 60s
