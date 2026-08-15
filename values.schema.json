@@ -41,6 +41,14 @@
         }
       }
     },
+    "persistentVolumeClaimRetentionPolicyShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "whenDeleted": {"type": "string", "enum": ["Retain", "Delete"]},
+        "whenScaled": {"type": "string", "enum": ["Retain", "Delete"]}
+      }
+    },
     "inheritShape": {
       "type": "object",
       "additionalProperties": false,
@@ -759,6 +767,7 @@
         "tlsRoute": {"$ref": "#/$defs/tlsWorkloadRouteEntry"},
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
         "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
+        "persistentVolumeClaimRetentionPolicy": {"$ref": "#/$defs/persistentVolumeClaimRetentionPolicyShape"},
         "volumeClaimTemplates": {"type": "array"},
         "minReadySeconds": {"type": "integer", "minimum": 0},
         "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0},

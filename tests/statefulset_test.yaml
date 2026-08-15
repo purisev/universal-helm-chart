@@ -538,3 +538,32 @@ tests:
       - equal:
           path: metadata.annotations["example.com/criticality"]
           value: tier-1
+
+  - it: should render persistentVolumeClaimRetentionPolicy when set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          persistentVolumeClaimRetentionPolicy:
+            whenDeleted: Delete
+            whenScaled: Retain
+    asserts:
+      - equal:
+          path: spec.persistentVolumeClaimRetentionPolicy.whenDeleted
+          value: Delete
+      - equal:
+          path: spec.persistentVolumeClaimRetentionPolicy.whenScaled
+          value: Retain
+
+  - it: should not render persistentVolumeClaimRetentionPolicy when unset
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.persistentVolumeClaimRetentionPolicy
