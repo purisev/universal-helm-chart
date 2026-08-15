@@ -43,6 +43,9 @@ spec:
   {{- if hasKey $merged "parallelism" }}
   parallelism: {{ $merged.parallelism | int }}
   {{- end }}
+  {{- if hasKey $merged "suspend" }}
+  suspend: {{ $merged.suspend }}
+  {{- end }}
   template:
     metadata:
       {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}
