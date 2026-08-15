@@ -17,6 +17,7 @@ jobs:
       secrets-config: ${{ steps.check.outputs.secrets-config }}
       observability: ${{ steps.check.outputs.observability }}
       network-policy: ${{ steps.check.outputs.network-policy }}
+      argocd: ${{ steps.check.outputs.argocd }}
     steps:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
       # workflow_dispatch always runs everything (there's no label to read).
@@ -31,7 +32,7 @@ jobs:
             FULL=true
           fi
 
-          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy; do
+          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy argocd; do
             if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$job=true" >> "$GITHUB_OUTPUT"
             else
@@ -624,4 +625,153 @@ jobs:
 
           echo "::group::Events"
           kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-argocd:
+    name: E2E / argocd
+    needs: gate
+    if: needs.gate.outputs.argocd == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-argocd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/argocd.yaml
+          cluster_name: e2e-argocd
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install crane
+        run: |
+          curl -fsSL -o crane.tar.gz \
+            https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz
+          tar xzf crane.tar.gz crane
+          sudo mv crane /usr/local/bin/crane
+          rm crane.tar.gz
+
+      - name: Install ArgoCD Core (headless - no UI, no API server)
+        run: |
+          kubectl create namespace argocd
+          kubectl apply -n argocd --server-side --force-conflicts \
+            -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/core-install.yaml
+          # kubectl wait on a pod label selector fails immediately if it
+          # matches zero pods right now — it doesn't wait for pods to
+          # appear, only for a condition on pods that already exist. The
+          # apply just finished, so no pods exist yet. rollout status
+          # waits on the named controller object instead, which does exist.
+          kubectl rollout status deployment/argocd-repo-server -n argocd --timeout=3m
+          kubectl rollout status deployment/argocd-redis -n argocd --timeout=3m
+          kubectl rollout status deployment/argocd-applicationset-controller -n argocd --timeout=3m
+          kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=3m
+          # The full install's API server bootstraps the default AppProject
+          # on startup; Core mode has no API server, so it never gets
+          # created on its own.
+          kubectl apply -f test/e2e/fixtures/argocd-default-appproject.yaml
+
+      - name: Install argocd-image-updater
+        run: |
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/config/install.yaml
+          kubectl apply -n argocd -f test/e2e/fixtures/argocd-image-updater-registries.yaml
+          kubectl apply -f test/e2e/fixtures/argocd-image-updater-rbac.yaml
+          kubectl apply -f test/e2e/fixtures/gitea-git-creds.yaml
+          kubectl rollout restart deployment/argocd-image-updater-controller -n argocd
+          kubectl rollout status deployment/argocd-image-updater-controller -n argocd --timeout=2m
+
+      - name: Install Gitea (minimal dev instance - sqlite, no persistence)
+        run: |
+          helm repo add gitea-charts https://dl.gitea.com/charts/
+          helm repo update
+          helm install gitea gitea-charts/gitea \
+            -n gitea --create-namespace \
+            --set valkey.enabled=false \
+            --set postgresql.enabled=false \
+            --set postgresql-ha.enabled=false \
+            --set persistence.enabled=false \
+            --set gitea.config.database.DB_TYPE=sqlite3 \
+            --set gitea.config.session.PROVIDER=memory \
+            --set gitea.config.cache.ADAPTER=memory \
+            --set gitea.config.queue.TYPE=level \
+            --wait --timeout 3m
+
+      - name: Install NORA (in-cluster OCI registry)
+        run: |
+          helm repo add nora https://getnora-io.github.io/helm-charts
+          helm repo update
+          helm install nora nora/nora \
+            -n nora --create-namespace \
+            --set config.server.public_url=http://nora.nora.svc.cluster.local:4000 \
+            --set service.type=NodePort \
+            --wait --timeout 3m
+          # A .svc.cluster.local name only resolves inside pod network
+          # namespaces; the kind node's own containerd (which does the
+          # kubelet's image pulls) uses the node's own resolver and can
+          # never resolve it, no matter how NORA or the image is
+          # configured. Pin a NodePort instead: reachable at
+          # localhost:<port> from the node itself. The chart has no values
+          # field for this, so patch it in after install; a fixed port
+          # (rather than one Kubernetes assigns) lets it be hardcoded in
+          # the values file ArgoCD renders from git.
+          kubectl patch service nora -n nora --type merge -p \
+            '{"spec":{"ports":[{"name":"http","port":4000,"targetPort":"http","protocol":"TCP","nodePort":30500}]}}'
+          # Still plain HTTP, so containerd also needs explicit trust for
+          # this endpoint; it defaults to requiring HTTPS otherwise.
+          mkdir -p /tmp/certs.d/localhost:30500
+          cat > /tmp/certs.d/localhost:30500/hosts.toml <<'EOF'
+          [host."http://localhost:30500"]
+            capabilities = ["pull", "resolve"]
+          EOF
+          docker exec e2e-argocd-control-plane mkdir -p /etc/containerd/certs.d/localhost:30500
+          docker cp /tmp/certs.d/localhost:30500/hosts.toml \
+            e2e-argocd-control-plane:/etc/containerd/certs.d/localhost:30500/hosts.toml
+
+      - name: Bootstrap Gitea repo and push test images to NORA
+        run: |
+          bash test/e2e/scripts/bootstrap-argocd-repo.sh
+          bash test/e2e/scripts/push-test-image.sh
+
+      - name: Apply the Application
+        run: kubectl apply -f test/e2e/fixtures/argocd-application.yaml
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/argocd --config test/e2e/chainsaw/argocd-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::Application"
+          kubectl get application e2e-app -n argocd -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::ImageUpdater"
+          kubectl get imageupdater -n argocd -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::ArgoCD component logs"
+          kubectl logs -n argocd -l app.kubernetes.io/part-of=argocd --all-containers --prefix --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::argocd-image-updater logs"
+          kubectl logs -n argocd deployment/argocd-image-updater-controller --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::App pods"
+          kubectl get pods -n "$NAMESPACE" -o wide || true
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp || true
           echo "::endgroup::"

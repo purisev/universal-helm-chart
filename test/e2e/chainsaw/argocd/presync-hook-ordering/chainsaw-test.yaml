@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: presync-hook-ordering
+spec:
+  steps:
+    - name: the PreSync hook job actually completed before the main Deployment's pod was created
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-presync-check
+              status:
+                succeeded: 1
+        - script:
+            content: |
+              set -e
+              HOOK_DONE=$(kubectl get job e2e-presync-check -n "$NAMESPACE" -o jsonpath='{.status.completionTime}')
+              POD_CREATED=$(kubectl get pods -n "$NAMESPACE" \
+                -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
+                -o jsonpath='{.items[0].metadata.creationTimestamp}')
+
+              RESULT=out-of-order
+              # ISO8601 timestamps sort correctly as plain strings.
+              if [ "$HOOK_DONE" \< "$POD_CREATED" ] || [ "$HOOK_DONE" = "$POD_CREATED" ]; then
+                RESULT=ordered
+              fi
+
+              echo "hook-done=$HOOK_DONE pod-created=$POD_CREATED result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=ordered')): true

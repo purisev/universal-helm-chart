@@ -1,0 +1,20 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Configuration
+metadata:
+  name: universal-helm-chart-e2e-argocd
+spec:
+  # Most assertions target the app-under-test's own namespace; the
+  # Application resource itself lives in argocd and is asserted with an
+  # explicit namespace override.
+  namespace: e2e-argocd
+  parallel: 1
+  timeouts:
+    apply: 30s
+    assert: 60s
+    # ArgoCD's selfHeal keeps recreating resources chainsaw is trying to
+    # delete until its own reconciler settles, which can push a plain
+    # namespace deletion past 30s.
+    cleanup: 90s
+    delete: 30s
+    error: 30s
+    exec: 60s
