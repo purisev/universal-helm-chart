@@ -1548,3 +1548,35 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "exceeds 63 characters"
+
+  - it: should render resizePolicy on the main container
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          resizePolicy:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resizePolicy
+          value:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+
+  - it: should not render resizePolicy when unset
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].resizePolicy

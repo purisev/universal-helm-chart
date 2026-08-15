@@ -162,6 +162,10 @@ Output at zero indent; caller controls nindent.
   resources:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $wl.resizePolicy }}
+  resizePolicy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- $inheritParentMounts := true }}
   {{- if hasKey $wl "useRootVolumeMounts" }}
   {{- $inheritParentMounts = $wl.useRootVolumeMounts }}

@@ -646,6 +646,17 @@
         },
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
+        "resizePolicy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "resourceName": {"type": "string", "enum": ["cpu", "memory"]},
+              "restartPolicy": {"type": "string", "enum": ["NotRequired", "RestartContainer"]}
+            }
+          }
+        },
         "livenessProbe": {"type": "object"},
         "readinessProbe": {"type": "object"},
         "startupProbe": {"type": "object"},
@@ -719,6 +730,17 @@
         "hostAliases": {"type": "array"},
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
+        "resizePolicy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "resourceName": {"type": "string", "enum": ["cpu", "memory"]},
+              "restartPolicy": {"type": "string", "enum": ["NotRequired", "RestartContainer"]}
+            }
+          }
+        },
         "livenessProbe": {"type": "object"},
         "readinessProbe": {"type": "object"},
         "startupProbe": {"type": "object"},
@@ -804,6 +826,17 @@
         "hostAliases": {"type": "array"},
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
+        "resizePolicy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "resourceName": {"type": "string", "enum": ["cpu", "memory"]},
+              "restartPolicy": {"type": "string", "enum": ["NotRequired", "RestartContainer"]}
+            }
+          }
+        },
         "livenessProbe": {"type": "object"},
         "readinessProbe": {"type": "object"},
         "startupProbe": {"type": "object"},
