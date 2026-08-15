@@ -53,8 +53,8 @@ Merges group spec with per-job spec, applying:
     (even as []); otherwise the key is left absent so uhc.scheduling falls
     back to root tolerations, same as nodeSelector/affinity.
   - Name-keyed maps merged, job wins on collisions (volumes, volumeMounts)
-  - Scalars: job-override-else-group (backoffLimit, ttlSecondsAfterFinished,
-    activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
+  - Scalars: job-override-else-group (backoffLimit, completions, parallelism,
+    ttlSecondsAfterFinished, activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
     automountServiceAccountToken, terminationGracePeriodSeconds, useRootVolumes,
     useRootVolumeMounts, hashSuffix, hashIncludePodAnnotations, schedule, timeZone,
     concurrencyPolicy, successfulJobsHistoryLimit, failedJobsHistoryLimit,
@@ -140,7 +140,7 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{- end -}}
 {{- $_ := set $merged "volumeMounts" $vmMerged -}}
 {{/* Scalars: job-override-else-group */}}
-{{- range $k := list "backoffLimit" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
+{{- range $k := list "backoffLimit" "completions" "parallelism" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
 {{- $jv := index $job $k -}}
 {{- $gv := index $group $k -}}
 {{- if not (kindIs "invalid" $jv) -}}
