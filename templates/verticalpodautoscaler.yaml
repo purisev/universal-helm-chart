@@ -23,7 +23,7 @@ spec:
     kind: Deployment
     name: {{ $releaseName }}-{{ $wlName }}
   updatePolicy:
-    updateMode: {{ $vpaSpec.updateMode | default "Initial" }}
+    updateMode: {{ $vpaSpec.updateMode | default "Initial" | quote }}
   {{- if $vpaSpec.resourcePolicy }}
   resourcePolicy:
     {{- toYaml $vpaSpec.resourcePolicy | nindent 4 }}
@@ -54,7 +54,7 @@ spec:
     kind: StatefulSet
     name: {{ $releaseName }}-{{ $wlName }}
   updatePolicy:
-    updateMode: {{ $vpaSpec.updateMode | default "Initial" }}
+    updateMode: {{ $vpaSpec.updateMode | default "Initial" | quote }}
   {{- if $vpaSpec.resourcePolicy }}
   resourcePolicy:
     {{- toYaml $vpaSpec.resourcePolicy | nindent 4 }}
