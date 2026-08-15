@@ -613,3 +613,22 @@ tests:
               restartPolicy: NotRequired
             - resourceName: memory
               restartPolicy: RestartContainer
+
+  - it: should render pod-level resourceClaims (DRA)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          resourceClaims:
+            - name: gpu-claim
+              source:
+                resourceClaimName: my-gpu-claim
+    asserts:
+      - equal:
+          path: spec.template.spec.resourceClaims
+          value:
+            - name: gpu-claim
+              source:
+                resourceClaimName: my-gpu-claim
