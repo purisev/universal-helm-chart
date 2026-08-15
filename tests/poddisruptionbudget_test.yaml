@@ -152,3 +152,40 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "podDisruptionBudget for workload \"web\": cannot set both minAvailable and maxUnavailable"
+
+  - it: should render unhealthyPodEvictionPolicy when set
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.podDisruptionBudget.enabled: true
+      deployments.web.podDisruptionBudget.maxUnavailable: 1
+      deployments.web.podDisruptionBudget.unhealthyPodEvictionPolicy: AlwaysAllow
+    asserts:
+      - equal:
+          path: spec.unhealthyPodEvictionPolicy
+          value: AlwaysAllow
+
+  - it: should not render unhealthyPodEvictionPolicy when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.podDisruptionBudget.enabled: true
+      deployments.web.podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - isNull:
+          path: spec.unhealthyPodEvictionPolicy
+
+  - it: should render unhealthyPodEvictionPolicy on StatefulSet PDB when set
+    set:
+      image.repository: redis
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      statefulSets.db.podDisruptionBudget.enabled: true
+      statefulSets.db.podDisruptionBudget.maxUnavailable: 1
+      statefulSets.db.podDisruptionBudget.unhealthyPodEvictionPolicy: AlwaysAllow
+    asserts:
+      - equal:
+          path: spec.unhealthyPodEvictionPolicy
+          value: AlwaysAllow
