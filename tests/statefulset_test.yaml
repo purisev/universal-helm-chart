@@ -567,3 +567,28 @@ tests:
     asserts:
       - isNull:
           path: spec.persistentVolumeClaimRetentionPolicy
+
+  - it: should render ordinals.start when set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          ordinals:
+            start: 3
+    asserts:
+      - equal:
+          path: spec.ordinals.start
+          value: 3
+
+  - it: should not render ordinals when unset
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.ordinals
