@@ -965,6 +965,23 @@
         }
       }
     },
+    "successPolicyShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "succeededIndexes": {"type": "string"},
+              "succeededCount": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
     "jobGroupEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -999,6 +1016,9 @@
         "suspend": {"type": "boolean"},
         "podFailurePolicy": {"$ref": "#/$defs/podFailurePolicyShape"},
         "podReplacementPolicy": {"type": "string", "enum": ["TerminatingOrFailed", "Failed"]},
+        "completionMode": {"type": "string", "enum": ["NonIndexed", "Indexed"]},
+        "backoffLimitPerIndex": {"type": "integer", "minimum": 0},
+        "successPolicy": {"$ref": "#/$defs/successPolicyShape"},
         "parallelism": {"type": "integer", "minimum": 0},
         "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
         "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
@@ -1061,6 +1081,9 @@
         "suspend": {"type": "boolean"},
         "podFailurePolicy": {"$ref": "#/$defs/podFailurePolicyShape"},
         "podReplacementPolicy": {"type": "string", "enum": ["TerminatingOrFailed", "Failed"]},
+        "completionMode": {"type": "string", "enum": ["NonIndexed", "Indexed"]},
+        "backoffLimitPerIndex": {"type": "integer", "minimum": 0},
+        "successPolicy": {"$ref": "#/$defs/successPolicyShape"},
         "parallelism": {"type": "integer", "minimum": 0},
         "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
         "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},

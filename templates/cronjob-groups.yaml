@@ -73,6 +73,16 @@ spec:
       {{- with $merged.podReplacementPolicy }}
       podReplacementPolicy: {{ . }}
       {{- end }}
+      {{- with $merged.completionMode }}
+      completionMode: {{ . }}
+      {{- end }}
+      {{- if hasKey $merged "backoffLimitPerIndex" }}
+      backoffLimitPerIndex: {{ $merged.backoffLimitPerIndex | int }}
+      {{- end }}
+      {{- with $merged.successPolicy }}
+      successPolicy:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       template:
         metadata:
           {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}

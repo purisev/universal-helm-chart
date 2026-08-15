@@ -54,7 +54,8 @@ Merges group spec with per-job spec, applying:
     back to root tolerations, same as nodeSelector/affinity.
   - Name-keyed maps merged, job wins on collisions (volumes, volumeMounts)
   - Scalars: job-override-else-group (backoffLimit, completions, parallelism, suspend,
-    podFailurePolicy, podReplacementPolicy, ttlSecondsAfterFinished, activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
+    podFailurePolicy, podReplacementPolicy, completionMode, backoffLimitPerIndex, successPolicy,
+    ttlSecondsAfterFinished, activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
     automountServiceAccountToken, terminationGracePeriodSeconds, useRootVolumes,
     useRootVolumeMounts, hashSuffix, hashIncludePodAnnotations, schedule, timeZone,
     concurrencyPolicy, successfulJobsHistoryLimit, failedJobsHistoryLimit,
@@ -71,6 +72,8 @@ Fails fast when:
   - kind=CronJob with any non-empty hooks (ArgoCD/Helm hooks aren't applied to CronJob)
   - hashSuffix=true together with deletePolicy=HookSucceeded (argocd) or
     deletePolicy=hook-succeeded (helm) — that combination breaks idempotency.
+  - backoffLimitPerIndex or successPolicy set without completionMode: Indexed
+    (both require Indexed completion mode at the Kubernetes API level).
 Returns merged spec as YAML.
 Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 */}}
@@ -140,7 +143,7 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{- end -}}
 {{- $_ := set $merged "volumeMounts" $vmMerged -}}
 {{/* Scalars: job-override-else-group */}}
-{{- range $k := list "backoffLimit" "completions" "parallelism" "suspend" "podFailurePolicy" "podReplacementPolicy" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
+{{- range $k := list "backoffLimit" "completions" "parallelism" "suspend" "podFailurePolicy" "podReplacementPolicy" "completionMode" "backoffLimitPerIndex" "successPolicy" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
 {{- $jv := index $job $k -}}
 {{- $gv := index $group $k -}}
 {{- if not (kindIs "invalid" $jv) -}}
@@ -177,6 +180,11 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
   {{- if or (eq $aDel "HookSucceeded") (eq $hDel "hook-succeeded") -}}
     {{- fail (printf "jobGroups.%s.jobs.%s: hashSuffix=true is incompatible with deletePolicy that removes the Job after success (argocd HookSucceeded / helm hook-succeeded). The Job would be deleted then recreated on every sync, breaking idempotency. Use hashSuffix: false, or leave deletePolicy unset (HookFailed default ensures idempotency)" $gn $jn) -}}
   {{- end -}}
+{{- end -}}
+{{/* Fail-fast: backoffLimitPerIndex/successPolicy require completionMode: Indexed */}}
+{{- $isIndexed := eq (index $merged "completionMode") "Indexed" -}}
+{{- if and (not $isIndexed) (or (hasKey $merged "backoffLimitPerIndex") (hasKey $merged "successPolicy")) -}}
+  {{- fail (printf "jobGroups.%s.jobs.%s: backoffLimitPerIndex and successPolicy require completionMode: Indexed. Set completionMode: Indexed on the group or job, or remove these fields." $gn $jn) -}}
 {{- end -}}
 {{- toYaml $merged -}}
 {{- end -}}
