@@ -36,8 +36,13 @@ spec:
               # the same disruptionsAllowed=1 budget is what actually
               # exercises the PDB's mutual-exclusion guarantee.
               evict "$POD1" > /tmp/code1 &
+              EVICT1_PID=$!
               evict "$POD2" > /tmp/code2 &
-              wait
+              EVICT2_PID=$!
+              # Wait only for the two evict jobs, not for kubectl proxy: a
+              # bare `wait` waits for every background job, and the proxy
+              # runs forever, so that hung this script indefinitely.
+              wait "$EVICT1_PID" "$EVICT2_PID"
               CODE1=$(cat /tmp/code1)
               CODE2=$(cat /tmp/code2)
 
