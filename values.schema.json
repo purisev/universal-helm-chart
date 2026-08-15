@@ -95,6 +95,7 @@
         "clusterIP": {"type": "string"},
         "loadBalancerIP": {"type": "string"},
         "externalTrafficPolicy": {"type": "string", "enum": ["Cluster", "Local"]},
+        "internalTrafficPolicy": {"type": "string", "enum": ["Cluster", "Local"]},
         "sessionAffinity": {"type": "string", "enum": ["None", "ClientIP"]},
         "publishNotReadyAddresses": {"type": "boolean"}
       }
