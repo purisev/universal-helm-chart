@@ -53,7 +53,7 @@ Merges group spec with per-job spec, applying:
     (even as []); otherwise the key is left absent so uhc.scheduling falls
     back to root tolerations, same as nodeSelector/affinity.
   - Name-keyed maps merged, job wins on collisions (volumes, volumeMounts)
-  - Scalars: job-override-else-group (backoffLimit, completions, parallelism,
+  - Scalars: job-override-else-group (backoffLimit, completions, parallelism, suspend,
     ttlSecondsAfterFinished, activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
     automountServiceAccountToken, terminationGracePeriodSeconds, useRootVolumes,
     useRootVolumeMounts, hashSuffix, hashIncludePodAnnotations, schedule, timeZone,
@@ -140,7 +140,7 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{- end -}}
 {{- $_ := set $merged "volumeMounts" $vmMerged -}}
 {{/* Scalars: job-override-else-group */}}
-{{- range $k := list "backoffLimit" "completions" "parallelism" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
+{{- range $k := list "backoffLimit" "completions" "parallelism" "suspend" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
 {{- $jv := index $job $k -}}
 {{- $gv := index $group $k -}}
 {{- if not (kindIs "invalid" $jv) -}}
@@ -185,6 +185,8 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 Stable 8-char sha256 of fields that affect Job/CronJob behavior. Excludes metadata-only
 fields (metadataAnnotations, hooks, ttlSecondsAfterFinished, hashSuffix,
 hashIncludePodAnnotations) so changes to those don't trigger a re-run.
+Also excludes suspend: it's meant to pause/resume the same Job or CronJob in place —
+including it in the hash would rename the resource on every toggle, defeating the point.
 podAnnotations are included by default (so Vault/Datadog injection changes recreate
 the Job); set hashIncludePodAnnotations: false to opt out per group/job.
 Params: dict "merged" $merged
@@ -195,7 +197,7 @@ Params: dict "merged" $merged
 {{- if hasKey $merged "hashIncludePodAnnotations" -}}
   {{- $includePodAnn = ne (index $merged "hashIncludePodAnnotations") false -}}
 {{- end -}}
-{{- $excludeKeys := list "metadataAnnotations" "hooks" "ttlSecondsAfterFinished" "hashSuffix" "hashIncludePodAnnotations" -}}
+{{- $excludeKeys := list "metadataAnnotations" "hooks" "ttlSecondsAfterFinished" "hashSuffix" "hashIncludePodAnnotations" "suspend" -}}
 {{- if not $includePodAnn -}}
   {{- $excludeKeys = append $excludeKeys "podAnnotations" -}}
 {{- end -}}

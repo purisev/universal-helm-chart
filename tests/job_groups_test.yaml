@@ -961,6 +961,48 @@ tests:
       - isNull:
           path: spec.parallelism
 
+  - it: should render suspend on Job spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.suspend: true
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: true
+
+  - it: should keep the same resource name when suspend is true (excluded from hash)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.suspend: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-migrate-10097e84
+
+  - it: should keep the same resource name when suspend is false (excluded from hash)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.suspend: false
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-migrate-10097e84
+
   # ---------- scheduling: tolerations inheritance ----------
   - it: should inherit root tolerations when group and job declare none
     set:
