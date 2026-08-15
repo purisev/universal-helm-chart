@@ -66,6 +66,10 @@ spec:
       {{- if hasKey $merged "parallelism" }}
       parallelism: {{ $merged.parallelism | int }}
       {{- end }}
+      {{- with $merged.podFailurePolicy }}
+      podFailurePolicy:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       template:
         metadata:
           {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}

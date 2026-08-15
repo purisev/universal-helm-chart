@@ -929,6 +929,42 @@
         }
       }
     },
+    "podFailurePolicyShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "action": {"type": "string", "enum": ["Ignore", "FailJob", "Count", "FailIndex"]},
+              "onExitCodes": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "containerName": {"type": "string"},
+                  "operator": {"type": "string", "enum": ["In", "NotIn"]},
+                  "values": {"type": "array", "items": {"type": "integer"}}
+                }
+              },
+              "onPodConditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": {"type": "string"},
+                    "status": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "jobGroupEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -961,6 +997,7 @@
         "backoffLimit": {"type": "integer", "minimum": 0},
         "completions": {"type": "integer", "minimum": 1},
         "suspend": {"type": "boolean"},
+        "podFailurePolicy": {"$ref": "#/$defs/podFailurePolicyShape"},
         "parallelism": {"type": "integer", "minimum": 0},
         "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
         "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
@@ -1021,6 +1058,7 @@
         "backoffLimit": {"type": "integer", "minimum": 0},
         "completions": {"type": "integer", "minimum": 1},
         "suspend": {"type": "boolean"},
+        "podFailurePolicy": {"$ref": "#/$defs/podFailurePolicyShape"},
         "parallelism": {"type": "integer", "minimum": 0},
         "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
         "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
