@@ -1034,6 +1034,33 @@ tests:
           path: spec.suspend
           value: true
 
+  - it: should render podReplacementPolicy, job overrides group
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.podReplacementPolicy: Failed
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.podReplacementPolicy: TerminatingOrFailed
+    asserts:
+      - equal:
+          path: spec.podReplacementPolicy
+          value: TerminatingOrFailed
+
+  - it: should not render podReplacementPolicy when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - isNull:
+          path: spec.podReplacementPolicy
+
   - it: should keep the same resource name when suspend is true (excluded from hash)
     set:
       image.repository: nginx
