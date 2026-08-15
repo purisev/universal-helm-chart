@@ -396,10 +396,41 @@ jobs:
           helm install reloader stakater/reloader \
             -n reloader --create-namespace --wait --timeout 3m
 
-      - name: Create namespace and SecretStore fixture
+      - name: Install the Bank-Vaults operator
+        run: |
+          kubectl create namespace vault
+          helm install vault-operator oci://ghcr.io/bank-vaults/helm-charts/vault-operator \
+            -n vault --wait --timeout 3m
+          kubectl wait --for=condition=Established crd/vaults.vault.banzaicloud.com --timeout=1m
+
+      - name: Deploy a single-replica Vault via the operator
         run: |
           kubectl create namespace "$NAMESPACE"
-          kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/secrets-config-secretstore.yaml
+          # Vault's own ServiceAccount: the configurer needs to manage its
+          # unseal-key/root-token Secret and patch its own Pod, and Vault's
+          # Kubernetes auth method validates ServiceAccount tokens via the
+          # TokenReview API, which needs system:auth-delegator.
+          kubectl apply -f test/e2e/fixtures/secrets-config-vault-rbac.yaml
+          # A real, single-node Vault (raft storage), not a stand-in: auth
+          # role, KV v2 mount, and the seed value are all configured
+          # declaratively in the CR, which the operator's configurer applies
+          # on startup.
+          kubectl apply -f test/e2e/fixtures/secrets-config-vault-cr.yaml
+
+          # The operator reconciles the CR asynchronously, so the StatefulSet
+          # and configurer Deployment don't exist the instant the CR is
+          # applied; poll for their existence before waiting on readiness.
+          for i in $(seq 1 30); do
+            kubectl get pod/vault-0 -n vault >/dev/null 2>&1 && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=2m
+
+          for i in $(seq 1 30); do
+            kubectl get deployment/vault-configurer -n vault >/dev/null 2>&1 && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Available deployment/vault-configurer -n vault --timeout=2m
 
       - name: Install chart
         run: |
@@ -418,12 +449,36 @@ jobs:
           kubectl get secretstore,externalsecret,secret -n "$NAMESPACE"
           echo "::endgroup::"
 
+          echo "::group::ClusterSecretStore"
+          kubectl get clustersecretstore || true
+          echo "::endgroup::"
+
           echo "::group::ExternalSecret describe"
           kubectl describe externalsecret -n "$NAMESPACE"
           echo "::endgroup::"
 
           echo "::group::ESO controller logs"
           kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Vault CR status"
+          kubectl get vault vault -n vault -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::Vault logs"
+          kubectl logs -n vault vault-0 --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Vault configurer logs"
+          kubectl logs -n vault -l app.kubernetes.io/name=vault-configurator --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Vault operator logs"
+          kubectl logs -n vault -l app.kubernetes.io/name=vault-operator --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods in vault namespace"
+          kubectl get pods -n vault -o wide || true
           echo "::endgroup::"
 
           echo "::group::Reloader logs"
