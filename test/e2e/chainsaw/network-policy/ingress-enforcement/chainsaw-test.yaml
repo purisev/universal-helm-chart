@@ -1,0 +1,61 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ingress-enforcement
+spec:
+  steps:
+    - name: only the pod matching the NetworkPolicy's podSelector can reach the server
+      try:
+        - apply:
+            file: prober-allowed.yaml
+        - apply:
+            file: prober-denied.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober-allowed
+              status:
+                phase: Running
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober-denied
+              status:
+                phase: Running
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              # Felix (Calico's per-node agent) takes a moment to program
+              # the dataplane after the NetworkPolicy and pods exist, so
+              # this polls both outcomes together instead of checking once.
+              RESULT=not-yet
+              for i in $(seq 1 20); do
+                ALLOWED_OK=no
+                if kubectl exec prober-allowed -n "$NAMESPACE" -- \
+                    wget -q -O- --timeout=5 "http://e2e-server.$NAMESPACE.svc.cluster.local/" 2>/dev/null \
+                    | grep -q "Welcome to nginx"; then
+                  ALLOWED_OK=yes
+                fi
+
+                DENIED_BLOCKED=no
+                if ! kubectl exec prober-denied -n "$NAMESPACE" -- \
+                    wget -q -O- --timeout=5 "http://e2e-server.$NAMESPACE.svc.cluster.local/" >/dev/null 2>&1; then
+                  DENIED_BLOCKED=yes
+                fi
+
+                if [ "$ALLOWED_OK" = "yes" ] && [ "$DENIED_BLOCKED" = "yes" ]; then
+                  RESULT=enforced
+                  break
+                fi
+                sleep 3
+              done
+
+              echo "allowed-ok=$ALLOWED_OK denied-blocked=$DENIED_BLOCKED result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=enforced')): true
