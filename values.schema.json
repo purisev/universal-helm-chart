@@ -49,6 +49,13 @@
         "whenScaled": {"type": "string", "enum": ["Retain", "Delete"]}
       }
     },
+    "statefulSetOrdinalsShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {"type": "integer", "minimum": 0}
+      }
+    },
     "inheritShape": {
       "type": "object",
       "additionalProperties": false,
@@ -768,6 +775,7 @@
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
         "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
         "persistentVolumeClaimRetentionPolicy": {"$ref": "#/$defs/persistentVolumeClaimRetentionPolicyShape"},
+        "ordinals": {"$ref": "#/$defs/statefulSetOrdinalsShape"},
         "volumeClaimTemplates": {"type": "array"},
         "minReadySeconds": {"type": "integer", "minimum": 0},
         "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0},

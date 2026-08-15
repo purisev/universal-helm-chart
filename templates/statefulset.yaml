@@ -28,6 +28,10 @@ spec:
   persistentVolumeClaimRetentionPolicy:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $wl.ordinals }}
+  ordinals:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- if not (and $wl.keda $wl.keda.enabled) }}
   {{- if not (and $wl.hpa $wl.hpa.enabled) }}
   {{- $replicas := 1 }}
