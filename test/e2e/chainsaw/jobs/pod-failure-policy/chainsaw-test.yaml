@@ -14,6 +14,14 @@ spec:
                 name: e2e-podfail-policy-demo
               status:
                 failed: 1
-                conditions:
-                  - type: Failed
-                    status: "True"
+        # Kubernetes sets two conditions when a FailJob rule fires
+        # (FailureTarget, then Failed), so asserting the conditions list
+        # by literal contents needs an exact-length match. Query for the
+        # one condition that matters instead of listing both.
+        - script:
+            content: >-
+              kubectl get job e2e-podfail-policy-demo -n "$NAMESPACE"
+              -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}'
+            check:
+              ($error): ~
+              ($stdout): "True"
