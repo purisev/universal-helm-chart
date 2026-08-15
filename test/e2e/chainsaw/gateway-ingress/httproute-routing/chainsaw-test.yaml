@@ -1,0 +1,42 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-routing
+spec:
+  steps:
+    - name: the httproute renders correctly and agentgateway actually routes to it
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - httproute.e2e.local
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -q -O- --timeout=5 --header="Host: httproute.e2e.local" \
+                "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true

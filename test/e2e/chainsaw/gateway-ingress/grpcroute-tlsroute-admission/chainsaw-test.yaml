@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: grpcroute-tlsroute-admission
+spec:
+  steps:
+    # No listener on the fixture Gateway actually serves gRPC or
+    # TLS-passthrough traffic, so this is admission-level only: proof that
+    # the chart renders a schema-valid object the API server accepts, not
+    # that real traffic flows through it.
+    - name: grpcroute and tlsroute are schema-valid and accepted by the API server
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: GRPCRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - grpcroute.e2e.local
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1alpha2
+              kind: TLSRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - tlsroute.e2e.local
