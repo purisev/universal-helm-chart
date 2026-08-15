@@ -1,0 +1,32 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: victoriametrics-targets-up
+spec:
+  steps:
+    - name: the chart's VMServiceScrape is a real, healthy scrape target in VictoriaMetrics
+      try:
+        - script:
+            timeout: 3m
+            content: |
+              set -e
+              kubectl proxy --port=18001 &
+              PROXY_PID=$!
+              trap 'kill $PROXY_PID' EXIT
+              sleep 2
+
+              RESULT=not-found
+              for i in $(seq 1 30); do
+                BODY=$(curl -s "http://127.0.0.1:18001/api/v1/namespaces/vm/services/vmsingle-e2e:8429/proxy/api/v1/targets" || true)
+                HEALTH=$(echo "$BODY" | jq -r '.data.activeTargets[]? | select(.labels.service=="e2e-api-metrics") | .health' 2>/dev/null | head -1)
+                if [ "$HEALTH" = "up" ]; then
+                  RESULT=up
+                  break
+                fi
+                sleep 3
+              done
+
+              echo "result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=up')): true

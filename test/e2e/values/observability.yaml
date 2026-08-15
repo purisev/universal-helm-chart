@@ -1,0 +1,30 @@
+fullnameOverride: e2e
+
+integrations:
+  monitoring:
+    defaults:
+      enabled: true
+      # Overridden with --set for the VictoriaMetrics leg of the matrix.
+      provider: prometheus
+      discovery: crd
+      type: service
+      interval: 15s
+      scrapeTimeout: 5s
+      exposeService:
+        enabled: true
+        port: 9100
+        targetPort: 9100
+
+deployments:
+  # node-exporter serves genuine Prometheus-format /metrics with zero
+  # configuration, so the real scrape target actually has real data to
+  # report `health: up` for instead of an empty/unreachable endpoint.
+  api:
+    image:
+      repository: prom/node-exporter
+      tag: "v1.8.2"
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
