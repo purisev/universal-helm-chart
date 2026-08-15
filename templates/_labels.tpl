@@ -130,3 +130,14 @@ Params: dict "name" "<built-name>" "kind" "<resource-kind-or-context>"
 {{- fail (printf "%s name %q exceeds 253 characters (length=%d). Kubernetes enforces a 253-char ceiling on DNS-1123 subdomain names. Shorten the Helm release name, .Values.fullnameOverride, or the entry key in values.yaml." .kind $name (len $name)) -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Create the name of the service account to use
+*/}}
+{{- define "uhc.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "uhc.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
