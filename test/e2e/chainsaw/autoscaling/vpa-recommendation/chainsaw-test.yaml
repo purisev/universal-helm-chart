@@ -1,0 +1,24 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: vpa-recommendation
+spec:
+  steps:
+    # The recommender's default loop interval is 1 minute and it needs at
+    # least one pass of real usage data from metrics-server before it
+    # publishes anything, so this needs a much longer budget than the other
+    # scenarios in this suite. assert (unlike script/command) polls until
+    # the timeout, which is what makes waiting out that interval work here.
+    - name: the vpa recommender eventually publishes a real recommendation
+      try:
+        - assert:
+            timeout: 5m
+            resource:
+              apiVersion: autoscaling.k8s.io/v1
+              kind: VerticalPodAutoscaler
+              metadata:
+                name: e2e-hpa-demo
+              status:
+                recommendation:
+                  containerRecommendations:
+                    - containerName: hpa-demo

@@ -1,0 +1,30 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: hpa-structural
+spec:
+  steps:
+    - name: the HPA is well-formed and adopted by the controller
+      try:
+        - assert:
+            resource:
+              apiVersion: autoscaling/v2
+              kind: HorizontalPodAutoscaler
+              metadata:
+                name: e2e-hpa-demo
+              spec:
+                scaleTargetRef:
+                  kind: Deployment
+                  name: e2e-hpa-demo
+                minReplicas: 1
+                maxReplicas: 3
+        # The controller only adds this condition once it has actually
+        # processed the object (not just admitted it), so its presence is
+        # proof of adoption independent of whether real CPU metrics exist.
+        - script:
+            content: >-
+              kubectl get hpa e2e-hpa-demo -n "$NAMESPACE"
+              -o jsonpath='{.status.conditions[?(@.type=="AbleToScale")].status}'
+            check:
+              ($error): ~
+              ($stdout): "True"

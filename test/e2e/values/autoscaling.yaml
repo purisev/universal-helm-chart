@@ -1,0 +1,62 @@
+fullnameOverride: e2e
+
+deployments:
+  hpa-demo:
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 80
+
+    # updateMode Off: the recommender still computes and publishes
+    # status.recommendation, but nothing evicts/mutates running pods, which
+    # keeps this scenario from also depending on the admission-controller's
+    # webhook being fully warmed up.
+    verticalPodAutoscaler:
+      enabled: true
+      updateMode: "Off"
+
+  keda-demo:
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    keda:
+      enabled: true
+      minReplicas: 0
+      maxReplicas: 3
+      pollingInterval: 5
+      # start/end are cron expressions for a recurring daily window, not
+      # timestamps, so they can't be hardcoded here to reliably cover
+      # "right now" whenever CI happens to run. The workflow overrides both
+      # via --set, computed from the current UTC time just before install.
+      triggers:
+        - type: cron
+          metadata:
+            timezone: UTC
+            start: "0 0 * * *"
+            end: "0 1 * * *"
+            desiredReplicas: "2"
