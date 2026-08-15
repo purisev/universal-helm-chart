@@ -592,3 +592,24 @@ tests:
     asserts:
       - isNull:
           path: spec.ordinals
+
+  - it: should render resizePolicy on the main container
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          resizePolicy:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resizePolicy
+          value:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
