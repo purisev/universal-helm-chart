@@ -385,6 +385,21 @@ tests:
           path: spec.externalTrafficPolicy
           value: Local
 
+  - it: should render service.internalTrafficPolicy on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.internalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.internalTrafficPolicy
+          value: Local
+
   - it: should render service.sessionAffinity on Deployment
     set:
       image.repository: nginx
