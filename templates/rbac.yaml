@@ -7,6 +7,9 @@
 {{- $clusterScoped := .Values.rbac.clusterScoped | default false -}}
 {{- $roleKind := ternary "ClusterRole" "Role" $clusterScoped -}}
 {{- $bindingKind := ternary "ClusterRoleBinding" "RoleBinding" $clusterScoped -}}
+{{- if and .Values.rbac.aggregationRule (not $clusterScoped) -}}
+{{- fail "rbac.aggregationRule is only valid on a ClusterRole. Set rbac.clusterScoped=true, or remove rbac.aggregationRule to keep the namespaced Role." -}}
+{{- end -}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: {{ $roleKind }}
@@ -19,6 +22,10 @@ metadata:
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}
+{{- with .Values.rbac.aggregationRule }}
+aggregationRule:
+  {{- toYaml . | nindent 2 }}
+{{- end }}
 rules:
   {{- toYaml .Values.rbac.rules | nindent 2 }}
 ---

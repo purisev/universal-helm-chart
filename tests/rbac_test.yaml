@@ -132,3 +132,36 @@ tests:
       - equal:
           path: roleRef.apiGroup
           value: rbac.authorization.k8s.io
+
+  - it: should render aggregationRule on a cluster-scoped ClusterRole
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.clusterScoped: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+      rbac.aggregationRule.clusterRoleSelectors:
+        - matchLabels:
+            rbac-aggregate-to-admin: "true"
+    documentIndex: 0
+    asserts:
+      - equal:
+          path: aggregationRule.clusterRoleSelectors[0].matchLabels.rbac-aggregate-to-admin
+          value: "true"
+
+  - it: should fail fast when aggregationRule is set without clusterScoped
+    set:
+      serviceAccount.create: true
+      rbac.enabled: true
+      rbac.rules:
+        - apiGroups: [""]
+          resources: ["configmaps"]
+          verbs: ["get"]
+      rbac.aggregationRule.clusterRoleSelectors:
+        - matchLabels:
+            rbac-aggregate-to-admin: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "aggregationRule is only valid on a ClusterRole"

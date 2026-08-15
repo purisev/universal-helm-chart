@@ -1181,6 +1181,13 @@
         },
         "rules": {
           "type": "array"
+        },
+        "aggregationRule": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clusterRoleSelectors": {"type": "array"}
+          }
         }
       }
     },
