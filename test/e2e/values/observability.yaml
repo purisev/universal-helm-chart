@@ -1,0 +1,78 @@
+fullnameOverride: e2e
+
+integrations:
+  monitoring:
+    defaults:
+      enabled: true
+      # Overridden with --set for the VictoriaMetrics leg of the matrix.
+      provider: prometheus
+      discovery: crd
+      type: service
+      interval: 15s
+      scrapeTimeout: 5s
+      exposeService:
+        enabled: true
+        port: 9100
+        targetPort: 9100
+
+deployments:
+  # node-exporter serves genuine Prometheus-format /metrics with zero
+  # configuration, so the real scrape target actually has real data to
+  # report `health: up` for instead of an empty/unreachable endpoint.
+  api:
+    image:
+      repository: prom/node-exporter
+      tag: "v1.8.2"
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+  # Same target, but discovered via prometheus.io/* Service annotations
+  # instead of a ServiceMonitor/VMServiceScrape CRD object.
+  api-annotations:
+    image:
+      repository: prom/node-exporter
+      tag: "v1.8.2"
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # No manual service/port block: the inherited root exposeService
+    # default (enabled, port 9100) already creates the Service and its
+    # port, and metrics.port falls back to exposeService.port for the
+    # prometheus.io/port annotation value.
+    metrics:
+      enabled: true
+      discovery: annotations
+
+  # Same target, discovered via PodMonitor/VMPodScrape (metrics.type: pod)
+  # instead of the default ServiceMonitor/VMServiceScrape.
+  api-pod:
+    image:
+      repository: prom/node-exporter
+      tag: "v1.8.2"
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # exposeService only adds a container port when metrics.type is
+    # "service" (the default) — for "pod" it's a no-op, so the container
+    # port a PodMonitor/VMPodScrape endpoint can reference by name has to
+    # be declared directly instead.
+    ports:
+      metrics:
+        containerPort: 9100
+
+    # No manual metrics.port/exposeService override: exposeService is
+    # already a no-op for type: pod, and the inherited root exposeService
+    # default is still what resolves the endpoint's default port name to
+    # "metrics" — matching the container port declared above.
+    metrics:
+      enabled: true
+      type: pod

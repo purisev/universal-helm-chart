@@ -1,0 +1,25 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: prometheus-annotations-discovery
+spec:
+  steps:
+    # Annotation-based discovery isn't something kube-prometheus-stack's
+    # default Prometheus CR watches out of the box (that needs an
+    # additionalScrapeConfigs block implementing the classic
+    # kubernetes_sd_configs + annotation-relabel pattern), so this only
+    # proves the chart renders the annotations correctly, not that a
+    # scraper picks them up — see the *-targets-up tests for a real,
+    # end-to-end scrape proof via the CRD-based discovery path instead.
+    - name: the annotations-mode workload's service carries the right prometheus.io/* annotations
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-api-annotations-metrics
+                annotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/path: /metrics
+                  prometheus.io/port: "9100"
