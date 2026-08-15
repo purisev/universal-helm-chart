@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: e2e-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    # In-cluster DNS name for the Gitea Service the bootstrap script pushes
+    # this repo's current commit to; repoURL is resolved by the ArgoCD
+    # repo-server pod, not the CI runner, so a runner-side port-forward
+    # URL wouldn't work here.
+    repoURL: http://gitea-http.gitea.svc.cluster.local:3000/gitea_admin/universal-helm-chart.git
+    targetRevision: main
+    path: .
+    helm:
+      valueFiles:
+        - test/e2e/values/argocd.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: e2e-argocd
+  syncPolicy:
+    automated:
+      enabled: true
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

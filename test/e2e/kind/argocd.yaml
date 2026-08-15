@@ -1,0 +1,12 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+# Enables per-host containerd trust config under /etc/containerd/certs.d;
+# the actual per-host config for NORA's NodePort is written after install,
+# once the port is known (see the "Install NORA" workflow step). This
+# single line is the mechanism kind's own docs recommend for this.
+containerdConfigPatches:
+  - |-
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"

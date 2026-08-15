@@ -1,0 +1,46 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: resync-idempotency
+spec:
+  steps:
+    - name: a resync with no behavior-affecting change keeps the hash-suffixed job's identity
+      try:
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              JOB_NAME_BEFORE=$(kubectl get jobs -n "$NAMESPACE" -l app.kubernetes.io/name=idemp-check -o jsonpath='{.items[0].metadata.name}')
+              JOB_UID_BEFORE=$(kubectl get job "$JOB_NAME_BEFORE" -n "$NAMESPACE" -o jsonpath='{.metadata.uid}')
+
+              REPO_ROOT=$(git rev-parse --show-toplevel)
+              MARKER_LINE=$(bash "$REPO_ROOT/test/e2e/scripts/argocd-trigger-resync.sh")
+              MARKER=$(echo "$MARKER_LINE" | sed -n 's/^marker=//p')
+
+              RESULT=not-resynced
+              for i in $(seq 1 18); do
+                CURRENT=$(kubectl get deployment e2e-api -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.resync-marker}' 2>/dev/null || true)
+                if [ "$CURRENT" = "$MARKER" ]; then
+                  RESULT=resynced
+                  break
+                fi
+                sleep 5
+              done
+
+              JOB_NAME_AFTER=$(kubectl get jobs -n "$NAMESPACE" -l app.kubernetes.io/name=idemp-check -o jsonpath='{.items[0].metadata.name}')
+              JOB_UID_AFTER=$(kubectl get job "$JOB_NAME_AFTER" -n "$NAMESPACE" -o jsonpath='{.metadata.uid}')
+
+              IDEMPOTENT=no
+              if [ "$RESULT" = "resynced" ] && [ "$JOB_NAME_BEFORE" = "$JOB_NAME_AFTER" ] && [ "$JOB_UID_BEFORE" = "$JOB_UID_AFTER" ]; then
+                IDEMPOTENT=yes
+              fi
+
+              if [ "$RESULT" != "resynced" ]; then
+                echo "--- application status ---"
+                kubectl get application e2e-app -n argocd -o yaml || true
+              fi
+
+              echo "before=$JOB_NAME_BEFORE/$JOB_UID_BEFORE after=$JOB_NAME_AFTER/$JOB_UID_AFTER resync=$RESULT idempotent=$IDEMPOTENT"
+            check:
+              ($error): ~
+              (contains($stdout, 'idempotent=yes')): true

@@ -1,0 +1,108 @@
+fullnameOverride: e2e
+
+commonAnnotations: {}
+
+# hooks.argocd.hook set → deletePolicy defaults to HookFailed (only failed
+# jobs are deleted), so a successful PreSync hook stays around afterward
+# for this suite to assert against directly.
+jobGroups:
+  # hashSuffix left at its default (true): the resource name carries an
+  # 8-char hash of the job's behavior-affecting fields, specifically so a
+  # resync with no behavior-affecting change resolves to the exact same
+  # name and Kubernetes/ArgoCD never deletes+recreates it. commonAnnotations
+  # is excluded from that hash, so bumping it forces a real resync without
+  # changing the job's identity — the idempotency proof this suite checks.
+  idemp:
+    kind: Job
+    image:
+      repository: busybox
+      tag: "1.36"
+    jobs:
+      check:
+        command: ["sh", "-c", "echo idempotent-job-ran"]
+        backoffLimit: 0
+        ttlSecondsAfterFinished: 3600
+
+  presync:
+    kind: Job
+    hashSuffix: false
+    # PreSync hooks run in their own phase before the main Sync phase, so
+    # the chart's own ServiceAccount (created during Sync) doesn't exist
+    # yet when this pod is admitted. Use the namespace's always-present
+    # default ServiceAccount instead.
+    serviceAccountName: default
+    image:
+      repository: busybox
+      tag: "1.36"
+    hooks:
+      argocd:
+        hook: PreSync
+    jobs:
+      check:
+        command: ["sh", "-c", "echo presync-hook-ran"]
+        backoffLimit: 0
+
+deployments:
+  api:
+    # Matches the ImageUpdater CR's tracked image below, so the controller
+    # has a real live container to detect and (on write-back) actually
+    # resync to a new tag of. localhost:30500 (NORA's fixed NodePort), not
+    # its .svc.cluster.local name: the kind node's own containerd, which
+    # does the kubelet's pull, can't resolve cluster-internal DNS. sleep
+    # infinity: busybox's default entrypoint would otherwise exit
+    # immediately.
+    image:
+      repository: localhost:30500/test-image
+      tag: "1.0.0"
+    command: ["sh", "-c", "sleep infinity"]
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+integrations:
+  argocd:
+    imageUpdater:
+      enabled: true
+      # argocd-image-updater only matches Applications living in the same
+      # namespace as the ImageUpdater CR itself; our Application (applied
+      # as a fixture, not rendered by this chart) lives in argocd, not in
+      # this release's own namespace, so point the CR there too.
+      namespace: argocd
+      # Matches the Application's own name.
+      appNamePattern: e2e-app
+      writeBackConfig:
+        # git:secret:<ns>/<name> looked simpler, but that code path only
+        # checks IsHTTPSURL and falls through to "unknown repository type"
+        # for our plain-http Gitea (confirmed via debug logs). repocreds
+        # reads a standard ArgoCD Repository secret instead (see
+        # gitea-git-creds.yaml), which builds HTTPS creds off Password !=
+        # "" alone, with no scheme check.
+        method: "git:repocreds"
+        gitConfig:
+          branch: main
+          # Written in place as a targeted patch of just the name/tag keys
+          # below, not a full-file replace, so the rest of this values file
+          # survives the write-back untouched.
+          writeBackTarget: "helmvalues:./test/e2e/values/argocd.yaml"
+      images:
+        test-image:
+          # updateStrategy defaults to semver, which (per the controller's
+          # own source) turns the currently-deployed tag into an exact-match
+          # constraint with no field to widen it: confirmed via debug logs
+          # showing "found 1 from 2 tags eligible" and "already on latest
+          # allowed version" even with a genuinely newer tag in the
+          # registry. newest-build compares by registry push time instead
+          # and has no such constraint gate, so it actually finds 1.1.0.
+          commonUpdateSettings:
+            updateStrategy: newest-build
+          imageName: "localhost:30500/test-image:1.0.0"
+          # Without this, write-back defaults to the generic image.name /
+          # image.tag Helm parameter names, which this chart's schema
+          # doesn't define and which would permanently break every later
+          # render of the Application. Point it at the real keys instead.
+          manifestTargets:
+            helm:
+              name: "deployments.api.image.repository"
+              tag: "deployments.api.image.tag"
