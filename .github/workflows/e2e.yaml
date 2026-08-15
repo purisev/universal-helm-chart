@@ -14,6 +14,7 @@ jobs:
       jobs: ${{ steps.check.outputs.jobs }}
       autoscaling: ${{ steps.check.outputs.autoscaling }}
       gateway-ingress: ${{ steps.check.outputs.gateway-ingress }}
+      secrets-config: ${{ steps.check.outputs.secrets-config }}
     steps:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
       # workflow_dispatch always runs everything (there's no label to read).
@@ -28,7 +29,7 @@ jobs:
             FULL=true
           fi
 
-          for job in core-workloads jobs autoscaling gateway-ingress; do
+          for job in core-workloads jobs autoscaling gateway-ingress secrets-config; do
             if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$job=true" >> "$GITHUB_OUTPUT"
             else
@@ -346,6 +347,88 @@ jobs:
 
           echo "::group::Pods"
           kubectl get pods -A -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-secrets-config:
+    name: E2E / secrets config
+    needs: gate
+    if: needs.gate.outputs.secrets-config == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-secrets-config
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-secrets-config
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install External Secrets Operator
+        run: |
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo update
+          helm install external-secrets external-secrets/external-secrets \
+            -n external-secrets --create-namespace --wait --timeout 3m
+
+      - name: Install Stakater Reloader
+        run: |
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo update
+          helm install reloader stakater/reloader \
+            -n reloader --create-namespace --wait --timeout 3m
+
+      - name: Create namespace and SecretStore fixture
+        run: |
+          kubectl create namespace "$NAMESPACE"
+          kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/secrets-config-secretstore.yaml
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/secrets-config.yaml \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/secrets-config --config test/e2e/chainsaw/secrets-config-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::SecretStore / ExternalSecret / Secret"
+          kubectl get secretstore,externalsecret,secret -n "$NAMESPACE"
+          echo "::endgroup::"
+
+          echo "::group::ExternalSecret describe"
+          kubectl describe externalsecret -n "$NAMESPACE"
+          echo "::endgroup::"
+
+          echo "::group::ESO controller logs"
+          kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Reloader logs"
+          kubectl logs -n reloader -l app=reloader --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
           echo "::endgroup::"
 
           echo "::group::Events"
