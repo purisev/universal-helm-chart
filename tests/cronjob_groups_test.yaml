@@ -251,3 +251,26 @@ tests:
             name: cm-app-cfg
             mountPath: /etc/app
             readOnly: true
+
+  - it: should inherit root tolerations when group and job declare none
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.tolerations
+          value:
+            - key: dedicated
+              operator: Equal
+              value: stage
+              effect: NoSchedule

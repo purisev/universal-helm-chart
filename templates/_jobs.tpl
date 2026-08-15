@@ -48,7 +48,10 @@ Params: dict "groupName" $g "jobName" $j
 Merges group spec with per-job spec, applying:
   - Maps merged, job wins (env, image, securityContext, podSecurityContext, resources,
     nodeSelector, affinity, metadataAnnotations, inherit, hooks.argocd, hooks.helm)
-  - Lists concatenated, group then job (envSecrets, envConfigMaps, tolerations)
+  - Lists concatenated, group then job (envSecrets, envConfigMaps, tolerations).
+    tolerations is only set on the merged spec when group or job declares it
+    (even as []); otherwise the key is left absent so uhc.scheduling falls
+    back to root tolerations, same as nodeSelector/affinity.
   - Name-keyed maps merged, job wins on collisions (volumes, volumeMounts)
   - Scalars: job-override-else-group (backoffLimit, ttlSecondsAfterFinished,
     activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
@@ -120,7 +123,9 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{/* Lists: concat group then job */}}
 {{- $_ := set $merged "envSecrets" (concat ($group.envSecrets | default list) ($job.envSecrets | default list)) -}}
 {{- $_ := set $merged "envConfigMaps" (concat ($group.envConfigMaps | default list) ($job.envConfigMaps | default list)) -}}
+{{- if or (hasKey $group "tolerations") (hasKey $job "tolerations") -}}
 {{- $_ := set $merged "tolerations" (concat ($group.tolerations | default list) ($job.tolerations | default list)) -}}
+{{- end -}}
 {{/* Maps: union by name; on key collision the whole job entry replaces the group entry
      (we do NOT recurse into the inner spec — k8s volume/volumeMount kinds are mutually
      exclusive: a name can be either an emptyDir or a configMap, not both). */}}
