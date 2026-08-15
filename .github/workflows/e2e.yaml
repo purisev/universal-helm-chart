@@ -480,15 +480,24 @@ jobs:
             --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
             --wait --timeout 3m
 
+          # --wait above only waits for the operator Deployment itself; the
+          # actual Prometheus pod is created asynchronously afterward, when
+          # the operator reconciles the Prometheus CR, and isn't part of
+          # the Helm release's own resource list.
+          kubectl wait --timeout=2m -n monitoring pod \
+            -l app.kubernetes.io/name=prometheus --for=condition=Ready
+
       - name: Install VictoriaMetrics Operator and a VMSingle instance
         if: matrix.provider == 'victoriametrics'
         run: |
           helm repo add vm https://victoriametrics.github.io/helm-charts/
           helm repo update
-          helm install vm-operator-crds vm/victoria-metrics-operator-crds \
-            -n vm --create-namespace --wait --timeout 3m
+          # The operator chart manages its own CRDs by default
+          # (crds.enabled: true); installing the separate -crds chart
+          # alongside it makes Helm refuse the second release as an
+          # ownership conflict on the same CRD objects.
           helm install vm-operator vm/victoria-metrics-operator \
-            -n vm --wait --timeout 3m
+            -n vm --create-namespace --wait --timeout 3m
           kubectl apply -n vm -f test/e2e/fixtures/observability-vmsingle.yaml
           kubectl wait --timeout=3m -n vm vmsingle/e2e --for=jsonpath='{.status.updateStatus}'=operational
 
@@ -509,12 +518,19 @@ jobs:
       - name: Dump cluster state on failure
         if: failure()
         run: |
+          # Only one of these CRD kinds exists on this leg's cluster by
+          # design (each matrix leg only installs its own operator/CRDs);
+          # querying both unconditionally without `|| true` would abort
+          # this whole step on "the server doesn't have a resource type"
+          # before anything useful below it gets printed.
           echo "::group::ServiceMonitor / VMServiceScrape"
-          kubectl get servicemonitor,vmservicescrape -n "$NAMESPACE" -o wide
+          kubectl get servicemonitor -n "$NAMESPACE" -o wide 2>/dev/null || true
+          kubectl get vmservicescrape -n "$NAMESPACE" -o wide 2>/dev/null || true
           echo "::endgroup::"
 
           echo "::group::Monitoring stack pods"
-          kubectl get pods -n monitoring -n vm -o wide 2>/dev/null || true
+          kubectl get pods -n monitoring -o wide 2>/dev/null || true
+          kubectl get pods -n vm -o wide 2>/dev/null || true
           echo "::endgroup::"
 
           echo "::group::App pods"

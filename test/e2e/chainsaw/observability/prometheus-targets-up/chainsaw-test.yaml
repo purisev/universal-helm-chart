@@ -26,6 +26,13 @@ spec:
                 sleep 3
               done
 
+              if [ "$RESULT" != "up" ]; then
+                echo "--- last response body ---"
+                echo "$BODY"
+                echo "--- discovered target labels.service values ---"
+                echo "$BODY" | jq -r '.data.activeTargets[]?.labels.service' 2>/dev/null | sort -u
+              fi
+
               echo "result=$RESULT"
             check:
               ($error): ~
