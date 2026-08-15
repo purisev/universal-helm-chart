@@ -913,3 +913,64 @@ tests:
       - equal:
           path: spec.backoffLimit
           value: 0
+
+  # ---------- scheduling: tolerations inheritance ----------
+  - it: should inherit root tolerations when group and job declare none
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.db.enabled: true
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: dedicated
+              operator: Equal
+              value: stage
+              effect: NoSchedule
+
+  - it: should use group tolerations instead of root when group declares them
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.db.enabled: true
+      jobGroups.db.tolerations:
+        - key: gpu
+          operator: Exists
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: gpu
+              operator: Exists
+
+  - it: should opt out of root tolerations with an explicit empty list
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.db.enabled: true
+      jobGroups.db.tolerations: []
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - isNull:
+          path: spec.template.spec.tolerations
