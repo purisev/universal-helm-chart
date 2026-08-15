@@ -353,3 +353,33 @@ tests:
           value: TerminatingOrFailed
       - isNull:
           path: spec.podReplacementPolicy
+
+  - it: should render Indexed jobGroups fields inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        cron:
+          enabled: true
+          kind: CronJob
+          completionMode: Indexed
+          completions: 3
+          backoffLimitPerIndex: 1
+          successPolicy:
+            rules:
+              - succeededCount: 2
+          jobs:
+            run:
+              enabled: true
+              schedule: "0 0 * * *"
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.completionMode
+          value: Indexed
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimitPerIndex
+          value: 1
+      - equal:
+          path: spec.jobTemplate.spec.successPolicy.rules[0].succeededCount
+          value: 2

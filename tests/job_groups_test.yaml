@@ -1061,6 +1061,95 @@ tests:
       - isNull:
           path: spec.podReplacementPolicy
 
+  - it: should render completionMode, backoffLimitPerIndex, and successPolicy together
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          completionMode: Indexed
+          completions: 5
+          parallelism: 5
+          backoffLimitPerIndex: 2
+          successPolicy:
+            rules:
+              - succeededIndexes: "0,2-4"
+                succeededCount: 4
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.completionMode
+          value: Indexed
+      - equal:
+          path: spec.backoffLimitPerIndex
+          value: 2
+      - equal:
+          path: spec.successPolicy.rules[0].succeededIndexes
+          value: "0,2-4"
+      - equal:
+          path: spec.successPolicy.rules[0].succeededCount
+          value: 4
+
+  - it: should fail fast when backoffLimitPerIndex is set without completionMode Indexed
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          backoffLimitPerIndex: 2
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "backoffLimitPerIndex and successPolicy require completionMode: Indexed"
+
+  - it: should fail fast when successPolicy is set without completionMode Indexed
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          successPolicy:
+            rules:
+              - succeededCount: 1
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "backoffLimitPerIndex and successPolicy require completionMode: Indexed"
+
+  - it: should allow completionMode Indexed without backoffLimitPerIndex or successPolicy
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          completionMode: Indexed
+          completions: 3
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.completionMode
+          value: Indexed
+
   - it: should keep the same resource name when suspend is true (excluded from hash)
     set:
       image.repository: nginx
