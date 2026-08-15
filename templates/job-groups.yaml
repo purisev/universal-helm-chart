@@ -37,6 +37,12 @@ spec:
   {{- with $merged.activeDeadlineSeconds }}
   activeDeadlineSeconds: {{ . | int }}
   {{- end }}
+  {{- with $merged.completions }}
+  completions: {{ . | int }}
+  {{- end }}
+  {{- if hasKey $merged "parallelism" }}
+  parallelism: {{ $merged.parallelism | int }}
+  {{- end }}
   template:
     metadata:
       {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}

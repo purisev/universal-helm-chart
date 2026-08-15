@@ -914,6 +914,53 @@ tests:
           path: spec.backoffLimit
           value: 0
 
+  - it: should render completions and parallelism, job overrides group
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.completions: 5
+      jobGroups.db.parallelism: 0
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.parallelism: 2
+    asserts:
+      - equal:
+          path: spec.completions
+          value: 5
+      - equal:
+          path: spec.parallelism
+          value: 2
+
+  - it: should respect parallelism=0 (no group/job override collapses it)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.parallelism: 0
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.parallelism
+          value: 0
+
+  - it: should not render completions/parallelism when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - isNull:
+          path: spec.completions
+      - isNull:
+          path: spec.parallelism
+
   # ---------- scheduling: tolerations inheritance ----------
   - it: should inherit root tolerations when group and job declare none
     set:
