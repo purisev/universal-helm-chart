@@ -62,7 +62,7 @@ spec:
         {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 8 }}
       {{- end }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | trim | nindent 8 }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName "renderDirectPorts" true) | trim | nindent 8 }}
         {{- $sidecars := include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | trim }}
         {{- if $sidecars }}
         {{- $sidecars | nindent 8 }}

@@ -23,7 +23,8 @@ metadata:
   name: {{ $metricsSvcName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service") }}
+  {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" (($promAnnots | fromYaml) | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

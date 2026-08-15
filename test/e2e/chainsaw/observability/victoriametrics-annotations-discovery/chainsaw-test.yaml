@@ -1,0 +1,22 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: victoriametrics-annotations-discovery
+spec:
+  steps:
+    # Annotation-based discovery needs vmagent to be configured with a
+    # matching scrape_config, which isn't set up by this suite (see the
+    # Prometheus leg's equivalent test for the same scoping rationale), so
+    # this only proves the chart renders the annotations correctly.
+    - name: the annotations-mode workload's service carries the right prometheus.io/* annotations
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-api-annotations-metrics
+                annotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/path: /metrics
+                  prometheus.io/port: "9100"

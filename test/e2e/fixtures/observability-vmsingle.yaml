@@ -5,8 +5,22 @@ metadata:
   # fixture must be named "e2e" to make the Service vmsingle-e2e.
   name: e2e
 spec:
+  retentionPeriod: "1"
+---
+# VMSingle only stores data pushed to it — it does no discovery or
+# scraping of its own. VMAgent is the component that actually discovers
+# VMServiceScrape/VMPodScrape objects, scrapes them, and remote-writes the
+# result into VMSingle, so it's this object's /api/v1/targets that reports
+# real scrape health, not VMSingle's.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAgent
+metadata:
+  # The operator names the generated Service vmagent-<this name>.
+  name: e2e
+spec:
   # Both ...Selector and ...NamespaceSelector default to nil, which means
   # "select nothing" (not "select everything") — this flips that so the
-  # instance actually scrapes the chart's rendered VMServiceScrape.
+  # agent actually scrapes the chart's rendered VMServiceScrape/VMPodScrape.
   selectAllByDefault: true
-  retentionPeriod: "1"
+  remoteWrite:
+    - url: http://vmsingle-e2e.vm.svc.cluster.local:8429/api/v1/write

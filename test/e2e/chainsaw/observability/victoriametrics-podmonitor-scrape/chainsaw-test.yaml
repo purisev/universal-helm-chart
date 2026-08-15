@@ -1,10 +1,10 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: victoriametrics-targets-up
+  name: victoriametrics-podmonitor-scrape
 spec:
   steps:
-    - name: the chart's VMServiceScrape is a real, healthy scrape target in VictoriaMetrics
+    - name: the chart's VMPodScrape is a real, healthy scrape target in VictoriaMetrics
       try:
         - script:
             timeout: 3m
@@ -15,14 +15,15 @@ spec:
               trap 'kill $PROXY_PID' EXIT
               sleep 2
 
+              # VMPodScrape-discovered targets have no `service` label (no
+              # Service is involved at all); `container` reliably matches
+              # the workload/container name instead. VMAgent (not
+              # VMSingle) is what actually scrapes — see the
+              # *-targets-up test for why.
               RESULT=not-found
               for i in $(seq 1 30); do
-                # VMSingle only stores data — VMAgent is what actually
-                # discovers and scrapes VMServiceScrape/VMPodScrape objects,
-                # so it's VMAgent's own /api/v1/targets that reports real
-                # scrape health.
                 BODY=$(curl -s "http://127.0.0.1:18001/api/v1/namespaces/vm/services/vmagent-e2e:8429/proxy/api/v1/targets" || true)
-                HEALTH=$(echo "$BODY" | jq -r '.data.activeTargets[]? | select(.labels.service=="e2e-api-metrics") | .health' 2>/dev/null | head -1)
+                HEALTH=$(echo "$BODY" | jq -r '.data.activeTargets[]? | select(.labels.container=="api-pod") | .health' 2>/dev/null | head -1)
                 if [ "$HEALTH" = "up" ]; then
                   RESULT=up
                   break
@@ -33,8 +34,8 @@ spec:
               if [ "$RESULT" != "up" ]; then
                 echo "--- last response body ---"
                 echo "$BODY"
-                echo "--- discovered target labels.service values ---"
-                echo "$BODY" | jq -r '.data.activeTargets[]?.labels.service' 2>/dev/null | sort -u
+                echo "--- discovered target labels.container values ---"
+                echo "$BODY" | jq -r '.data.activeTargets[]?.labels.container' 2>/dev/null | sort -u
               fi
 
               echo "result=$RESULT"
