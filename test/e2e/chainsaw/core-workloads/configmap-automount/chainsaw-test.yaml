@@ -1,0 +1,30 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: configmap-automount
+spec:
+  steps:
+    - name: the chart-owned configmap is auto-mounted into every workload container
+      try:
+        - script:
+            content: >-
+              POD=$(kubectl get pods -n $NAMESPACE
+              -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api
+              --field-selector=status.phase=Running
+              -o jsonpath='{.items[0].metadata.name}') &&
+              kubectl exec "$POD" -n $NAMESPACE -c api --
+              cat /etc/app/app.conf
+            check:
+              ($error): ~
+              (contains($stdout, 'greeting=hello-from-configmap')): true
+        - script:
+            content: >-
+              POD=$(kubectl get pods -n $NAMESPACE
+              -l app.kubernetes.io/name=web,app.kubernetes.io/instance=e2e-web
+              --field-selector=status.phase=Running
+              -o jsonpath='{.items[0].metadata.name}') &&
+              kubectl exec "$POD" -n $NAMESPACE -c web --
+              cat /etc/app/app.conf
+            check:
+              ($error): ~
+              (contains($stdout, 'greeting=hello-from-configmap')): true

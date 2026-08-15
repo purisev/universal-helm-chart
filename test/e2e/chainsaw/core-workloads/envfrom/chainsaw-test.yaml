@@ -1,0 +1,19 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: envfrom
+spec:
+  steps:
+    - name: root envSecrets and envConfigMaps are both injected via envFrom
+      try:
+        - script:
+            content: >-
+              POD=$(kubectl get pods -n $NAMESPACE
+              -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api
+              --field-selector=status.phase=Running
+              -o jsonpath='{.items[0].metadata.name}') &&
+              kubectl exec "$POD" -n $NAMESPACE -c api -- env
+            check:
+              ($error): ~
+              (contains($stdout, 'API_KEY=e2e-test-api-key')): true
+              (contains($stdout, 'GREETING=hello-from-configmap')): true

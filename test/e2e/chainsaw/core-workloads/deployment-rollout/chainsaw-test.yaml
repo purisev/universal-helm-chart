@@ -1,0 +1,29 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: deployment-rollout
+spec:
+  steps:
+    - name: deployment reaches the desired ready/available replica count
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: e2e-api
+              status:
+                replicas: 2
+                readyReplicas: 2
+                availableReplicas: 2
+                updatedReplicas: 2
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                labels:
+                  app.kubernetes.io/name: api
+                  app.kubernetes.io/instance: e2e-api
+              status:
+                phase: Running

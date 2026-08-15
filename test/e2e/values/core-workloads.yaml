@@ -1,0 +1,129 @@
+fullnameOverride: e2e
+
+serviceAccount:
+  create: true
+
+rbac:
+  enabled: true
+  clusterScoped: false
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps"]
+      verbs: ["get", "list", "watch"]
+
+envSecrets:
+  - app-secrets
+
+envConfigMaps:
+  - app-config
+
+configMaps:
+  app-config:
+    enabled: true
+    mountPath: /etc/app
+    data:
+      GREETING: hello-from-configmap
+      app.conf: |
+        greeting=hello-from-configmap
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# nginx-unprivileged pairs with the chart's default hardened podSecurityContext/
+# securityContext (runAsNonRoot, readOnlyRootFilesystem, all capabilities
+# dropped): it listens on 8080 instead of 80 and needs its cache/run/tmp
+# directories mounted as writable emptyDirs since the root filesystem isn't.
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  api:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+  web:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
+deployments:
+  api:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    replicaCount: 2
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+    resizePolicy:
+      - resourceName: cpu
+        restartPolicy: NotRequired
+      - resourceName: memory
+        restartPolicy: RestartContainer
+
+statefulSets:
+  web:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    replicaCount: 2
+    podManagementPolicy: Parallel
+
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Delete
+
+    ordinals:
+      start: 0
+
+    headlessService: {}
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+
+    # Mounted away from nginx's served root so the container keeps serving its
+    # baked-in default page (used by the service-routing HTTP check) while
+    # still proving the per-replica PVC from volumeClaimTemplates is writable.
+    volumeMounts:
+      html:
+        mountPath: /data
+
+    volumeClaimTemplates:
+      - metadata:
+          name: html
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 1Gi

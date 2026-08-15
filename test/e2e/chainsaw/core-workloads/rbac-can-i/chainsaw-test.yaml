@@ -1,0 +1,21 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: rbac-can-i
+spec:
+  steps:
+    - name: the workload's serviceaccount can only do what its role grants
+      try:
+        - script:
+            content: >-
+              kubectl auth can-i get configmaps
+              --as=system:serviceaccount:$NAMESPACE:e2e -n $NAMESPACE
+            check:
+              ($error): ~
+              (contains($stdout, 'yes')): true
+        - script:
+            content: >-
+              kubectl auth can-i delete secrets
+              --as=system:serviceaccount:$NAMESPACE:e2e -n $NAMESPACE
+            check:
+              (contains($stdout, 'no')): true

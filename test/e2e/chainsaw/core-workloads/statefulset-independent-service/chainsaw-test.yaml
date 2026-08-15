@@ -1,0 +1,71 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: statefulset-independent-service
+spec:
+  steps:
+    - name: statefulset renders ordinals and the PVC retention policy
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: StatefulSet
+              metadata:
+                name: e2e-web
+              spec:
+                ordinals:
+                  start: 0
+                persistentVolumeClaimRetentionPolicy:
+                  whenDeleted: Retain
+                  whenScaled: Delete
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: html-e2e-web-0
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: PersistentVolumeClaim
+              metadata:
+                name: html-e2e-web-1
+
+    - name: the independent client service (not the headless one) routes to the statefulset pods
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web
+              spec:
+                type: ClusterIP
+                selector:
+                  app.kubernetes.io/name: web
+                  app.kubernetes.io/instance: e2e-web
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web-headless
+              spec:
+                clusterIP: None
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            content: >-
+              kubectl exec prober -n $NAMESPACE --
+              wget -q -O- --timeout=5 http://e2e-web.$NAMESPACE.svc.cluster.local/
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
