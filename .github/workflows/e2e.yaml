@@ -16,6 +16,7 @@ jobs:
       gateway-ingress: ${{ steps.check.outputs.gateway-ingress }}
       secrets-config: ${{ steps.check.outputs.secrets-config }}
       observability: ${{ steps.check.outputs.observability }}
+      network-policy: ${{ steps.check.outputs.network-policy }}
     steps:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
       # workflow_dispatch always runs everything (there's no label to read).
@@ -30,7 +31,7 @@ jobs:
             FULL=true
           fi
 
-          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability; do
+          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy; do
             if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$job=true" >> "$GITHUB_OUTPUT"
             else
@@ -550,6 +551,74 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::App pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-network-policy:
+    name: E2E / network policy
+    needs: gate
+    if: needs.gate.outputs.network-policy == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-network-policy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster (no default CNI)
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/network-policy.yaml
+          cluster_name: e2e-network-policy
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install Calico
+        run: |
+          # kind's default kindnet CNI doesn't enforce NetworkPolicy at all;
+          # Calico is what actually programs the dataplane for this suite
+          # to have anything real to verify. `create` (not `apply`) per
+          # Calico's own docs, since the manifest's CRD bundle is too
+          # large for a client-side apply.
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/calico.yaml
+          kubectl wait --timeout=3m -n kube-system pod -l k8s-app=calico-node --for=condition=Ready
+
+      - name: Create namespace
+        run: kubectl create namespace "$NAMESPACE"
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/network-policy.yaml \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/network-policy --config test/e2e/chainsaw/network-policy-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::NetworkPolicy"
+          kubectl get networkpolicy -n "$NAMESPACE" -o yaml
+          echo "::endgroup::"
+
+          echo "::group::Calico node logs"
+          kubectl logs -n kube-system -l k8s-app=calico-node --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
           kubectl get pods -n "$NAMESPACE" -o wide
           echo "::endgroup::"
 
