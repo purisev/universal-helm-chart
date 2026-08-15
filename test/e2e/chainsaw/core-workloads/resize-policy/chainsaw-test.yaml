@@ -18,7 +18,12 @@ spec:
               UID_BEFORE=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.metadata.uid}')
               RESTARTS_BEFORE=$(kubectl get pod "$POD" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[0].restartCount}')
 
-              kubectl patch pod "$POD" -n "$NAMESPACE" --subresource resize --type merge -p \
+              # --type strategic (not merge): a JSON Merge Patch replaces the
+              # whole containers array atomically, wiping every field of the
+              # container we didn't list (including its memory request/limit).
+              # Strategic merge patch matches the "api" container by name and
+              # only touches the cpu fields we specify.
+              kubectl patch pod "$POD" -n "$NAMESPACE" --subresource resize --type strategic -p \
                 '{"spec":{"containers":[{"name":"api","resources":{"requests":{"cpu":"150m"},"limits":{"cpu":"250m"}}}]}}'
 
               # Give the kubelet a moment to apply the resize in place.

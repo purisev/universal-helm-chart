@@ -55,7 +55,13 @@ spec:
         - apply:
             file: ../_shared/prober-pod.yaml
         - assert:
-            file: ../_shared/prober-pod.yaml
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
         - script:
             content: >-
               kubectl exec prober -n $NAMESPACE --

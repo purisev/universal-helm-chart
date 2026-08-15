@@ -28,12 +28,27 @@ spec:
                   -d "{\"apiVersion\":\"policy/v1\",\"kind\":\"Eviction\",\"metadata\":{\"name\":\"$1\",\"namespace\":\"$NAMESPACE\"}}"
               }
 
-              CODE1=$(evict "$POD1")
-              sleep 3
-              CODE2=$(evict "$POD2")
+              # Fire both evictions concurrently instead of one after another:
+              # nginx has no readiness probe, so a replacement pod becomes
+              # Ready in well under a second, which would let a sequential
+              # second eviction through legitimately and prove nothing. Two
+              # requests racing the API server at the same instant against
+              # the same disruptionsAllowed=1 budget is what actually
+              # exercises the PDB's mutual-exclusion guarantee.
+              evict "$POD1" > /tmp/code1 &
+              evict "$POD2" > /tmp/code2 &
+              wait
+              CODE1=$(cat /tmp/code1)
+              CODE2=$(cat /tmp/code2)
 
-              echo "first-eviction=$CODE1 second-eviction=$CODE2"
+              RESULT=unexpected
+              if { [ "$CODE1" = "201" ] || [ "$CODE1" = "200" ]; } && [ "$CODE2" = "429" ]; then
+                RESULT=one-allowed-one-blocked
+              elif { [ "$CODE2" = "201" ] || [ "$CODE2" = "200" ]; } && [ "$CODE1" = "429" ]; then
+                RESULT=one-allowed-one-blocked
+              fi
+
+              echo "eviction-codes=$CODE1,$CODE2 result=$RESULT"
             check:
               ($error): ~
-              (contains($stdout, 'first-eviction=200')): true
-              (contains($stdout, 'second-eviction=429')): true
+              (contains($stdout, 'result=one-allowed-one-blocked')): true
