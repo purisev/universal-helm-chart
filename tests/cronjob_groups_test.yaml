@@ -294,6 +294,32 @@ tests:
           path: spec.jobTemplate.spec.parallelism
           value: 1
 
+  - it: should render podFailurePolicy inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        cron:
+          enabled: true
+          kind: CronJob
+          podFailurePolicy:
+            rules:
+              - action: FailJob
+                onExitCodes:
+                  operator: In
+                  values: [42]
+          jobs:
+            run:
+              enabled: true
+              schedule: "0 0 * * *"
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.podFailurePolicy.rules[0].action
+          value: FailJob
+      - isNull:
+          path: spec.podFailurePolicy
+
   - it: should render suspend on CronJobSpec, not inside jobTemplate.spec
     set:
       image.repository: nginx

@@ -961,6 +961,65 @@ tests:
       - isNull:
           path: spec.parallelism
 
+  - it: should render podFailurePolicy, job overrides group entirely
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          podFailurePolicy:
+            rules:
+              - action: Count
+                onExitCodes:
+                  operator: In
+                  values: [1]
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+              podFailurePolicy:
+                rules:
+                  - action: FailJob
+                    onExitCodes:
+                      containerName: migrate
+                      operator: In
+                      values: [42]
+    asserts:
+      - equal:
+          path: spec.podFailurePolicy.rules[0].action
+          value: FailJob
+      - equal:
+          path: spec.podFailurePolicy.rules[0].onExitCodes.containerName
+          value: migrate
+      - lengthEqual:
+          path: spec.podFailurePolicy.rules
+          count: 1
+
+  - it: should fall back to group podFailurePolicy when job does not set one
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          podFailurePolicy:
+            rules:
+              - action: Ignore
+                onPodConditions:
+                  - type: DisruptionTarget
+                    status: "True"
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.podFailurePolicy.rules[0].action
+          value: Ignore
+
   - it: should render suspend on Job spec
     set:
       image.repository: nginx

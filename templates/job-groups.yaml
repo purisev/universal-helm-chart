@@ -46,6 +46,10 @@ spec:
   {{- if hasKey $merged "suspend" }}
   suspend: {{ $merged.suspend }}
   {{- end }}
+  {{- with $merged.podFailurePolicy }}
+  podFailurePolicy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   template:
     metadata:
       {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}
