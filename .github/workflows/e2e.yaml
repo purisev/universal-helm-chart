@@ -7,25 +7,38 @@ on:
 
 jobs:
   gate:
-    name: Check e2e label
+    name: Check e2e labels
     runs-on: ubuntu-latest
     outputs:
-      run: ${{ steps.check.outputs.run }}
+      core-workloads: ${{ steps.check.outputs.core-workloads }}
+      jobs: ${{ steps.check.outputs.jobs }}
+      autoscaling: ${{ steps.check.outputs.autoscaling }}
     steps:
-      - name: Decide whether e2e jobs should run
+      # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
+      # workflow_dispatch always runs everything (there's no label to read).
+      - name: Decide which e2e jobs should run
         id: check
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
+          FULL=false
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             [[ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" == "true" ]]; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
+             jq -e 'index("e2e") != null' <<<"$LABELS_JSON" >/dev/null; then
+            FULL=true
           fi
+
+          for job in core-workloads jobs autoscaling; do
+            if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
+              echo "$job=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$job=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
 
   e2e-core-workloads:
     name: E2E / core workloads
     needs: gate
-    if: needs.gate.outputs.run == 'true'
+    if: needs.gate.outputs.core-workloads == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-core-workloads
@@ -87,7 +100,7 @@ jobs:
   e2e-jobs:
     name: E2E / jobs
     needs: gate
-    if: needs.gate.outputs.run == 'true'
+    if: needs.gate.outputs.jobs == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-jobs
@@ -154,7 +167,7 @@ jobs:
   e2e-autoscaling:
     name: E2E / autoscaling
     needs: gate
-    if: needs.gate.outputs.run == 'true'
+    if: needs.gate.outputs.autoscaling == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-autoscaling
@@ -203,7 +216,7 @@ jobs:
 
       - name: Install chart
         run: |
-          read -r CRON_START CRON_END < <(bash test/e2e/scripts/keda-cron-window.sh | tr '\n' ' ')
+          eval "$(bash test/e2e/scripts/keda-cron-window.sh)"
           helm upgrade --install e2e . \
             -n "$NAMESPACE" \
             -f test/e2e/values/autoscaling.yaml \
