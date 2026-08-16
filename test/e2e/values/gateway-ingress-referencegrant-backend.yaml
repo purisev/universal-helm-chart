@@ -1,5 +1,22 @@
 fullnameOverride: e2e-rg-backend
 
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  backend:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
 deployments:
   backend:
     image:
