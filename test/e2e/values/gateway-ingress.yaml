@@ -141,6 +141,13 @@ deployments:
 ingress:
   enabled: true
   ingressClassName: nginx
+  # Real TLS termination at ingress-nginx, using the cert-manager-issued
+  # cert for e2e.local (see ingress-tls-termination) — the http:// prober
+  # request above still works too, since this doesn't force a redirect.
+  tls:
+    - hosts:
+        - e2e.local
+      secretName: e2e-ingress-tls
   hosts:
     e2e.local:
       paths:
