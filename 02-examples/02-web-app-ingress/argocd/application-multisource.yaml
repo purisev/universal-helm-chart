@@ -1,0 +1,30 @@
+# Argo CD Application — multi-source: chart from OCI, values from this chart's repo at v3.0.0.
+# In your own setup, repoint the second source to your config repository and adjust valueFiles.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: webapp
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: webapp
+  sources:
+    - repoURL: ghcr.io/purisev
+      chart: universal-helm-chart
+      targetRevision: 3.0.0
+      helm:
+        releaseName: webapp
+        valueFiles:
+          - $values/docs/02-examples/02-web-app-ingress/values.yaml
+    - repoURL: https://github.com/purisev/universal-helm-chart.git
+      targetRevision: v3.0.0
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

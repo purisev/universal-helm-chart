@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - universal-helm-chart</title>
+        <title>Dual networking stack (Ingress + Gateway API) - universal-helm-chart</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="favicon-8114d1fc.png">
-        <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-e96d0476.css">
-        <link rel="stylesheet" href="css/chrome-d279d366.css">
-        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "";
+            const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5c9a7cbb.js";
+            window.path_to_searchindex_js = "../searchindex-5c9a7cbb.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-447daa91.js"></script>
+        <script src="../toc-447daa91.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,13 +140,13 @@
                     <h1 class="menu-title">universal-helm-chart</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/purisev/universal-helm-chart" title="Git repository" aria-label="Git repository">
                             <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
-                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/README.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/05-adr/009-dual-networking-stack.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
                         </a>
 
@@ -180,46 +180,133 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="documentation"><a class="header" href="#documentation">Documentation</a></h1>
-<p><code>universal-helm-chart</code> is one Helm chart that covers the common Kubernetes workload shapes — Deployments, StatefulSets, Jobs, CronJobs — along with the networking, autoscaling, monitoring, secrets and policy resources that almost every release ends up needing. The goal is to keep one well-tested template in one place so individual services don’t each carry a pile of YAML.</p>
-<p>These docs are versioned with the chart and <strong>never ship inside the OCI artifact</strong> (see <a href="../.helmignore"><code>.helmignore</code></a>).</p>
-<h2 id="where-to-start"><a class="header" href="#where-to-start">Where to start</a></h2>
+                        <h1 id="009--dual-networking-stack-ingress--gateway-api"><a class="header" href="#009--dual-networking-stack-ingress--gateway-api">009 — Dual networking stack (Ingress + Gateway API)</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2025-04-25</li>
+</ul>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Two layers of routing primitives are widely deployed in 2025:</p>
+<ul>
+<li><strong>Ingress</strong> (<code>networking.k8s.io/v1</code>) — stable, ubiquitous, controller-specific feature surface (annotations carry the meaning).</li>
+<li><strong>Gateway API</strong> (<code>gateway.networking.k8s.io/v1</code>) — newer, expressive, multi-route-kind: HTTPRoute, GRPCRoute, TLSRoute, plus <code>ReferenceGrant</code> for cross-namespace backends.</li>
+</ul>
+<p>Real fleets have both: legacy services on Ingress, new services on Gateway API, and migration paths in between. A chart that supports only one forces a hard cutover; a chart that supports both lets each service migrate on its own schedule.</p>
+<p>The chart also needs to handle the two reasonable mental models for routing:</p>
+<ul>
+<li><strong>Per-release routing object</strong> — one Ingress / HTTPRoute per release, every workload contributes rules to it.</li>
+<li><strong>Per-workload routing object</strong> — each workload owns its own Ingress / HTTPRoute (different controllers, different hostnames, different parents).</li>
+</ul>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<p>Support <strong>both</strong> Ingress and Gateway API, with <strong>both</strong> singleton and multi-resource shapes for each:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>You want to…</th><th>Read</th></tr>
+<tr><th>Resource</th><th>Singleton key</th><th>Multi-resource map</th><th>Templates</th></tr>
 </thead>
 <tbody>
-<tr><td>Understand what this chart does and why it’s shaped that way</td><td><a href="01-getting-started/"><code>01-getting-started/</code></a></td></tr>
-<tr><td>Copy a working example</td><td><a href="02-examples/"><code>02-examples/</code></a></td></tr>
-<tr><td>Look up a <code>values.yaml</code> field</td><td><a href="03-reference/"><code>03-reference/</code></a></td></tr>
-<tr><td>Hack on the chart itself</td><td><a href="04-contributing/"><code>04-contributing/</code></a></td></tr>
-<tr><td>Read the design decision behind a feature</td><td><a href="05-adr/"><code>05-adr/</code></a></td></tr>
+<tr><td>Ingress</td><td><code>ingress.*</code></td><td><code>ingresses.*</code></td><td><code>templates/ingress.yaml</code></td></tr>
+<tr><td>HTTPRoute</td><td><code>httpRoute.*</code></td><td><code>httpRoutes.*</code></td><td><code>templates/httproute.yaml</code></td></tr>
+<tr><td>GRPCRoute</td><td><code>grpcRoute.*</code></td><td><code>grpcRoutes.*</code></td><td><code>templates/grpcroute.yaml</code></td></tr>
+<tr><td>TLSRoute</td><td><code>tlsRoute.*</code></td><td><code>tlsRoutes.*</code></td><td><code>templates/tlsroute.yaml</code></td></tr>
+<tr><td>ReferenceGrant</td><td><code>referenceGrant.*</code></td><td><code>referenceGrants.*</code></td><td><code>templates/referencegrant.yaml</code></td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
+<p><strong>Per-workload route shorthand.</strong> When a workload at <code>deployments.&lt;w&gt;.httpRoute.enabled: true</code> is set, its rules merge into the <strong>singleton</strong> <code>httpRoute</code> (or <code>grpcRoute</code> / <code>tlsRoute</code>). <code>parentRefs</code> and <code>hostnames</code> are inherited from the singleton; <code>serviceName</code> and <code>servicePort</code> default to the workload’s Service. A <code>priority</code> integer controls rule order in the merged list (lower = earlier; ties broken alphabetically by workload name). The same shorthand works for grpcRoute and tlsRoute.</p>
+<p><strong>HTTPRoute rule-level fields.</strong> Each rule in <code>httpRoute.rules</code> (root, per-workload, or plural-map) supports four optional field groups from the Gateway API spec: <code>name</code> (identifies the rule in status and traces), <code>timeouts</code> (<code>request</code> and <code>backendRequest</code> as Gateway API Duration strings — <a href="https://gateway-api.sigs.k8s.io/geps/gep-2257/">GEP-2257</a>), <code>retry</code> (<code>attempts</code>, <code>codes</code> status-code list 400–599, <code>backoff</code>), and <code>sessionPersistence</code> (<code>sessionName</code>, <code>type</code> (<code>Cookie</code>/<code>Header</code>), <code>absoluteTimeout</code>, <code>idleTimeout</code>, <code>cookieConfig.lifetimeType</code>). All four are independently optional and are omitted from the rendered manifest when not set. Channel/version requirements: <code>name</code> needs Gateway API v1.4+ Standard or v1.2+ Experimental CRDs; <code>timeouts</code> is Standard since v1.2; <code>retry</code> and <code>sessionPersistence</code> are <strong>Experimental only</strong> as of Gateway API v1.5.1. The chart fails fast when a field is set but the cluster’s installed CRD channel does not support it (detection skipped during offline <code>helm template</code>).</p>
+<p><strong>HTTPRoute rule schema strictness.</strong> Each entry in <code>httpRoute.rules</code> (and the equivalent under <code>httpRoutes.&lt;n&gt;.rules</code> and per-workload route maps) is validated against a strict schema (<code>additionalProperties: false</code>) listing only the supported fields: <code>name</code>, <code>matches</code>, <code>filters</code>, <code>backendRefs</code>, <code>serviceName</code>, <code>servicePort</code>, <code>timeouts</code>, <code>retry</code>, <code>sessionPersistence</code>. Unknown keys — typos, deprecated fields, or Gateway API fields not yet wired into the chart — now fail at <code>helm template</code> time instead of being silently dropped. This is a behaviour change relative to the previous loose <code>type: array</code> validation on <code>httpRoute.rules</code>; if you depend on a Gateway API HTTPRouteRule field not in the list above, file an issue or submit a PR.</p>
+<p><strong>GRPCRoute rule-level fields.</strong> Each rule in <code>grpcRoute.rules</code> (root, per-workload, or plural-map) supports <code>name</code> (Gateway API SectionName, identifies the rule in status and traces) and <code>sessionPersistence</code> (<code>sessionName</code>, <code>type</code> (<code>Cookie</code>/<code>Header</code>), <code>absoluteTimeout</code>, <code>idleTimeout</code>, <code>cookieConfig.lifetimeType</code>) on top of the existing <code>matches</code>/<code>filters</code>/<code>backendRefs</code>. Both are independently optional. The Gateway API spec <strong>does not define <code>timeouts</code> or <code>retry</code> on GRPCRouteRule</strong> — those are HTTPRoute-only — so the chart does not surface them. Channel/version requirements: <code>name</code> needs Gateway API v1.4+ Standard or v1.2+ Experimental CRDs; <code>sessionPersistence</code> is <strong>Experimental only</strong> as of Gateway API v1.5.1. The chart fails fast at template time when a field is set but the cluster’s installed CRD channel does not support it (detection skipped during offline <code>helm template</code>). The same strict per-rule schema (<code>additionalProperties: false</code>) now applies to GRPCRoute rules — unknown keys fail fast.</p>
+<p><strong>TLSRoute rule-level fields.</strong> Each rule in <code>tlsRoute.rules</code> (root, per-workload, or plural-map) supports <code>name</code> (Gateway API SectionName, identifies the rule) on top of <code>backendRefs</code>. The Gateway API spec defines <strong>only <code>name</code> and <code>backendRefs</code></strong> on TLSRouteRule — TLS is L4 passthrough, so <code>matches</code>, <code>filters</code>, <code>timeouts</code>, <code>retry</code>, and <code>sessionPersistence</code> are not part of the type and are not surfaced by the chart. TLSRoute itself is Experimental-only (<code>gateway.networking.k8s.io/v1alpha2</code>), so any use of TLSRoute already presupposes Experimental CRDs — <code>name</code> adds no further per-field channel requirement. The same strict per-rule schema (<code>additionalProperties: false</code>) now applies to TLSRoute rules.</p>
+<p><strong>ReferenceGrant</strong> lives in the namespace of the <em>target</em> (the Service being referenced), so the chart always emits it in the release namespace. It supports cross-namespace HTTPRoute → Service references without RBAC complexity.</p>
+<p><strong>Singleton vs multi-resource.</strong> The singleton exists for the common case (one chart instance, one external entry point). The multi-map exists when the same release exposes routes via different controllers / parents / hostnames (e.g. <code>nginx-internal</code> Ingress for east-west traffic, <code>nginx-external</code> Ingress for north-south).</p>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<p><strong>What this enables:</strong></p>
 <ul>
-<li><a href="01-getting-started/"><code>01-getting-started/</code></a> — concepts, install, quickstart.</li>
-<li><a href="02-examples/"><code>02-examples/</code></a> — self-contained scenarios. Each example is a folder you can copy verbatim. Every example carries its own <code>values.yaml</code> plus ready-to-apply manifests for <strong>Argo CD</strong> (single-source and multi-source <code>sources[]</code>), <strong>Flux</strong> (<code>OCIRepository</code> + <code>HelmRelease</code>) and plain <strong><code>helm</code> CLI</strong>.</li>
-<li><a href="03-reference/"><code>03-reference/</code></a> — <code>values.yaml</code> reference, schema notes, version compatibility.</li>
-<li><a href="04-contributing/"><code>04-contributing/</code></a> — local dev, testing, releases.</li>
-<li><a href="05-adr/"><code>05-adr/</code></a> — Architecture Decision Records. Numbered by importance: <code>001</code> is the most foundational decision, the tail covers narrower refinements.</li>
+<li>A team migrating from Ingress to HTTPRoute can run both side-by-side during the migration window — <code>ingress.enabled: true</code> and <code>httpRoute.enabled: true</code> co-exist on the same release.</li>
+<li>“Internal + external” Ingresses without a second chart release.</li>
+<li>Cross-namespace Gateway API routing without per-release ReferenceGrant boilerplate — drop a <code>referenceGrants.from-gateway-ns</code> map entry and the resource is generated.</li>
+<li>Per-workload route rules contributed automatically to the right merged route, with deterministic ordering.</li>
 </ul>
-<h2 id="conventions"><a class="header" href="#conventions">Conventions</a></h2>
+<p><strong>What it costs:</strong></p>
 <ul>
-<li>Top-level sections and concrete examples use numeric prefixes (<code>01-</code>, <code>02-</code>, …) so file-system order matches reading order.</li>
-<li>ADR files use a three-digit prefix (<code>001-…</code>).</li>
-<li>Examples follow a fixed shape: <code>README.md</code>, <code>values.yaml</code>, <code>argocd/</code>, <code>flux/</code>, <code>helm/</code>. The kitchen-sink example (<code>99-kitchen-sink/</code>) intentionally exercises everything at once.</li>
-<li>All documentation is in English.</li>
+<li>Five route templates plus two Ingress shapes (singleton + map) is a lot of surface. Tests cover each (<code>tests/httproute_test.yaml</code>, <code>tests/grpcroute_test.yaml</code>, <code>tests/tlsroute_test.yaml</code>, <code>tests/ingress_test.yaml</code>, <code>tests/referencegrant_test.yaml</code>).</li>
+<li>The “rules merge from per-workload shorthand” model needs a clear ordering contract. Implemented as: explicit <code>priority</code> first (ascending), then alphabetical by workload name. See <a href="014-deterministic-ordering.html">ADR 014</a>.</li>
+<li>A user can configure both <code>ingress</code> and <code>ingresses</code> (singleton + map) at the same time. The chart renders both — duplicates are the user’s problem. This is an intentional simplification; a fail-fast check would over-constrain unusual but valid setups (singleton for legacy, map for new).</li>
+<li>Gateway API requires CRDs installed in the cluster. The chart assumes installs match the user’s intent: if <code>httpRoute.enabled: true</code> is set without the CRD installed, <code>kubectl apply</code> fails with a clear message.</li>
+</ul>
+<h2 id="per-workload-shorthand-example"><a class="header" href="#per-workload-shorthand-example">Per-workload shorthand example</a></h2>
+<pre><code class="language-yaml">httpRoute:
+  enabled: true
+  parentRefs:
+    - name: my-gateway
+      namespace: gateway-system
+  hostnames:
+    - app.example.com
+
+deployments:
+  api:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+    httpRoute:
+      enabled: true
+      priority: 10
+      rules:
+        - name: api-traffic
+          matches:
+            - path:
+                type: PathPrefix
+                value: /api
+          timeouts:
+            request: 30s
+            backendRequest: 10s
+          retry:
+            attempts: 3
+            codes: [503, 504]
+            backoff: 1s
+  web:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 80
+    httpRoute:
+      enabled: true
+      priority: 20
+      rules:
+        - matches:
+            - path:
+                type: PathPrefix
+                value: /
+</code></pre>
+<p>Renders one HTTPRoute with two merged rules: API first (with name, timeouts, retry), web second (minimal catch-all). <code>serviceName</code> defaults to <code>&lt;release-fullname&gt;-api</code> / <code>-web</code>; <code>servicePort</code> defaults to the workload’s <code>service.port</code>.</p>
+<h2 id="alternatives-considered"><a class="header" href="#alternatives-considered">Alternatives considered</a></h2>
+<ul>
+<li><strong>Ingress only.</strong> Rejected: closes the door on Gateway API migrations.</li>
+<li><strong>Gateway API only.</strong> Rejected: many clusters still don’t have a Gateway controller installed; Ingress remains the lowest-common-denominator routing primitive.</li>
+<li><strong>Per-workload Ingress, no singleton.</strong> Rejected: the common case is one Ingress per release; making users pay multi-resource ceremony for the common case is a regression.</li>
+<li><strong>Render <code>parentRefs</code> / <code>hostnames</code> on every per-workload route.</strong> Rejected: invites drift; one source of truth (singleton) and inheritance is cleaner.</li>
+</ul>
+<h2 id="references"><a class="header" href="#references">References</a></h2>
+<ul>
+<li><code>values.yaml</code> — the <code>ingress</code> / <code>ingresses</code> and Gateway API (<code>httpRoute</code> / <code>httpRoutes</code> / <code>grpcRoute</code> / <code>grpcRoutes</code> / <code>tlsRoute</code> / <code>tlsRoutes</code> / <code>referenceGrant</code> / <code>referenceGrants</code>) blocks.</li>
+<li><code>templates/ingress.yaml</code>, <code>templates/httproute.yaml</code>, <code>templates/grpcroute.yaml</code>, <code>templates/tlsroute.yaml</code>, <code>templates/referencegrant.yaml</code>.</li>
+<li>Tests: <code>tests/ingress_test.yaml</code>, <code>tests/httproute_test.yaml</code>, <code>tests/grpcroute_test.yaml</code>, <code>tests/tlsroute_test.yaml</code>, <code>tests/referencegrant_test.yaml</code>.</li>
+<li>Related: <a href="014-deterministic-ordering.html">ADR 014</a>.</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../05-adr/008-multi-provider-monitoring.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
-                            <a rel="next prefetch" href="01-getting-started/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../05-adr/010-argocd-sync-waves.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -229,8 +316,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../05-adr/008-multi-provider-monitoring.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
-                    <a rel="next prefetch" href="01-getting-started/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../05-adr/010-argocd-sync-waves.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -250,13 +340,13 @@
         </script>
 
 
-        <script src="elasticlunr-ef4e11c1.min.js"></script>
-        <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-09f2665d.js"></script>
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
 
-        <script src="clipboard-1626706a.min.js"></script>
-        <script src="highlight-abc7f01d.js"></script>
-        <script src="book-609e4cb8.js"></script>
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

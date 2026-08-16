@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Introduction - universal-helm-chart</title>
+        <title>Layered inheritance and explicit override - universal-helm-chart</title>
 
 
         <!-- Custom HTML head -->
@@ -12,33 +12,33 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="theme-color" content="#ffffff">
 
-        <link rel="icon" href="favicon-de23e50b.svg">
-        <link rel="shortcut icon" href="favicon-8114d1fc.png">
-        <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-e96d0476.css">
-        <link rel="stylesheet" href="css/chrome-d279d366.css">
-        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
-        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
 
         <!-- Highlight.js Stylesheets -->
-        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
-        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
-        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
 
         <!-- Custom theme stylesheets -->
 
 
         <!-- Provide site root and default themes to javascript -->
         <script>
-            const path_to_root = "";
+            const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5c9a7cbb.js";
+            window.path_to_searchindex_js = "../searchindex-5c9a7cbb.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-447daa91.js"></script>
+        <script src="../toc-447daa91.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -105,7 +105,7 @@
             <!-- populated by js -->
             <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
             <noscript>
-                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
             </noscript>
             <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
                 <div class="sidebar-resize-indicator"></div>
@@ -140,13 +140,13 @@
                     <h1 class="menu-title">universal-helm-chart</h1>
 
                     <div class="right-buttons">
-                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
                             <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
                         </a>
                         <a href="https://github.com/purisev/universal-helm-chart" title="Git repository" aria-label="Git repository">
                             <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
-                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/README.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/05-adr/003-layered-inheritance-and-override.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
                         </a>
 
@@ -180,46 +180,113 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="documentation"><a class="header" href="#documentation">Documentation</a></h1>
-<p><code>universal-helm-chart</code> is one Helm chart that covers the common Kubernetes workload shapes — Deployments, StatefulSets, Jobs, CronJobs — along with the networking, autoscaling, monitoring, secrets and policy resources that almost every release ends up needing. The goal is to keep one well-tested template in one place so individual services don’t each carry a pile of YAML.</p>
-<p>These docs are versioned with the chart and <strong>never ship inside the OCI artifact</strong> (see <a href="../.helmignore"><code>.helmignore</code></a>).</p>
-<h2 id="where-to-start"><a class="header" href="#where-to-start">Where to start</a></h2>
+                        <h1 id="003--layered-inheritance-and-explicit-override"><a class="header" href="#003--layered-inheritance-and-explicit-override">003 — Layered inheritance and explicit override</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2025-04-25</li>
+</ul>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>A real release fans out across several scopes that all want to inject the same kinds of configuration:</p>
+<ul>
+<li>the <strong>fleet</strong> scope — env vars common to every chart instance in a cluster (<code>OTEL_EXPORTER_OTLP_ENDPOINT</code>, region, environment name);</li>
+<li>the <strong>release</strong> scope — env vars and labels common to every workload in this app (<code>SERVICE_NAME</code>, app version);</li>
+<li>the <strong>workload</strong> scope — env vars specific to one Deployment (“the worker uses a different log level”);</li>
+<li>the <strong>container</strong> scope — env vars specific to a sidecar.</li>
+</ul>
+<p>If each layer carries its own merge rules implemented inline in templates, the result is fragile: it’s easy to forget to inherit one piece (and pods miss a critical env var) or to double-inject another (and <code>envFrom</code> lists grow). We need one consistent answer that covers env vars, ConfigMap mounts, Secret mounts, volumes, scheduling parameters and labels.</p>
+<p>We also need a way to <strong>opt out</strong>. Most workloads should inherit everything; a small number need to escape — for example, a sidecar that talks to a different secret store than the main container, or a CronJob that should not pick up the global Datadog agent annotation.</p>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<p>A <strong>four-layer cascade</strong> with <strong>explicit opt-out</strong> at the inheriting layer:</p>
+<pre><code>global  →  root  →  workload  →  container
+</code></pre>
+<p>At each layer the chart applies these merge rules:</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>You want to…</th><th>Read</th></tr>
+<tr><th>Kind</th><th>How layers combine</th></tr>
 </thead>
 <tbody>
-<tr><td>Understand what this chart does and why it’s shaped that way</td><td><a href="01-getting-started/"><code>01-getting-started/</code></a></td></tr>
-<tr><td>Copy a working example</td><td><a href="02-examples/"><code>02-examples/</code></a></td></tr>
-<tr><td>Look up a <code>values.yaml</code> field</td><td><a href="03-reference/"><code>03-reference/</code></a></td></tr>
-<tr><td>Hack on the chart itself</td><td><a href="04-contributing/"><code>04-contributing/</code></a></td></tr>
-<tr><td>Read the design decision behind a feature</td><td><a href="05-adr/"><code>05-adr/</code></a></td></tr>
+<tr><td>Maps (env vars, labels, annotations)</td><td><strong>Replace per key</strong> — later layer’s value wins on collision; non-colliding keys union.</td></tr>
+<tr><td>Lists (<code>envSecrets</code>, <code>envConfigMaps</code>, <code>hostAliases</code>)</td><td><strong>Concat</strong> — earlier-layer entries appear first, later-layer entries appended. Duplicates are not deduplicated; map-keyed inheritance (<code>inherit.configMapMount.&lt;name&gt;: false</code>) is the way to suppress one.</td></tr>
+<tr><td>Scheduling fields (<code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code>, <code>topologySpreadConstraints</code>)</td><td><strong>Workload replaces root</strong> — if the workload defines the field, it takes full ownership and the root value is ignored. If the workload omits the field entirely, the root value is inherited. To explicitly disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</td></tr>
+<tr><td>Volumes (map keyed by volume name)</td><td><strong>Replace by key</strong> — same rule as maps. Cannot deep-merge: a volume <code>data</code> cannot be partially <code>emptyDir</code> and partially <code>configMap</code>. See <a href="004-maps-over-lists.html">ADR 004</a>.</td></tr>
 </tbody>
 </table>
 </div>
-<h2 id="sections"><a class="header" href="#sections">Sections</a></h2>
+<p>The opt-out for env and configMap inheritance is expressed via <code>inherit.*</code> flags:</p>
+<pre><code class="language-yaml">deployments:
+  worker:
+    inherit:
+      env:
+        global: true            # opt out of global.env  → false
+        root: true              # opt out of root env    → false
+      envSecrets: true          # opt out of root envSecrets in envFrom → false
+      configMaps: true          # opt out of root envConfigMaps
+      configMapMount: true      # or fine-grained: configMapMount.&lt;name&gt;: false
+</code></pre>
+<p>Default values are all <code>true</code> — i.e. inherit everything. Opt-out is a deliberate, visible setting in the workload that needs it.</p>
+<p>For <code>jobGroups</code>, an additional override level applies between a group and one of its jobs — distinct from the layer cascade above and with its own merge rules. Job-level fields override group-level fields as follows: scalars take the job value when set, otherwise the group’s; lists (<code>envSecrets</code>, <code>envConfigMaps</code>, <code>tolerations</code>) are concatenated group-then-job; nested maps (<code>env</code>, <code>image</code>, <code>securityContext</code>, <code>podSecurityContext</code>, <code>resources</code>, <code>nodeSelector</code>, <code>affinity</code>, <code>inherit</code>, <code>hooks.argocd</code>, <code>hooks.helm</code>, <code>metadataAnnotations</code>) <strong>deep-merge</strong> with the job winning on key collision; <code>volumes</code> and <code>volumeMounts</code> (maps keyed by name) replace <strong>whole entries</strong> by name — the chart does not recurse into a single volume/mount, because k8s volume kinds are mutually exclusive (a name is either an <code>emptyDir</code> or a <code>configMap</code>, never both). See <a href="005-jobgroups-unification.html">ADR 005</a>.</p>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<p><strong>What this enables:</strong></p>
 <ul>
-<li><a href="01-getting-started/"><code>01-getting-started/</code></a> — concepts, install, quickstart.</li>
-<li><a href="02-examples/"><code>02-examples/</code></a> — self-contained scenarios. Each example is a folder you can copy verbatim. Every example carries its own <code>values.yaml</code> plus ready-to-apply manifests for <strong>Argo CD</strong> (single-source and multi-source <code>sources[]</code>), <strong>Flux</strong> (<code>OCIRepository</code> + <code>HelmRelease</code>) and plain <strong><code>helm</code> CLI</strong>.</li>
-<li><a href="03-reference/"><code>03-reference/</code></a> — <code>values.yaml</code> reference, schema notes, version compatibility.</li>
-<li><a href="04-contributing/"><code>04-contributing/</code></a> — local dev, testing, releases.</li>
-<li><a href="05-adr/"><code>05-adr/</code></a> — Architecture Decision Records. Numbered by importance: <code>001</code> is the most foundational decision, the tail covers narrower refinements.</li>
+<li><strong>Cluster-wide defaults</strong> in <code>global.env</code> propagate everywhere automatically (Helm’s subchart <code>global:</code> mechanism). A platform team can ship an OTel endpoint in one place.</li>
+<li><strong>Predictable overrides.</strong> “Workload value wins for maps; lists concat” is a single sentence to remember.</li>
+<li><strong>Local escape hatches</strong> without touching ancestor configuration. A bursty worker that should not inherit a Datadog agent annotation simply sets <code>inherit.configMapMount.datadog: false</code>.</li>
 </ul>
-<h2 id="conventions"><a class="header" href="#conventions">Conventions</a></h2>
+<p><strong>What it costs:</strong></p>
 <ul>
-<li>Top-level sections and concrete examples use numeric prefixes (<code>01-</code>, <code>02-</code>, …) so file-system order matches reading order.</li>
-<li>ADR files use a three-digit prefix (<code>001-…</code>).</li>
-<li>Examples follow a fixed shape: <code>README.md</code>, <code>values.yaml</code>, <code>argocd/</code>, <code>flux/</code>, <code>helm/</code>. The kitchen-sink example (<code>99-kitchen-sink/</code>) intentionally exercises everything at once.</li>
-<li>All documentation is in English.</li>
+<li>The merge rules differ between maps, lists, and scheduling fields; contributors must remember which is which. We mitigate this with <a href="004-maps-over-lists.html">ADR 004</a> — collections become maps unless they truly cannot — and with the cross-cutting rules section in <a href="../03-reference/01-values.html"><code>docs/03-reference/01-values.md</code></a>.</li>
+<li>“Inheritance” is <em>not</em> deep merge of arbitrary structures. Volumes, env vars and configMap entries inherit by <em>whole entity</em> keyed by name. This is a feature: deep-merging a volume that’s <code>emptyDir</code> at one layer and <code>configMap</code> at another would produce nonsense.</li>
+<li>Helpers carrying inheritance logic (<code>uhc.envVars</code>, <code>uhc.envFrom</code>, <code>uhc.containerSpecWithOptions</code>, <code>uhc.sidecarsSpec</code> in <code>templates/_env.tpl</code> and <code>templates/_workload.tpl</code>; <code>uhc.jobGroupSpec</code> in <code>templates/_jobs.tpl</code>) are non-trivial. They are tested aggressively via helm-unittest.</li>
+</ul>
+<h2 id="examples"><a class="header" href="#examples">Examples</a></h2>
+<pre><code class="language-yaml"># global.env propagates to every container in every workload
+global:
+  env:
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+
+# Release-level env applies to every workload in this release
+env:
+  SERVICE_NAME: orders
+
+deployments:
+  api:
+    # No 'inherit' block — inherits both global and release env
+    env:
+      LOG_LEVEL: info        # adds to the merged set; wins on collision
+  reaper:
+    inherit:
+      env:
+        global: false        # this workload skips global.env
+    env:
+      LOG_LEVEL: warn
+</code></pre>
+<p>The resulting effective env in <code>deployments.api</code>’s container:
+<code>OTEL_EXPORTER_OTLP_ENDPOINT, SERVICE_NAME, LOG_LEVEL</code> (plus the chart-injected <code>NAMESPACE</code> from <code>fieldRef</code>).</p>
+<p>In <code>deployments.reaper</code>’s container:
+<code>SERVICE_NAME, LOG_LEVEL</code> only — <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> is suppressed by the opt-out.</p>
+<h2 id="alternatives-considered"><a class="header" href="#alternatives-considered">Alternatives considered</a></h2>
+<ul>
+<li><strong>No inheritance — each workload restates everything.</strong> Rejected: defeats the universal chart goal and re-creates copy-paste drift inside one chart.</li>
+<li><strong>Deep merge with strategic-merge-patch semantics.</strong> Rejected: surprising behaviour around list merging (replace vs append vs merge-by-key); would require us to re-implement a substantial subset of <code>kubectl apply</code> semantics in templates.</li>
+<li><strong>Producer-side opt-out</strong> — env vars at <code>global.env</code> carrying their own per-workload exclusion list. Rejected: scatters per-workload knowledge into ancestor configuration; harder to read.</li>
+</ul>
+<h2 id="references"><a class="header" href="#references">References</a></h2>
+<ul>
+<li><code>templates/_env.tpl</code> — <code>uhc.envVars</code>, <code>uhc.envFrom</code>. <code>templates/_workload.tpl</code> — <code>uhc.containerSpecWithOptions</code>, <code>uhc.sidecarsSpec</code>, <code>uhc.scheduling</code>. <code>templates/_jobs.tpl</code> — <code>uhc.jobGroupSpec</code>.</li>
+<li><a href="../03-reference/01-values.html"><code>docs/03-reference/01-values.md</code></a> — Cross-cutting rules: env merge order, scheduling field inheritance, jobGroups merge.</li>
+<li>Related: <a href="002-multi-workload-keyed-maps.html">ADR 002</a>, <a href="004-maps-over-lists.html">ADR 004</a>, <a href="005-jobgroups-unification.html">ADR 005</a>.</li>
 </ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../05-adr/002-multi-workload-keyed-maps.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
-                            <a rel="next prefetch" href="01-getting-started/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../05-adr/004-maps-over-lists.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -229,8 +296,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../05-adr/002-multi-workload-keyed-maps.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
-                    <a rel="next prefetch" href="01-getting-started/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../05-adr/004-maps-over-lists.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>
@@ -250,13 +320,13 @@
         </script>
 
 
-        <script src="elasticlunr-ef4e11c1.min.js"></script>
-        <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-09f2665d.js"></script>
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
 
-        <script src="clipboard-1626706a.min.js"></script>
-        <script src="highlight-abc7f01d.js"></script>
-        <script src="book-609e4cb8.js"></script>
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 
