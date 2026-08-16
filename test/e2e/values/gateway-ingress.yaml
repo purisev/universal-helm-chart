@@ -92,3 +92,19 @@ tlsRoute:
     - backendRefs:
         - name: e2e-api
           port: 80
+
+# Separate HTTPRoute with a backendRef into another namespace, exercised by
+# the referencegrant-cross-namespace test: agentgateway must refuse to
+# resolve this backend until the chart's own ReferenceGrant template is
+# applied in the e2e-gateway-ingress-backend namespace.
+httpRoutes:
+  referencegrant-cross-ns:
+    parentRefs:
+      - name: e2e-gateway
+    hostnames:
+      - referencegrant.e2e.local
+    rules:
+      - backendRefs:
+          - name: e2e-rg-backend-backend
+            namespace: e2e-gateway-ingress-backend
+            port: 80

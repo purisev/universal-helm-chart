@@ -330,6 +330,14 @@ jobs:
             -f test/e2e/values/gateway-ingress.yaml \
             --wait --timeout 3m
 
+      - name: Deploy the cross-namespace ReferenceGrant backend (no grant yet)
+        run: |
+          kubectl create namespace e2e-gateway-ingress-backend
+          helm upgrade --install e2e-rg-backend . \
+            -n e2e-gateway-ingress-backend \
+            -f test/e2e/values/gateway-ingress-referencegrant-backend.yaml \
+            --wait --timeout 3m
+
       - name: Run Chainsaw tests
         run: chainsaw test test/e2e/chainsaw/gateway-ingress --config test/e2e/chainsaw/gateway-ingress-config.yaml
 
@@ -338,6 +346,11 @@ jobs:
         run: |
           echo "::group::Ingress / HTTPRoute / GRPCRoute / TLSRoute / Gateway"
           kubectl get ingress,httproute,grpcroute,tlsroute,gateway -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::ReferenceGrant / cross-namespace backend"
+          kubectl get referencegrant,httproute,svc -n e2e-gateway-ingress-backend -o wide
+          kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" -o yaml
           echo "::endgroup::"
 
           echo "::group::ingress-nginx controller logs"
