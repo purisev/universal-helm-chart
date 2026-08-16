@@ -59,6 +59,21 @@ http (if present)  →  others alphabetically  →  metrics (if present)
 
 Auto-injected metrics port (from `integrations.monitoring.defaults.exposeService`) lands last. See [ADR 014](../05-adr/014-deterministic-ordering.md) and [ADR 016](../05-adr/016-metrics-port-auto-exposure.md).
 
+### Service port `appProtocol`
+
+Both Service port shapes accept an optional `appProtocol` — the single-port `service.port`/`service.targetPort` form and the `service.ports.<name>` map form (and their `headlessService` equivalents on StatefulSets). It passes straight through to `spec.ports[].appProtocol`, the native Kubernetes Service field.
+
+Set it when a port speaks something other than plain HTTP/1.1 and the consumer needs to know — most commonly `kubernetes.io/h2c` on a gRPC port, so a Gateway API implementation routing a GRPCRoute to that Service configures the upstream connection as HTTP/2 cleartext instead of assuming HTTP/1.1:
+
+```yaml
+service:
+  ports:
+    grpc:
+      port: 9000
+      targetPort: 9000
+      appProtocol: kubernetes.io/h2c
+```
+
 ### `jobGroups` group → job merge
 
 For each per-job field:
