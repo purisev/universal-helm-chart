@@ -85,9 +85,23 @@ spec:
               GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
                 -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
                 -o jsonpath='{.items[0].metadata.name}')
-              kubectl exec prober -n "$NAMESPACE" -- \
-                wget -q -O- --timeout=5 --header="Host: referencegrant.e2e.local" \
-                "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/"
+
+              # The HTTPRoute's ResolvedRefs condition flips to True as soon
+              # as the control plane accepts the reference, but agentgateway's
+              # dataplane needs a moment longer to actually push the new
+              # route, so a curl fired right after the status check can still
+              # 503 for a beat.
+              RESULT=unknown
+              for i in $(seq 1 20); do
+                if OUT=$(kubectl exec prober -n "$NAMESPACE" -- \
+                    wget -q -O- --timeout=5 --header="Host: referencegrant.e2e.local" \
+                    "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/" 2>/dev/null); then
+                  RESULT="$OUT"
+                  break
+                fi
+                sleep 3
+              done
+              echo "$RESULT"
             check:
               ($error): ~
               (contains($stdout, 'Welcome to nginx')): true
