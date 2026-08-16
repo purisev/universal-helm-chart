@@ -30,11 +30,14 @@ spec:
               # detached, waits for it to finish, and reads its logs
               # explicitly instead. No --command: the image's own
               # ENTRYPOINT is already grpcurl, so these tokens are its args.
+              # grpcurl parses flags-then-positionals, so -d must come
+              # before the address/symbol, not after — trailing flags are
+              # rejected with "Too many arguments".
               kubectl run grpc-prober -n "$NAMESPACE" --image=fullstorydev/grpcurl:v1.9.3 \
                 --restart=Never -- \
-                -plaintext -authority=grpcroute.e2e.local \
+                -plaintext -authority=grpcroute.e2e.local -d '{"f_string":"e2e-grpcroute"}' \
                 "${GW_SVC}.${NAMESPACE}.svc.cluster.local:80" \
-                grpcbin.GRPCBin/DummyUnary -d '{"f_string":"e2e-grpcroute"}'
+                grpcbin.GRPCBin/DummyUnary
 
               for i in $(seq 1 20); do
                 PHASE=$(kubectl get pod grpc-prober -n "$NAMESPACE" -o jsonpath='{.status.phase}')
