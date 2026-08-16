@@ -91,16 +91,16 @@ spec:
     {{- range $pName := include "uhc.orderedPortNames" $svc.ports | fromJsonArray }}
     {{- $p := index $svc.ports $pName }}
     - name: {{ $pName }}
-      port: {{ $p.port }}
-      targetPort: {{ $p.targetPort }}
+      port: {{ $p.port | default $p.targetPort }}
+      targetPort: {{ $p.targetPort | default $p.port }}
       protocol: {{ $p.protocol | default "TCP" }}
       {{- with $p.appProtocol }}
       appProtocol: {{ . }}
       {{- end }}
     {{- end }}
     {{- else }}
-    - port: {{ $svc.port }}
-      targetPort: {{ $svc.targetPort }}
+    - port: {{ $svc.port | default $svc.targetPort }}
+      targetPort: {{ $svc.targetPort | default $svc.port }}
       protocol: TCP
       name: http
       {{- with $svc.appProtocol }}
@@ -171,7 +171,7 @@ spec:
     {{- $p := index $hs.ports $pName }}
     - name: {{ $pName }}
       port: {{ $p.port | default $p.targetPort }}
-      targetPort: {{ $p.targetPort }}
+      targetPort: {{ $p.targetPort | default $p.port }}
       protocol: {{ $p.protocol | default "TCP" }}
       {{- with $p.appProtocol }}
       appProtocol: {{ . }}
@@ -180,7 +180,7 @@ spec:
     {{- else if or $hs.port $hs.targetPort }}
     - name: http
       port: {{ $hs.port | default $hs.targetPort }}
-      targetPort: {{ $hs.targetPort }}
+      targetPort: {{ $hs.targetPort | default $hs.port }}
       protocol: TCP
       {{- with $hs.appProtocol }}
       appProtocol: {{ . }}
