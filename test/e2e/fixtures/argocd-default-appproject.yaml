@@ -1,0 +1,19 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: default
+  namespace: argocd
+spec:
+  # ArgoCD Core has no API server, and it's the API server that normally
+  # bootstraps the default AppProject on startup for a full install —
+  # Core mode never creates it, so any Application referencing project
+  # "default" (the implicit default when spec.project isn't set otherwise)
+  # fails with "project default which does not exist" unless this exists.
+  sourceRepos:
+    - "*"
+  destinations:
+    - server: "*"
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

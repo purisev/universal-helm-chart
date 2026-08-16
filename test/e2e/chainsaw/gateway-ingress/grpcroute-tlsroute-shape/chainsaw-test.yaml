@@ -1,0 +1,33 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: grpcroute-tlsroute-shape
+spec:
+  steps:
+    # Both routes get real-traffic coverage elsewhere (grpcroute-routing,
+    # tlsroute-passthrough) — this is just a single place to check both
+    # objects render with the right parentRefs/hostnames.
+    - name: grpcroute and tlsroute are schema-valid and accepted by the API server
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: GRPCRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - grpcroute.e2e.local
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1alpha2
+              kind: TLSRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - tlsroute.e2e.local

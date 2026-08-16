@@ -41,6 +41,36 @@
         }
       }
     },
+    "persistentVolumeClaimRetentionPolicyShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "whenDeleted": {"type": "string", "enum": ["Retain", "Delete"]},
+        "whenScaled": {"type": "string", "enum": ["Retain", "Delete"]}
+      }
+    },
+    "statefulSetOrdinalsShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "start": {"type": "integer", "minimum": 0}
+      }
+    },
+    "podResourceClaimEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string"},
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resourceClaimName": {"type": "string"},
+            "resourceClaimTemplateName": {"type": "string"}
+          }
+        }
+      }
+    },
     "inheritShape": {
       "type": "object",
       "additionalProperties": false,
@@ -67,7 +97,22 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": {"type": "boolean"}
+        "enabled": {"type": "boolean"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "targetPort": {"type": ["integer", "string"]},
+        "appProtocol": {"type": "string"},
+        "ports": {
+          "type": "object",
+          "additionalProperties": {"$ref": "#/$defs/servicePortEntry"}
+        },
+        "annotations": {"type": "object"},
+        "publishNotReadyAddresses": {"type": "boolean"},
+        "ipFamilies": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {"type": "string", "enum": ["IPv4", "IPv6"]}
+        },
+        "ipFamilyPolicy": {"type": "string", "enum": ["SingleStack", "PreferDualStack", "RequireDualStack"]}
       }
     },
     "servicePortEntry": {
@@ -76,7 +121,21 @@
       "properties": {
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "targetPort": {"type": ["integer", "string"]},
-        "protocol": {"type": "string", "enum": ["TCP", "UDP", "SCTP"]}
+        "protocol": {"type": "string", "enum": ["TCP", "UDP", "SCTP"]},
+        "appProtocol": {"type": "string"}
+      }
+    },
+    "sessionAffinityConfigShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "clientIP": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "timeoutSeconds": {"type": "integer", "minimum": 1, "maximum": 86400}
+          }
+        }
       }
     },
     "serviceShape": {
@@ -87,15 +146,32 @@
         "type": {"type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "targetPort": {"type": ["integer", "string"]},
+        "appProtocol": {"type": "string"},
         "ports": {
           "type": "object",
           "additionalProperties": {"$ref": "#/$defs/servicePortEntry"}
         },
         "annotations": {"type": "object"},
         "clusterIP": {"type": "string"},
+        "clusterIPs": {"type": "array", "maxItems": 2, "items": {"type": "string"}},
+        "externalName": {"type": "string"},
+        "externalIPs": {"type": "array", "items": {"type": "string"}},
         "loadBalancerIP": {"type": "string"},
+        "loadBalancerClass": {"type": "string"},
+        "loadBalancerSourceRanges": {"type": "array", "items": {"type": "string"}},
+        "allocateLoadBalancerNodePorts": {"type": "boolean"},
+        "healthCheckNodePort": {"type": "integer", "minimum": 1, "maximum": 65535},
         "externalTrafficPolicy": {"type": "string", "enum": ["Cluster", "Local"]},
+        "internalTrafficPolicy": {"type": "string", "enum": ["Cluster", "Local"]},
         "sessionAffinity": {"type": "string", "enum": ["None", "ClientIP"]},
+        "sessionAffinityConfig": {"$ref": "#/$defs/sessionAffinityConfigShape"},
+        "ipFamilies": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {"type": "string", "enum": ["IPv4", "IPv6"]}
+        },
+        "ipFamilyPolicy": {"type": "string", "enum": ["SingleStack", "PreferDualStack", "RequireDualStack"]},
+        "trafficDistribution": {"type": "string"},
         "publishNotReadyAddresses": {"type": "boolean"}
       }
     },
@@ -158,7 +234,8 @@
       "properties": {
         "enabled": {"type": "boolean"},
         "minAvailable": {"type": ["integer", "string"]},
-        "maxUnavailable": {"type": ["integer", "string"]}
+        "maxUnavailable": {"type": ["integer", "string"]},
+        "unhealthyPodEvictionPolicy": {"type": "string", "enum": ["IfHealthyBudget", "AlwaysAllow"]}
       }
     },
     "vpaShape": {
@@ -394,6 +471,7 @@
                         "mountPath": {"type": "string"},
                         "role": {"type": "string"},
                         "serviceAccountRef": {"type": "string"},
+                        "serviceAccountNamespace": {"type": "string"},
                         "audiences": {"type": "array", "items": {"type": "string"}},
                         "expirationSeconds": {"type": "integer", "minimum": 1}
                       }
@@ -588,6 +666,17 @@
         },
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
+        "resizePolicy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "resourceName": {"type": "string", "enum": ["cpu", "memory"]},
+              "restartPolicy": {"type": "string", "enum": ["NotRequired", "RestartContainer"]}
+            }
+          }
+        },
         "livenessProbe": {"type": "object"},
         "readinessProbe": {"type": "object"},
         "startupProbe": {"type": "object"},
@@ -636,6 +725,7 @@
         "progressDeadlineSeconds": {"type": "integer", "minimum": 1},
         "minReadySeconds": {"type": "integer", "minimum": 0},
         "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0},
+        "paused": {"type": "boolean"},
         "automountServiceAccountToken": {"type": "boolean"},
         "serviceAccountName": {"type": "string"},
         "priorityClassName": {"type": "string"},
@@ -659,8 +749,23 @@
         "tolerations": {"type": "array"},
         "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
         "hostAliases": {"type": "array"},
+        "resourceClaims": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/podResourceClaimEntry"}
+        },
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
+        "resizePolicy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "resourceName": {"type": "string", "enum": ["cpu", "memory"]},
+              "restartPolicy": {"type": "string", "enum": ["NotRequired", "RestartContainer"]}
+            }
+          }
+        },
         "livenessProbe": {"type": "object"},
         "readinessProbe": {"type": "object"},
         "startupProbe": {"type": "object"},
@@ -716,6 +821,8 @@
         "tlsRoute": {"$ref": "#/$defs/tlsWorkloadRouteEntry"},
         "statefulSetUpdateStrategy": {"$ref": "#/$defs/statefulSetUpdateStrategyShape"},
         "podManagementPolicy": {"type": "string", "enum": ["OrderedReady", "Parallel"]},
+        "persistentVolumeClaimRetentionPolicy": {"$ref": "#/$defs/persistentVolumeClaimRetentionPolicyShape"},
+        "ordinals": {"$ref": "#/$defs/statefulSetOrdinalsShape"},
         "volumeClaimTemplates": {"type": "array"},
         "minReadySeconds": {"type": "integer", "minimum": 0},
         "terminationGracePeriodSeconds": {"type": "integer", "minimum": 0},
@@ -742,8 +849,23 @@
         "tolerations": {"type": "array"},
         "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
         "hostAliases": {"type": "array"},
+        "resourceClaims": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/podResourceClaimEntry"}
+        },
         "lifecycle": {"type": "object"},
         "probesEnabled": {"type": "boolean"},
+        "resizePolicy": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "resourceName": {"type": "string", "enum": ["cpu", "memory"]},
+              "restartPolicy": {"type": "string", "enum": ["NotRequired", "RestartContainer"]}
+            }
+          }
+        },
         "livenessProbe": {"type": "object"},
         "readinessProbe": {"type": "object"},
         "startupProbe": {"type": "object"},
@@ -811,6 +933,59 @@
         }
       }
     },
+    "podFailurePolicyShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "action": {"type": "string", "enum": ["Ignore", "FailJob", "Count", "FailIndex"]},
+              "onExitCodes": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "containerName": {"type": "string"},
+                  "operator": {"type": "string", "enum": ["In", "NotIn"]},
+                  "values": {"type": "array", "items": {"type": "integer"}}
+                }
+              },
+              "onPodConditions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "type": {"type": "string"},
+                    "status": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "successPolicyShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "succeededIndexes": {"type": "string"},
+              "succeededCount": {"type": "integer", "minimum": 1}
+            }
+          }
+        }
+      }
+    },
     "jobGroupEntry": {
       "type": "object",
       "additionalProperties": false,
@@ -841,6 +1016,14 @@
         "failedJobsHistoryLimit": {"type": "integer", "minimum": 0},
         "startingDeadlineSeconds": {"type": ["integer", "null"], "minimum": 0},
         "backoffLimit": {"type": "integer", "minimum": 0},
+        "completions": {"type": "integer", "minimum": 1},
+        "suspend": {"type": "boolean"},
+        "podFailurePolicy": {"$ref": "#/$defs/podFailurePolicyShape"},
+        "podReplacementPolicy": {"type": "string", "enum": ["TerminatingOrFailed", "Failed"]},
+        "completionMode": {"type": "string", "enum": ["NonIndexed", "Indexed"]},
+        "backoffLimitPerIndex": {"type": "integer", "minimum": 0},
+        "successPolicy": {"$ref": "#/$defs/successPolicyShape"},
+        "parallelism": {"type": "integer", "minimum": 0},
         "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
         "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
         "restartPolicy": {"type": "string", "enum": ["Never", "OnFailure"]},
@@ -898,6 +1081,14 @@
         "failedJobsHistoryLimit": {"type": "integer", "minimum": 0},
         "startingDeadlineSeconds": {"type": ["integer", "null"], "minimum": 0},
         "backoffLimit": {"type": "integer", "minimum": 0},
+        "completions": {"type": "integer", "minimum": 1},
+        "suspend": {"type": "boolean"},
+        "podFailurePolicy": {"$ref": "#/$defs/podFailurePolicyShape"},
+        "podReplacementPolicy": {"type": "string", "enum": ["TerminatingOrFailed", "Failed"]},
+        "completionMode": {"type": "string", "enum": ["NonIndexed", "Indexed"]},
+        "backoffLimitPerIndex": {"type": "integer", "minimum": 0},
+        "successPolicy": {"$ref": "#/$defs/successPolicyShape"},
+        "parallelism": {"type": "integer", "minimum": 0},
         "ttlSecondsAfterFinished": {"type": ["integer", "null"], "minimum": 0},
         "activeDeadlineSeconds": {"type": ["integer", "null"], "minimum": 1},
         "restartPolicy": {"type": "string", "enum": ["Never", "OnFailure"]},
@@ -1045,6 +1236,9 @@
         },
         "annotations": {
           "type": "object"
+        },
+        "automountServiceAccountToken": {
+          "type": "boolean"
         }
       }
     },
@@ -1060,6 +1254,13 @@
         },
         "rules": {
           "type": "array"
+        },
+        "aggregationRule": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "clusterRoleSelectors": {"type": "array"}
+          }
         }
       }
     },

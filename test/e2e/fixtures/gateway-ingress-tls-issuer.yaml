@@ -1,0 +1,32 @@
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: e2e-selfsigned
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tlsroute-cert
+spec:
+  secretName: tlsroute-tls
+  commonName: tlsroute.e2e.local
+  dnsNames:
+    - tlsroute.e2e.local
+  issuerRef:
+    kind: Issuer
+    name: e2e-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress-cert
+spec:
+  secretName: e2e-ingress-tls
+  commonName: e2e.local
+  dnsNames:
+    - e2e.local
+  issuerRef:
+    kind: Issuer
+    name: e2e-selfsigned

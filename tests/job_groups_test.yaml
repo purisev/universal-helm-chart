@@ -191,6 +191,29 @@ tests:
           path: spec.template.spec.containers[0].image
           value: alpine:3.21
 
+  - it: should fall back to the root securityContext default on the job-completed sidecar
+    # Regression guard: job-completed is hardcoded directly in job-groups.yaml
+    # rather than going through uhc.containerSpecWithOptions, so it used to
+    # miss the root securityContext fallback every other container gets —
+    # a jobGroup using tasks with no explicit securityContext rendered that
+    # sidecar with none at all.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.tasks.schema.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: job-completed
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+
   - it: should override completionImage when set
     set:
       image.repository: nginx
@@ -913,3 +936,328 @@ tests:
       - equal:
           path: spec.backoffLimit
           value: 0
+
+  - it: should render completions and parallelism, job overrides group
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.completions: 5
+      jobGroups.db.parallelism: 0
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.parallelism: 2
+    asserts:
+      - equal:
+          path: spec.completions
+          value: 5
+      - equal:
+          path: spec.parallelism
+          value: 2
+
+  - it: should respect parallelism=0 (no group/job override collapses it)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.parallelism: 0
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.parallelism
+          value: 0
+
+  - it: should not render completions/parallelism when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - isNull:
+          path: spec.completions
+      - isNull:
+          path: spec.parallelism
+
+  - it: should render podFailurePolicy, job overrides group entirely
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          podFailurePolicy:
+            rules:
+              - action: Count
+                onExitCodes:
+                  operator: In
+                  values: [1]
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+              podFailurePolicy:
+                rules:
+                  - action: FailJob
+                    onExitCodes:
+                      containerName: migrate
+                      operator: In
+                      values: [42]
+    asserts:
+      - equal:
+          path: spec.podFailurePolicy.rules[0].action
+          value: FailJob
+      - equal:
+          path: spec.podFailurePolicy.rules[0].onExitCodes.containerName
+          value: migrate
+      - lengthEqual:
+          path: spec.podFailurePolicy.rules
+          count: 1
+
+  - it: should fall back to group podFailurePolicy when job does not set one
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          podFailurePolicy:
+            rules:
+              - action: Ignore
+                onPodConditions:
+                  - type: DisruptionTarget
+                    status: "True"
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.podFailurePolicy.rules[0].action
+          value: Ignore
+
+  - it: should render suspend on Job spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.suspend: true
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: true
+
+  - it: should render podReplacementPolicy, job overrides group
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.podReplacementPolicy: Failed
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.podReplacementPolicy: TerminatingOrFailed
+    asserts:
+      - equal:
+          path: spec.podReplacementPolicy
+          value: TerminatingOrFailed
+
+  - it: should not render podReplacementPolicy when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - isNull:
+          path: spec.podReplacementPolicy
+
+  - it: should render completionMode, backoffLimitPerIndex, and successPolicy together
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          completionMode: Indexed
+          completions: 5
+          parallelism: 5
+          backoffLimitPerIndex: 2
+          successPolicy:
+            rules:
+              - succeededIndexes: "0,2-4"
+                succeededCount: 4
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.completionMode
+          value: Indexed
+      - equal:
+          path: spec.backoffLimitPerIndex
+          value: 2
+      - equal:
+          path: spec.successPolicy.rules[0].succeededIndexes
+          value: "0,2-4"
+      - equal:
+          path: spec.successPolicy.rules[0].succeededCount
+          value: 4
+
+  - it: should fail fast when backoffLimitPerIndex is set without completionMode Indexed
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          backoffLimitPerIndex: 2
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "backoffLimitPerIndex and successPolicy require completionMode: Indexed"
+
+  - it: should fail fast when successPolicy is set without completionMode Indexed
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          successPolicy:
+            rules:
+              - succeededCount: 1
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - failedTemplate:
+          errorPattern: "backoffLimitPerIndex and successPolicy require completionMode: Indexed"
+
+  - it: should allow completionMode Indexed without backoffLimitPerIndex or successPolicy
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        db:
+          enabled: true
+          kind: Job
+          completionMode: Indexed
+          completions: 3
+          jobs:
+            migrate:
+              enabled: true
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.completionMode
+          value: Indexed
+
+  - it: should keep the same resource name when suspend is true (excluded from hash)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.suspend: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-migrate-10097e84
+
+  - it: should keep the same resource name when suspend is false (excluded from hash)
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.kind: Job
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.suspend: false
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-migrate-10097e84
+
+  # ---------- scheduling: tolerations inheritance ----------
+  - it: should inherit root tolerations when group and job declare none
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.db.enabled: true
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: dedicated
+              operator: Equal
+              value: stage
+              effect: NoSchedule
+
+  - it: should use group tolerations instead of root when group declares them
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.db.enabled: true
+      jobGroups.db.tolerations:
+        - key: gpu
+          operator: Exists
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.tolerations
+          value:
+            - key: gpu
+              operator: Exists
+
+  - it: should opt out of root tolerations with an explicit empty list
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.db.enabled: true
+      jobGroups.db.tolerations: []
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - isNull:
+          path: spec.template.spec.tolerations

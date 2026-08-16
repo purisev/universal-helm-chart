@@ -1,0 +1,46 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: application-sync-health
+spec:
+  steps:
+    - name: a real ArgoCD Application deploys the chart via GitOps and reaches Synced/Healthy
+      try:
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              RESULT=not-synced
+              for i in $(seq 1 18); do
+                SYNC=$(kubectl get application e2e-app -n argocd -o jsonpath='{.status.sync.status}' 2>/dev/null || true)
+                HEALTH=$(kubectl get application e2e-app -n argocd -o jsonpath='{.status.health.status}' 2>/dev/null || true)
+                if [ "$SYNC" = "Synced" ] && [ "$HEALTH" = "Healthy" ]; then
+                  RESULT=synced
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "$RESULT" != "synced" ]; then
+                echo "--- full Application status (last observed: sync=$SYNC health=$HEALTH) ---"
+                kubectl get application e2e-app -n argocd -o yaml || true
+                echo "--- jobs in e2e-argocd ---"
+                kubectl get jobs -n e2e-argocd -o wide || true
+                echo "--- pods in e2e-argocd ---"
+                kubectl get pods -n e2e-argocd -o wide || true
+                echo "--- events in e2e-argocd ---"
+                kubectl get events -n e2e-argocd --sort-by=.lastTimestamp || true
+              fi
+
+              echo "result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=synced')): true
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: e2e-api
+              status:
+                readyReplicas: 1

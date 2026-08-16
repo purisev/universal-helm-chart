@@ -353,6 +353,63 @@ tests:
           path: spec.ports[1].port
           value: 9090
 
+  - it: should render appProtocol on a single-port service
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.grpc.enabled: true
+      deployments.grpc.service.enabled: true
+      deployments.grpc.service.port: 9000
+      deployments.grpc.service.targetPort: 9000
+      deployments.grpc.service.appProtocol: kubernetes.io/h2c
+    asserts:
+      - equal:
+          path: spec.ports[0].appProtocol
+          value: kubernetes.io/h2c
+
+  - it: should render appProtocol on a service port from the ports map
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.grpc.enabled: true
+      deployments.grpc.service.enabled: true
+      deployments.grpc.service.ports.grpc.port: 9000
+      deployments.grpc.service.ports.grpc.targetPort: 9000
+      deployments.grpc.service.ports.grpc.appProtocol: kubernetes.io/h2c
+      deployments.grpc.service.ports.http.port: 80
+      deployments.grpc.service.ports.http.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.ports[0].appProtocol
+      - equal:
+          path: spec.ports[1].appProtocol
+          value: kubernetes.io/h2c
+
+  - it: should not render appProtocol when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.ports[0].appProtocol
+
+  - it: should render appProtocol on a StatefulSet headless Service
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.port: 9000
+      statefulSets.db.headlessService.targetPort: 9000
+      statefulSets.db.headlessService.appProtocol: kubernetes.io/h2c
+    asserts:
+      - equal:
+          path: spec.ports[0].appProtocol
+          value: kubernetes.io/h2c
+
   # --- explicit pass-through Service fields ---
 
   - it: should render service.loadBalancerIP on Deployment
@@ -383,6 +440,21 @@ tests:
     asserts:
       - equal:
           path: spec.externalTrafficPolicy
+          value: Local
+
+  - it: should render service.internalTrafficPolicy on Deployment
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ClusterIP
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.internalTrafficPolicy: Local
+    asserts:
+      - equal:
+          path: spec.internalTrafficPolicy
           value: Local
 
   - it: should render service.sessionAffinity on Deployment
@@ -430,20 +502,12 @@ tests:
           path: spec.publishNotReadyAddresses
           value: true
 
-  - it: should render service.annotations on the headless StatefulSet Service
-    # Regression: the headless branch used to drop $wl.service.annotations and
-    # only emit chart-managed (sync-wave/etc.) annotations. The Deployment and
-    # non-headless StatefulSet branches always merged user annotations on top
-    # of the chart-managed ones — this test pins that the headless branch now
-    # behaves the same.
+  - it: should render headlessService.annotations on the headless StatefulSet Service
     set:
       image.repository: redis
       image.tag: alpine
       statefulSets.db.enabled: true
-      statefulSets.db.service.enabled: true
-      statefulSets.db.service.port: 6379
-      statefulSets.db.service.targetPort: 6379
-      statefulSets.db.service.annotations:
+      statefulSets.db.headlessService.annotations:
         custom-annotation: my-value
         another-annotation: another-value
     asserts:
@@ -454,17 +518,16 @@ tests:
           path: metadata.annotations.another-annotation
           value: another-value
 
-  - it: should render service.publishNotReadyAddresses on StatefulSet headless (peer discovery)
+  - it: should render headlessService.publishNotReadyAddresses on StatefulSet headless (peer discovery)
     # The Cassandra/Kafka/etcd use case: peers must resolve each other via DNS
     # before they reach Ready, which requires this flag on the headless Service.
     set:
       image.repository: cassandra
       image.tag: v1.0.0
       statefulSets.db.enabled: true
-      statefulSets.db.service.enabled: true
-      statefulSets.db.service.port: 9042
-      statefulSets.db.service.targetPort: 9042
-      statefulSets.db.service.publishNotReadyAddresses: true
+      statefulSets.db.headlessService.port: 9042
+      statefulSets.db.headlessService.targetPort: 9042
+      statefulSets.db.headlessService.publishNotReadyAddresses: true
     asserts:
       - equal:
           path: spec.clusterIP
@@ -473,9 +536,12 @@ tests:
           path: spec.publishNotReadyAddresses
           value: true
 
-  - it: should fail fast when StatefulSet service.clusterIP is set to a non-None value
-    # The auto-rendered headless Service hardcodes clusterIP: None.
-    # User-supplied clusterIP=<ip> would be silently overridden — fail loudly instead.
+  - it: service.* no longer affects the headless Service (independent objects)
+    # This is the core 3.0.0 behavior change: service.* used to be merged into
+    # the headless Service's spec when headlessService stayed enabled. It now
+    # always renders its own, separate Service instead — see the dual-service
+    # test below. Setting service.clusterIP no longer conflicts with headless
+    # clusterIP: None because they're different Service objects.
     set:
       image.repository: redis
       image.tag: alpine
@@ -483,24 +549,25 @@ tests:
       statefulSets.db.service.enabled: true
       statefulSets.db.service.port: 6379
       statefulSets.db.service.targetPort: 6379
-      statefulSets.db.service.clusterIP: 10.0.0.5
     asserts:
-      - failedTemplate:
-          errorPattern: "conflicts with the auto-rendered headless Service"
-
-  - it: should accept service.clusterIP=None on StatefulSet (redundant but harmless)
-    set:
-      image.repository: redis
-      image.tag: alpine
-      statefulSets.db.enabled: true
-      statefulSets.db.service.enabled: true
-      statefulSets.db.service.port: 6379
-      statefulSets.db.service.targetPort: 6379
-      statefulSets.db.service.clusterIP: None
-    asserts:
+      - hasDocuments:
+          count: 2
       - equal:
           path: spec.clusterIP
           value: None
+        documentIndex: 0
+      - matchRegex:
+          path: metadata.name
+          pattern: -db-headless$
+        documentIndex: 0
+      - matchRegex:
+          path: metadata.name
+          pattern: -db$
+        documentIndex: 1
+      - notEqual:
+          path: spec.clusterIP
+          value: None
+        documentIndex: 1
 
   # --- non-headless StatefulSet Service (headlessService opt-out + service.enabled) ---
 
@@ -563,21 +630,6 @@ tests:
           path: spec.sessionAffinity
           value: ClientIP
 
-  - it: default headless still renders single Service when service.enabled is true (backward compat)
-    set:
-      image.repository: redis
-      image.tag: alpine
-      statefulSets.db.enabled: true
-      statefulSets.db.service.enabled: true
-      statefulSets.db.service.port: 6379
-      statefulSets.db.service.targetPort: 6379
-    asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: spec.clusterIP
-          value: None
-
   - it: should keep http first and metrics last around alphabetically-sorted middle ports
     set:
       image.repository: nginx
@@ -614,3 +666,91 @@ tests:
       - equal:
           path: spec.ports[3].name
           value: metrics
+
+  # --- newly supported ServiceSpec fields (3.0.0) ---
+
+  - it: should render externalName, externalIPs, loadBalancer*, sessionAffinityConfig, ipFamilies, trafficDistribution on Deployment service
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: LoadBalancer
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.externalIPs:
+        - 203.0.113.10
+      deployments.web.service.loadBalancerClass: example.com/internal-lb
+      deployments.web.service.loadBalancerSourceRanges:
+        - 10.0.0.0/8
+      deployments.web.service.allocateLoadBalancerNodePorts: false
+      deployments.web.service.healthCheckNodePort: 32000
+      deployments.web.service.sessionAffinity: ClientIP
+      deployments.web.service.sessionAffinityConfig.clientIP.timeoutSeconds: 600
+      deployments.web.service.ipFamilies:
+        - IPv4
+      deployments.web.service.ipFamilyPolicy: SingleStack
+      deployments.web.service.trafficDistribution: PreferClose
+    asserts:
+      - equal:
+          path: spec.externalIPs
+          value: ["203.0.113.10"]
+      - equal:
+          path: spec.loadBalancerClass
+          value: example.com/internal-lb
+      - equal:
+          path: spec.loadBalancerSourceRanges
+          value: ["10.0.0.0/8"]
+      - equal:
+          path: spec.allocateLoadBalancerNodePorts
+          value: false
+      - equal:
+          path: spec.healthCheckNodePort
+          value: 32000
+      - equal:
+          path: spec.sessionAffinityConfig.clientIP.timeoutSeconds
+          value: 600
+      - equal:
+          path: spec.ipFamilies
+          value: ["IPv4"]
+      - equal:
+          path: spec.ipFamilyPolicy
+          value: SingleStack
+      - equal:
+          path: spec.trafficDistribution
+          value: PreferClose
+
+  - it: should render externalName on an ExternalName-type service
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: example.database.svc.cluster.local
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - equal:
+          path: spec.type
+          value: ExternalName
+      - equal:
+          path: spec.externalName
+          value: example.database.svc.cluster.local
+
+  - it: should render headlessService.ipFamilies and ipFamilyPolicy on StatefulSet headless Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ipFamilies:
+        - IPv4
+        - IPv6
+      statefulSets.db.headlessService.ipFamilyPolicy: RequireDualStack
+    asserts:
+      - equal:
+          path: spec.ipFamilies
+          value: ["IPv4", "IPv6"]
+      - equal:
+          path: spec.ipFamilyPolicy
+          value: RequireDualStack

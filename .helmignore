@@ -9,10 +9,15 @@ CLAUDE.md
 # CI / test fixtures / repo workflows — not part of the chart artifact
 ci/
 tests/
+test/
 .github/
 
 # Documentation, examples, ADRs — never shipped in the OCI artifact
 docs/
+
+# mdBook (docs/ -> GitHub Pages) — config and build output, not chart content
+book.toml
+book/
 
 # OS artifacts
 .DS_Store

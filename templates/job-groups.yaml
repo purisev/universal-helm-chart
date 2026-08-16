@@ -37,6 +37,32 @@ spec:
   {{- with $merged.activeDeadlineSeconds }}
   activeDeadlineSeconds: {{ . | int }}
   {{- end }}
+  {{- with $merged.completions }}
+  completions: {{ . | int }}
+  {{- end }}
+  {{- if hasKey $merged "parallelism" }}
+  parallelism: {{ $merged.parallelism | int }}
+  {{- end }}
+  {{- if hasKey $merged "suspend" }}
+  suspend: {{ $merged.suspend }}
+  {{- end }}
+  {{- with $merged.podFailurePolicy }}
+  podFailurePolicy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $merged.podReplacementPolicy }}
+  podReplacementPolicy: {{ . }}
+  {{- end }}
+  {{- with $merged.completionMode }}
+  completionMode: {{ . }}
+  {{- end }}
+  {{- if hasKey $merged "backoffLimitPerIndex" }}
+  backoffLimitPerIndex: {{ $merged.backoffLimitPerIndex | int }}
+  {{- end }}
+  {{- with $merged.successPolicy }}
+  successPolicy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   template:
     metadata:
       {{- /* podAnnotations are pre-merged in uhc.jobGroupSpec from root + group + job */}}
@@ -57,7 +83,7 @@ spec:
           image: {{ default (default "alpine:3.21" $ctx.Values.jobCompletionImage) $merged.completionImage | quote }}
           imagePullPolicy: IfNotPresent
           command: ["sh", "-c", "echo SUCCESS"]
-          {{- with $merged.securityContext }}
+          {{- with ($merged.securityContext | default $ctx.Values.securityContext) }}
           securityContext:
             {{- toYaml . | nindent 12 }}
           {{- end }}

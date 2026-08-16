@@ -27,6 +27,9 @@ spec:
   {{- end }}
   progressDeadlineSeconds: {{ default (default 600 $ctx.Values.progressDeadlineSeconds) $wl.progressDeadlineSeconds | int }}
   revisionHistoryLimit: {{ default 10 $ctx.Values.revisionHistoryLimit }}
+  {{- if hasKey $wl "paused" }}
+  paused: {{ $wl.paused }}
+  {{- end }}
   {{- $minReady := int ($wl.minReadySeconds | default $ctx.Values.minReadySeconds | default 0) }}
   {{- if gt $minReady 0 }}
   minReadySeconds: {{ $minReady }}
@@ -59,7 +62,7 @@ spec:
         {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 8 }}
       {{- end }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | trim | nindent 8 }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName "renderDirectPorts" true) | trim | nindent 8 }}
         {{- $sidecars := include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | trim }}
         {{- if $sidecars }}
         {{- $sidecars | nindent 8 }}

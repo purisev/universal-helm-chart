@@ -1,0 +1,94 @@
+fullnameOverride: e2e
+
+deployments:
+  hpa-demo:
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+    hpa:
+      enabled: true
+      minReplicas: 1
+      maxReplicas: 3
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 80
+
+    # updateMode Off: the recommender still computes and publishes
+    # status.recommendation, but nothing evicts/mutates running pods, which
+    # keeps this scenario from also depending on the admission-controller's
+    # webhook being fully warmed up.
+    verticalPodAutoscaler:
+      enabled: true
+      updateMode: "Off"
+
+  keda-demo:
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    keda:
+      enabled: true
+      minReplicas: 0
+      maxReplicas: 3
+      pollingInterval: 5
+      # start/end are cron expressions for a recurring daily window, not
+      # timestamps, so they can't be hardcoded here to reliably cover
+      # "right now" whenever CI happens to run. The workflow overrides both
+      # via --set, computed from the current UTC time just before install.
+      triggers:
+        - type: cron
+          metadata:
+            timezone: UTC
+            start: "0 0 * * *"
+            end: "0 1 * * *"
+            desiredReplicas: "2"
+
+  keda-scale-to-zero-demo:
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # Same cron trigger shape as keda-demo, but this scenario proves KEDA
+    # scales back down to zero once the trigger goes inactive — keda-demo's
+    # own window stays open for the whole job's runtime, so it never
+    # exercises that path. cooldownPeriod is cut way down from KEDA's
+    # 5-minute default so the scale-down is observable within this test's
+    # own timeout rather than the whole job's; the keda-scale-to-zero test
+    # closes the window itself by patching the ScaledObject mid-test
+    # instead of waiting out real wall-clock time.
+    keda:
+      enabled: true
+      minReplicas: 0
+      maxReplicas: 2
+      pollingInterval: 5
+      cooldownPeriod: 10
+      triggers:
+        - type: cron
+          metadata:
+            timezone: UTC
+            start: "0 0 * * *"
+            end: "0 1 * * *"
+            desiredReplicas: "1"

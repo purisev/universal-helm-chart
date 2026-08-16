@@ -1,0 +1,17 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: keda-cron-scaling
+spec:
+  steps:
+    - name: the cron trigger's active window scales the deployment to desiredReplicas
+      try:
+        - assert:
+            timeout: 3m
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: e2e-keda-demo
+              status:
+                readyReplicas: 2

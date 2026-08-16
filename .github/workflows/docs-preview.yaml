@@ -1,0 +1,70 @@
+name: Deploy docs PR preview
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, closed]
+
+concurrency:
+  group: docs-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Check docs-preview label
+    # Cleanup on close always runs regardless of label state; only the
+    # build+deploy path is label-gated.
+    if: github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      # `pre-merge` (see ci.yaml / e2e.yaml) is the one-label "run all the
+      # things before I merge this" shortcut — it implies docs-preview too.
+      - name: Decide whether to build a preview
+        id: check
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if jq -e 'index("docs-preview") != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  deploy-preview:
+    name: Build and deploy/remove docs PR preview
+    needs: gate
+    if: always() && (github.event.action == 'closed' || needs.gate.outputs.run == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push the preview to gh-pages
+      pull-requests: write # for the sticky preview-link comment
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdbook
+        if: github.event.action != 'closed'
+        run: |
+          tag=$(curl -fsSL 'https://api.github.com/repos/rust-lang/mdbook/releases/latest' | jq -r '.tag_name')
+          url="https://github.com/rust-lang/mdbook/releases/download/${tag}/mdbook-${tag}-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir mdbook-bin
+          curl -fsSL "$url" | tar -xz --directory=./mdbook-bin
+          echo "$(pwd)/mdbook-bin" >> "$GITHUB_PATH"
+
+      # Skipped on close: the PR's branch may already be gone by then, and
+      # pr-preview-action's "remove" doesn't need a fresh build anyway.
+      - name: Build book
+        if: github.event.action != 'closed'
+        run: mdbook build
+
+      - name: Deploy or remove preview
+        uses: rossjrw/pr-preview-action@ffa7509e91a3ec8dfc2e5536c4d5c1acdf7a6de9 # v1.8.1
+        with:
+          source-dir: ./book/
+          preview-branch: gh-pages
+          # action: auto only recognizes opened/reopened/synchronize/closed
+          # — our label-gated trigger fires on `labeled` too, which auto
+          # treats as "nothing to do", silently skipping the deploy. The
+          # gate job above already decides *whether* to run; here we just
+          # need deploy vs remove.
+          action: ${{ github.event.action == 'closed' && 'remove' || 'deploy' }}

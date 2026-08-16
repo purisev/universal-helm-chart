@@ -48,10 +48,14 @@ Params: dict "groupName" $g "jobName" $j
 Merges group spec with per-job spec, applying:
   - Maps merged, job wins (env, image, securityContext, podSecurityContext, resources,
     nodeSelector, affinity, metadataAnnotations, inherit, hooks.argocd, hooks.helm)
-  - Lists concatenated, group then job (envSecrets, envConfigMaps, tolerations)
+  - Lists concatenated, group then job (envSecrets, envConfigMaps, tolerations).
+    tolerations is only set on the merged spec when group or job declares it
+    (even as []); otherwise the key is left absent so uhc.scheduling falls
+    back to root tolerations, same as nodeSelector/affinity.
   - Name-keyed maps merged, job wins on collisions (volumes, volumeMounts)
-  - Scalars: job-override-else-group (backoffLimit, ttlSecondsAfterFinished,
-    activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
+  - Scalars: job-override-else-group (backoffLimit, completions, parallelism, suspend,
+    podFailurePolicy, podReplacementPolicy, completionMode, backoffLimitPerIndex, successPolicy,
+    ttlSecondsAfterFinished, activeDeadlineSeconds, restartPolicy, completionImage, serviceAccountName,
     automountServiceAccountToken, terminationGracePeriodSeconds, useRootVolumes,
     useRootVolumeMounts, hashSuffix, hashIncludePodAnnotations, schedule, timeZone,
     concurrencyPolicy, successfulJobsHistoryLimit, failedJobsHistoryLimit,
@@ -68,6 +72,8 @@ Fails fast when:
   - kind=CronJob with any non-empty hooks (ArgoCD/Helm hooks aren't applied to CronJob)
   - hashSuffix=true together with deletePolicy=HookSucceeded (argocd) or
     deletePolicy=hook-succeeded (helm) — that combination breaks idempotency.
+  - backoffLimitPerIndex or successPolicy set without completionMode: Indexed
+    (both require Indexed completion mode at the Kubernetes API level).
 Returns merged spec as YAML.
 Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 */}}
@@ -120,7 +126,9 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{/* Lists: concat group then job */}}
 {{- $_ := set $merged "envSecrets" (concat ($group.envSecrets | default list) ($job.envSecrets | default list)) -}}
 {{- $_ := set $merged "envConfigMaps" (concat ($group.envConfigMaps | default list) ($job.envConfigMaps | default list)) -}}
+{{- if or (hasKey $group "tolerations") (hasKey $job "tolerations") -}}
 {{- $_ := set $merged "tolerations" (concat ($group.tolerations | default list) ($job.tolerations | default list)) -}}
+{{- end -}}
 {{/* Maps: union by name; on key collision the whole job entry replaces the group entry
      (we do NOT recurse into the inner spec — k8s volume/volumeMount kinds are mutually
      exclusive: a name can be either an emptyDir or a configMap, not both). */}}
@@ -135,7 +143,7 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{- end -}}
 {{- $_ := set $merged "volumeMounts" $vmMerged -}}
 {{/* Scalars: job-override-else-group */}}
-{{- range $k := list "backoffLimit" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
+{{- range $k := list "backoffLimit" "completions" "parallelism" "suspend" "podFailurePolicy" "podReplacementPolicy" "completionMode" "backoffLimitPerIndex" "successPolicy" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
 {{- $jv := index $job $k -}}
 {{- $gv := index $group $k -}}
 {{- if not (kindIs "invalid" $jv) -}}
@@ -173,6 +181,11 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
     {{- fail (printf "jobGroups.%s.jobs.%s: hashSuffix=true is incompatible with deletePolicy that removes the Job after success (argocd HookSucceeded / helm hook-succeeded). The Job would be deleted then recreated on every sync, breaking idempotency. Use hashSuffix: false, or leave deletePolicy unset (HookFailed default ensures idempotency)" $gn $jn) -}}
   {{- end -}}
 {{- end -}}
+{{/* Fail-fast: backoffLimitPerIndex/successPolicy require completionMode: Indexed */}}
+{{- $isIndexed := eq (index $merged "completionMode") "Indexed" -}}
+{{- if and (not $isIndexed) (or (hasKey $merged "backoffLimitPerIndex") (hasKey $merged "successPolicy")) -}}
+  {{- fail (printf "jobGroups.%s.jobs.%s: backoffLimitPerIndex and successPolicy require completionMode: Indexed. Set completionMode: Indexed on the group or job, or remove these fields." $gn $jn) -}}
+{{- end -}}
 {{- toYaml $merged -}}
 {{- end -}}
 
@@ -180,6 +193,8 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 Stable 8-char sha256 of fields that affect Job/CronJob behavior. Excludes metadata-only
 fields (metadataAnnotations, hooks, ttlSecondsAfterFinished, hashSuffix,
 hashIncludePodAnnotations) so changes to those don't trigger a re-run.
+Also excludes suspend: it's meant to pause/resume the same Job or CronJob in place —
+including it in the hash would rename the resource on every toggle, defeating the point.
 podAnnotations are included by default (so Vault/Datadog injection changes recreate
 the Job); set hashIncludePodAnnotations: false to opt out per group/job.
 Params: dict "merged" $merged
@@ -190,7 +205,7 @@ Params: dict "merged" $merged
 {{- if hasKey $merged "hashIncludePodAnnotations" -}}
   {{- $includePodAnn = ne (index $merged "hashIncludePodAnnotations") false -}}
 {{- end -}}
-{{- $excludeKeys := list "metadataAnnotations" "hooks" "ttlSecondsAfterFinished" "hashSuffix" "hashIncludePodAnnotations" -}}
+{{- $excludeKeys := list "metadataAnnotations" "hooks" "ttlSecondsAfterFinished" "hashSuffix" "hashIncludePodAnnotations" "suspend" -}}
 {{- if not $includePodAnn -}}
   {{- $excludeKeys = append $excludeKeys "podAnnotations" -}}
 {{- end -}}

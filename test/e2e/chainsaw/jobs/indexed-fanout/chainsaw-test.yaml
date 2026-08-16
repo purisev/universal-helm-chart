@@ -1,0 +1,33 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: indexed-fanout
+spec:
+  steps:
+    - name: an indexed job completes all 3 indexes
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-indexed-fanout
+              spec:
+                completionMode: Indexed
+                completions: 3
+                parallelism: 3
+              status:
+                succeeded: 3
+
+    - name: kubernetes actually assigns a distinct JOB_COMPLETION_INDEX per pod
+      try:
+        - script:
+            content: >-
+              kubectl logs -n "$NAMESPACE"
+              -l batch.kubernetes.io/job-name=e2e-indexed-fanout
+              --all-containers --prefix=false
+            check:
+              ($error): ~
+              (contains($stdout, 'index=0')): true
+              (contains($stdout, 'index=1')): true
+              (contains($stdout, 'index=2')): true

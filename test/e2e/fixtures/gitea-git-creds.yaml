@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: gitea-git-creds
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: http://gitea-http.gitea.svc.cluster.local:3000/gitea_admin/universal-helm-chart.git
+  username: gitea_admin
+  password: "r8sA8CPHD9!bt6d"

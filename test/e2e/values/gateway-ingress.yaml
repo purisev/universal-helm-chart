@@ -1,0 +1,223 @@
+fullnameOverride: e2e
+
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+  tls-certs:
+    secret:
+      secretName: tlsroute-tls
+  tls-backend-conf:
+    configMap:
+      name: e2e-tls-backend-config
+
+volumeMounts:
+  api:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+  tls-backend:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+    tls-certs:
+      mountPath: /certs
+      readOnly: true
+    tls-backend-conf:
+      mountPath: /etc/nginx/conf.d/tls.conf
+      subPath: tls.conf
+
+deployments:
+  api:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # Adds this workload's rule to the singleton HTTPRoute below, backed by
+    # its own Service/port. An empty rule object is a deliberate catch-all:
+    # it gets its backendRef/port filled in from this workload's Service.
+    httpRoute:
+      enabled: true
+      rules:
+        - {}
+
+  # Real gRPC backend (registers grpc.reflection too) for the grpcroute
+  # test to route actual traffic to, instead of just proving CRD admission.
+  grpcbin:
+    image:
+      repository: moul/grpcbin
+      tag: latest
+      pullPolicy: Always
+
+    # The image's secure listener (unused by this test — only the insecure
+    # :9000 listener matters) reads a bundled cert under /root/cert at
+    # startup and log.Fatalf()s the whole process, insecure listener
+    # included, if that read fails. /root isn't traversable by the chart's
+    # default non-root UID, so this workload runs as root to let it start.
+    podSecurityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+      runAsGroup: 0
+      fsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+
+    # appProtocol tells agentgateway this port speaks HTTP/2 cleartext, so
+    # it configures the upstream as h2c instead of assuming HTTP/1.1 —
+    # without it grpcurl gets "invalid HTTP version parsed" through the
+    # gateway even though the GRPCRoute itself is routed correctly.
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        grpc:
+          port: 9000
+          targetPort: 9000
+          appProtocol: kubernetes.io/h2c
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+  # TLS passthrough means agentgateway never decrypts anything — this
+  # backend terminates TLS itself, using the cert-manager-issued cert
+  # mounted from the tlsroute-tls Secret. tls.conf is an extra server
+  # block dropped into the image's own conf.d (nginx.conf already
+  # includes conf.d/*.conf), so the plain-HTTP default.conf server stays
+  # intact alongside it.
+  tls-backend:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    createConfigmap: true
+    configData:
+      tls.conf: |
+        server {
+          listen 8443 ssl;
+          ssl_certificate     /certs/tls.crt;
+          ssl_certificate_key /certs/tls.key;
+          location / {
+            add_header Content-Type text/plain always;
+            return 200 "tls-backend-ok\n";
+          }
+        }
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        tls:
+          port: 8443
+          targetPort: 8443
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+# Classic networking.k8s.io/v1 Ingress, routed through ingress-nginx.
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  # Real TLS termination at ingress-nginx, using the cert-manager-issued
+  # cert for e2e.local (see ingress-tls-termination). ingress-nginx turns
+  # on ssl-redirect by default the moment a host has a tls: entry, which
+  # broke the plain-HTTP ingress-routing test (wget follows the redirect
+  # to https://e2e.local/, a hostname that only resolves via the Host
+  # header trick, never in real DNS) — disabled explicitly so both keep
+  # working side by side.
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  tls:
+    - hosts:
+        - e2e.local
+      secretName: e2e-ingress-tls
+  hosts:
+    e2e.local:
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: e2e-api
+          servicePort: 80
+
+# Gateway API HTTPRoute, routed through the agentgateway-backed Gateway the
+# workflow applies as a fixture (the chart only renders *Route kinds, never
+# the Gateway itself).
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: e2e-gateway
+  hostnames:
+    - httproute.e2e.local
+
+# Routed through the same agentgateway listener, to the real grpcbin
+# backend above.
+grpcRoute:
+  enabled: true
+  parentRefs:
+    - name: e2e-gateway
+  hostnames:
+    - grpcroute.e2e.local
+  rules:
+    - matches:
+        - method:
+            type: Exact
+            service: grpcbin.GRPCBin
+            method: DummyUnary
+      backendRefs:
+        - name: e2e-grpcbin
+          port: 9000
+
+# Real TLS passthrough: the Gateway's "tls" listener (see the fixture)
+# routes on SNI alone, straight through to tls-backend, which terminates
+# TLS with the cert-manager-issued cert. sectionName picks that listener
+# specifically now that the Gateway has two (http and tls).
+tlsRoute:
+  enabled: true
+  parentRefs:
+    - name: e2e-gateway
+      sectionName: tls
+  hostnames:
+    - tlsroute.e2e.local
+  rules:
+    - backendRefs:
+        - name: e2e-tls-backend
+          port: 8443
+
+# Separate HTTPRoute with a backendRef into another namespace, exercised by
+# the referencegrant-cross-namespace test: agentgateway must refuse to
+# resolve this backend until the chart's own ReferenceGrant template is
+# applied in the e2e-gateway-ingress-backend namespace.
+httpRoutes:
+  referencegrant-cross-ns:
+    parentRefs:
+      - name: e2e-gateway
+    hostnames:
+      - referencegrant.e2e.local
+    rules:
+      - backendRefs:
+          - name: e2e-rg-backend-backend
+            namespace: e2e-gateway-ingress-backend
+            port: 80

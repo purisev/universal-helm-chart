@@ -1,0 +1,33 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: cronjob-manual-trigger
+spec:
+  steps:
+    - name: the cronjob renders with its configured schedule
+      try:
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: CronJob
+              metadata:
+                name: e2e-cleanup-nightly
+              spec:
+                schedule: "0 3 1 1 *"
+
+    - name: a job created from the cronjob's template runs to completion
+      try:
+        - script:
+            content: >-
+              kubectl create job e2e-cleanup-manual -n "$NAMESPACE"
+              --from=cronjob/e2e-cleanup-nightly
+            check:
+              ($error): ~
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: e2e-cleanup-manual
+              status:
+                succeeded: 1

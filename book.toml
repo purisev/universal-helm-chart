@@ -1,0 +1,15 @@
+[book]
+title = "universal-helm-chart"
+description = "A single Helm chart for the common Kubernetes workload shapes, plus the networking, autoscaling, monitoring, secrets and policy resources most releases need."
+authors = ["purisev"]
+language = "en"
+src = "docs"
+
+[output.html]
+git-repository-url = "https://github.com/purisev/universal-helm-chart"
+git-repository-icon = "fab-github"
+edit-url-template = "https://github.com/purisev/universal-helm-chart/edit/main/{path}"
+# This is a project page (purisev.github.io/universal-helm-chart/), not a
+# user/org page at the domain root — mdBook needs this to load its own
+# static assets (CSS/JS) and to build a working 404 page.
+site-url = "/universal-helm-chart/"

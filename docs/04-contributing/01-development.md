@@ -40,6 +40,6 @@ helm template my-app . -s templates/deployment.yaml -f my-values.yaml
 
 ## Common pitfalls
 
-- **Changed the values shape?** Update [`values.schema.json`](../../values.schema.json) in the same commit. Schema and `values.yaml` drift is the most common reviewer comment.
+- **Changed the values shape?** Update [`values.schema.json`](https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json) in the same commit. Schema and `values.yaml` drift is the most common reviewer comment.
 - **Added a field?** Add at least one assertion in `tests/<template>_test.yaml`. Coverage prevents silent regressions on future refactors.
 - **Writing fixtures or example values?** Use **block-style** YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.

@@ -1,0 +1,898 @@
+name: E2E
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [labeled, synchronize]
+  workflow_dispatch: {}
+
+# Every label add (and every push once at least one e2e label is already
+# present) triggers a fresh run; without this, rapid successive label
+# additions pile up concurrent, resource-heavy kind-cluster runs instead of
+# the new one cancelling the now-stale old one. workflow_dispatch runs each
+# get their own group via run_id, since there's no PR to key on.
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: Check e2e labels
+    runs-on: ubuntu-latest
+    outputs:
+      core-workloads: ${{ steps.check.outputs.core-workloads }}
+      jobs: ${{ steps.check.outputs.jobs }}
+      autoscaling: ${{ steps.check.outputs.autoscaling }}
+      gateway-ingress: ${{ steps.check.outputs.gateway-ingress }}
+      secrets-config: ${{ steps.check.outputs.secrets-config }}
+      observability: ${{ steps.check.outputs.observability }}
+      network-policy: ${{ steps.check.outputs.network-policy }}
+      argocd: ${{ steps.check.outputs.argocd }}
+    steps:
+      # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
+      # `pre-merge` (see ci.yaml) also runs everything — it's the
+      # one-label "run all the things before I merge this" shortcut.
+      # workflow_dispatch and a push to main (post-merge) always run
+      # everything — there's no label to read in either case, and a push
+      # to main is exactly when we want the full suite to reverify the
+      # merged/squashed result.
+      - name: Decide which e2e jobs should run
+        id: check
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          FULL=false
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
+             [[ "${{ github.event_name }}" == "push" ]] || \
+             jq -e 'index("e2e") != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
+            FULL=true
+          fi
+
+          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy argocd; do
+            if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
+              echo "$job=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$job=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+
+  e2e-core-workloads:
+    name: E2E / core workloads
+    needs: gate
+    if: needs.gate.outputs.core-workloads == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-core-workloads
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-core-workloads
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Create namespace and secret fixture
+        run: |
+          kubectl create namespace "$NAMESPACE"
+          kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/core-workloads-secret.yaml
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/core-workloads.yaml \
+            --wait --timeout 5m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/core-workloads --config test/e2e/chainsaw/.chainsaw.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::Pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+          for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
+            echo "::group::Describe $pod"
+            kubectl describe pod "$pod" -n "$NAMESPACE"
+            echo "::endgroup::"
+
+            echo "::group::Logs $pod"
+            kubectl logs "$pod" -n "$NAMESPACE" --all-containers --prefix || true
+            echo "::endgroup::"
+          done
+
+  e2e-jobs:
+    name: E2E / jobs
+    needs: gate
+    if: needs.gate.outputs.jobs == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-jobs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-jobs
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Create namespace
+        run: kubectl create namespace "$NAMESPACE"
+
+      - name: Install chart
+        # No --wait here: the suspend and podFailurePolicy scenarios are
+        # deliberately suspended or destined to fail, so waiting for every
+        # Job to reach a ready/complete state would just time this step out.
+        # Each Chainsaw test polls for its own job's expected end state.
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/jobs.yaml
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/jobs --config test/e2e/chainsaw/jobs-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::Jobs"
+          kubectl get jobs,cronjobs -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+          for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
+            echo "::group::Describe $pod"
+            kubectl describe pod "$pod" -n "$NAMESPACE"
+            echo "::endgroup::"
+
+            echo "::group::Logs $pod"
+            kubectl logs "$pod" -n "$NAMESPACE" --all-containers --prefix || true
+            echo "::endgroup::"
+          done
+
+  e2e-autoscaling:
+    name: E2E / autoscaling
+    needs: gate
+    if: needs.gate.outputs.autoscaling == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-autoscaling
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-autoscaling
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install metrics-server
+        run: |
+          kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+          # kind's kubelet serving certs aren't signed by a CA metrics-server
+          # trusts by default.
+          kubectl patch deployment metrics-server -n kube-system --type=json \
+            -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--kubelet-insecure-tls"}]'
+          kubectl rollout status deployment/metrics-server -n kube-system --timeout=120s
+
+      - name: Install KEDA
+        run: |
+          helm repo add kedacore https://kedacore.github.io/charts
+          helm repo update
+          helm install keda kedacore/keda -n keda --create-namespace --wait --timeout 3m
+
+      - name: Install VPA
+        run: |
+          helm repo add autoscaler https://kubernetes.github.io/autoscaler
+          helm repo update
+          helm install vpa autoscaler/vertical-pod-autoscaler -n vpa --create-namespace --wait --timeout 3m
+
+      - name: Create namespace
+        run: kubectl create namespace "$NAMESPACE"
+
+      - name: Install chart
+        run: |
+          eval "$(bash test/e2e/scripts/keda-cron-window.sh)"
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/autoscaling.yaml \
+            --set "deployments.keda-demo.keda.triggers[0].metadata.start=${CRON_START}" \
+            --set "deployments.keda-demo.keda.triggers[0].metadata.end=${CRON_END}" \
+            --set "deployments.keda-scale-to-zero-demo.keda.triggers[0].metadata.start=${CRON_START}" \
+            --set "deployments.keda-scale-to-zero-demo.keda.triggers[0].metadata.end=${CRON_END}" \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/autoscaling --config test/e2e/chainsaw/autoscaling-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::HPA / ScaledObject / VPA"
+          kubectl get hpa,scaledobject,vpa -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::HPA describe"
+          kubectl describe hpa -n "$NAMESPACE"
+          kubectl describe scaledobject -n "$NAMESPACE"
+          echo "::endgroup::"
+
+          echo "::group::VPA describe"
+          kubectl describe vpa -n "$NAMESPACE"
+          echo "::endgroup::"
+
+          echo "::group::KEDA operator logs"
+          kubectl logs -n keda -l app=keda-operator --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::VPA recommender logs"
+          kubectl logs -n vpa -l app.kubernetes.io/name=vpa-recommender --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-gateway-ingress:
+    name: E2E / gateway ingress
+    needs: gate
+    if: needs.gate.outputs.gateway-ingress == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-gateway-ingress
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-gateway-ingress
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install Gateway API CRDs (experimental channel, needed for TLSRoute)
+        run: |
+          kubectl apply --server-side \
+            -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/experimental-install.yaml
+
+      - name: Install agentgateway
+        run: |
+          helm upgrade -i --create-namespace \
+            --namespace agentgateway-system \
+            --version v1.4.1 agentgateway-crds oci://cr.agentgateway.dev/charts/agentgateway-crds
+          helm upgrade -i -n agentgateway-system agentgateway oci://cr.agentgateway.dev/charts/agentgateway \
+            --version v1.4.1 --wait --timeout 3m
+          kubectl wait --timeout=60s gatewayclass/agentgateway --for=condition=Accepted
+
+      - name: Install ingress-nginx
+        run: |
+          helm upgrade --install ingress-nginx ingress-nginx \
+            --repo https://kubernetes.github.io/ingress-nginx \
+            --namespace ingress-nginx --create-namespace \
+            --wait --timeout 3m
+
+      - name: Install cert-manager
+        run: |
+          helm upgrade -i cert-manager oci://quay.io/jetstack/charts/cert-manager \
+            --version v1.21.1 \
+            --namespace cert-manager --create-namespace \
+            --set crds.enabled=true \
+            --wait --timeout 3m
+          kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=2m
+
+      - name: Create namespace and Gateway fixture
+        run: |
+          kubectl create namespace "$NAMESPACE"
+          kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/gateway-ingress-gateway.yaml
+
+          # The Gateway's Service is provisioned asynchronously by
+          # agentgateway once it reconciles the object.
+          for i in $(seq 1 30); do
+            COUNT=$(kubectl get svc -n "$NAMESPACE" -l gateway.networking.k8s.io/gateway-name=e2e-gateway -o name | wc -l)
+            [ "$COUNT" -gt 0 ] && break
+            sleep 2
+          done
+
+      - name: Issue self-signed certificates via cert-manager (TLSRoute + Ingress)
+        run: |
+          # cert-manager's webhook Deployment can report Available before
+          # its CA bundle has actually propagated to the API server, so
+          # this retries the apply instead of trusting readiness alone.
+          for i in $(seq 1 15); do
+            kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/gateway-ingress-tls-issuer.yaml && break
+            sleep 4
+          done
+          kubectl wait --for=condition=Ready certificate/tlsroute-cert -n "$NAMESPACE" --timeout=2m
+          kubectl wait --for=condition=Ready certificate/ingress-cert -n "$NAMESPACE" --timeout=2m
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/gateway-ingress.yaml \
+            --wait --timeout 3m
+
+      - name: Deploy the cross-namespace ReferenceGrant backend (no grant yet)
+        run: |
+          kubectl create namespace e2e-gateway-ingress-backend
+          helm upgrade --install e2e-rg-backend . \
+            -n e2e-gateway-ingress-backend \
+            -f test/e2e/values/gateway-ingress-referencegrant-backend.yaml \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/gateway-ingress --config test/e2e/chainsaw/gateway-ingress-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::Ingress / HTTPRoute / GRPCRoute / TLSRoute / Gateway"
+          kubectl get ingress,httproute,grpcroute,tlsroute,gateway -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::ReferenceGrant / cross-namespace backend"
+          kubectl get referencegrant,httproute,svc -n e2e-gateway-ingress-backend -o wide
+          kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" -o yaml
+          echo "::endgroup::"
+
+          echo "::group::cert-manager Issuer / Certificate / tls-backend"
+          kubectl get issuer,certificate,secret -n "$NAMESPACE" -o wide
+          kubectl describe certificate tlsroute-cert -n "$NAMESPACE" || true
+          kubectl describe certificate ingress-cert -n "$NAMESPACE" || true
+          kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=tls-backend --tail=200 || true
+          kubectl logs -n cert-manager -l app.kubernetes.io/component=webhook --tail=100 || true
+          echo "::endgroup::"
+
+          echo "::group::grpcbin logs"
+          kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=grpcbin --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::ingress-nginx controller logs"
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::agentgateway control plane logs"
+          kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -A -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-secrets-config:
+    name: E2E / secrets config
+    needs: gate
+    if: needs.gate.outputs.secrets-config == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-secrets-config
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-secrets-config
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install External Secrets Operator
+        run: |
+          helm repo add external-secrets https://charts.external-secrets.io
+          helm repo update
+          helm install external-secrets external-secrets/external-secrets \
+            -n external-secrets --create-namespace --wait --timeout 3m
+
+      - name: Install Stakater Reloader
+        run: |
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo update
+          helm install reloader stakater/reloader \
+            -n reloader --create-namespace --wait --timeout 3m
+
+      - name: Install the Bank-Vaults operator
+        run: |
+          kubectl create namespace vault
+          helm install vault-operator oci://ghcr.io/bank-vaults/helm-charts/vault-operator \
+            -n vault --wait --timeout 3m
+          kubectl wait --for=condition=Established crd/vaults.vault.banzaicloud.com --timeout=1m
+
+      - name: Deploy a single-replica Vault via the operator
+        run: |
+          kubectl create namespace "$NAMESPACE"
+          # Vault's own ServiceAccount: the configurer needs to manage its
+          # unseal-key/root-token Secret and patch its own Pod, and Vault's
+          # Kubernetes auth method validates ServiceAccount tokens via the
+          # TokenReview API, which needs system:auth-delegator.
+          kubectl apply -f test/e2e/fixtures/secrets-config-vault-rbac.yaml
+          # A real, single-node Vault (raft storage), not a stand-in: auth
+          # role, KV v2 mount, and the seed value are all configured
+          # declaratively in the CR, which the operator's configurer applies
+          # on startup.
+          kubectl apply -f test/e2e/fixtures/secrets-config-vault-cr.yaml
+
+          # The operator reconciles the CR asynchronously, so the StatefulSet
+          # and configurer Deployment don't exist the instant the CR is
+          # applied; poll for their existence before waiting on readiness.
+          for i in $(seq 1 30); do
+            kubectl get pod/vault-0 -n vault >/dev/null 2>&1 && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Ready pod/vault-0 -n vault --timeout=2m
+
+          for i in $(seq 1 30); do
+            kubectl get deployment/vault-configurer -n vault >/dev/null 2>&1 && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Available deployment/vault-configurer -n vault --timeout=2m
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/secrets-config.yaml \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/secrets-config --config test/e2e/chainsaw/secrets-config-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::SecretStore / ExternalSecret / Secret"
+          kubectl get secretstore,externalsecret,secret -n "$NAMESPACE"
+          echo "::endgroup::"
+
+          echo "::group::ClusterSecretStore"
+          kubectl get clustersecretstore || true
+          echo "::endgroup::"
+
+          echo "::group::ExternalSecret describe"
+          kubectl describe externalsecret -n "$NAMESPACE"
+          echo "::endgroup::"
+
+          echo "::group::ESO controller logs"
+          kubectl logs -n external-secrets -l app.kubernetes.io/name=external-secrets --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Vault CR status"
+          kubectl get vault vault -n vault -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::Vault logs"
+          kubectl logs -n vault vault-0 --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Vault configurer logs"
+          kubectl logs -n vault -l app.kubernetes.io/name=vault-configurator --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Vault operator logs"
+          kubectl logs -n vault -l app.kubernetes.io/name=vault-operator --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods in vault namespace"
+          kubectl get pods -n vault -o wide || true
+          echo "::endgroup::"
+
+          echo "::group::Reloader logs"
+          kubectl logs -n reloader -l app=reloader --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-observability:
+    name: E2E / observability (${{ matrix.provider }})
+    needs: gate
+    if: needs.gate.outputs.observability == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        provider: [prometheus, victoriametrics]
+    env:
+      NAMESPACE: e2e-observability
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/default.yaml
+          cluster_name: e2e-observability
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install Prometheus Operator (operator only, no Grafana/Alertmanager/exporters)
+        if: matrix.provider == 'prometheus'
+        run: |
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm install prometheus-stack prometheus-community/kube-prometheus-stack \
+            -n monitoring --create-namespace \
+            --set grafana.enabled=false \
+            --set alertmanager.enabled=false \
+            --set nodeExporter.enabled=false \
+            --set kubeStateMetrics.enabled=false \
+            --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+            --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+            --wait --timeout 3m
+
+          # --wait above only waits for the operator Deployment itself; the
+          # actual Prometheus pod is created asynchronously afterward, when
+          # the operator reconciles the Prometheus CR, and isn't part of
+          # the Helm release's own resource list.
+          kubectl wait --timeout=2m -n monitoring pod \
+            -l app.kubernetes.io/name=prometheus --for=condition=Ready
+
+      - name: Install VictoriaMetrics Operator, VMSingle, and VMAgent
+        if: matrix.provider == 'victoriametrics'
+        run: |
+          helm repo add vm https://victoriametrics.github.io/helm-charts/
+          helm repo update
+          # The operator chart manages its own CRDs by default
+          # (crds.enabled: true); installing the separate -crds chart
+          # alongside it makes Helm refuse the second release as an
+          # ownership conflict on the same CRD objects.
+          helm install vm-operator vm/victoria-metrics-operator \
+            -n vm --create-namespace --wait --timeout 3m
+          # VMSingle only stores data; VMAgent is the component that
+          # actually discovers and scrapes VMServiceScrape/VMPodScrape
+          # objects, so both need to be up before the chart's own scrape
+          # object can be picked up.
+          kubectl apply -n vm -f test/e2e/fixtures/observability-vmsingle.yaml
+          kubectl wait --timeout=3m -n vm vmsingle/e2e --for=jsonpath='{.status.updateStatus}'=operational
+          kubectl wait --timeout=3m -n vm vmagent/e2e --for=jsonpath='{.status.updateStatus}'=operational
+
+      - name: Create namespace
+        run: kubectl create namespace "$NAMESPACE"
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/observability.yaml \
+            --set integrations.monitoring.defaults.provider=${{ matrix.provider }} \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/observability/${{ matrix.provider }}-* --config test/e2e/chainsaw/observability-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          # Only one of these CRD kinds exists on this leg's cluster by
+          # design (each matrix leg only installs its own operator/CRDs);
+          # querying both unconditionally without `|| true` would abort
+          # this whole step on "the server doesn't have a resource type"
+          # before anything useful below it gets printed.
+          echo "::group::ServiceMonitor / VMServiceScrape"
+          kubectl get servicemonitor -n "$NAMESPACE" -o wide 2>/dev/null || true
+          kubectl get vmservicescrape -n "$NAMESPACE" -o wide 2>/dev/null || true
+          echo "::endgroup::"
+
+          echo "::group::Monitoring stack pods"
+          kubectl get pods -n monitoring -o wide 2>/dev/null || true
+          kubectl get pods -n vm -o wide 2>/dev/null || true
+          echo "::endgroup::"
+
+          echo "::group::Prometheus logs"
+          kubectl logs -n monitoring -l app.kubernetes.io/name=prometheus --tail=200 2>/dev/null || true
+          echo "::endgroup::"
+
+          echo "::group::VM operator/VMAgent/VMSingle logs"
+          kubectl logs -n vm -l app.kubernetes.io/name=victoria-metrics-operator --tail=200 2>/dev/null || true
+          kubectl logs -n vm -l app.kubernetes.io/name=vmagent --tail=200 2>/dev/null || true
+          kubectl logs -n vm -l app.kubernetes.io/name=vmsingle --tail=200 2>/dev/null || true
+          echo "::endgroup::"
+
+          echo "::group::App pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-network-policy:
+    name: E2E / network policy
+    needs: gate
+    if: needs.gate.outputs.network-policy == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-network-policy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster (no default CNI)
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/network-policy.yaml
+          cluster_name: e2e-network-policy
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install Calico
+        run: |
+          # kind's default kindnet CNI doesn't enforce NetworkPolicy at all;
+          # Calico is what actually programs the dataplane for this suite
+          # to have anything real to verify. `create` (not `apply`) per
+          # Calico's own docs, since the manifest's CRD bundle is too
+          # large for a client-side apply.
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/calico.yaml
+          kubectl wait --timeout=3m -n kube-system pod -l k8s-app=calico-node --for=condition=Ready
+
+      - name: Create namespace
+        run: kubectl create namespace "$NAMESPACE"
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/network-policy.yaml \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/network-policy --config test/e2e/chainsaw/network-policy-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::NetworkPolicy"
+          kubectl get networkpolicy -n "$NAMESPACE" -o yaml
+          echo "::endgroup::"
+
+          echo "::group::Calico node logs"
+          kubectl logs -n kube-system -l k8s-app=calico-node --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -n "$NAMESPACE" -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+  e2e-argocd:
+    name: E2E / argocd
+    needs: gate
+    if: needs.gate.outputs.argocd == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-argocd
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          config: test/e2e/kind/argocd.yaml
+          cluster_name: e2e-argocd
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@v0.1.0
+        with:
+          release: v0.2.15
+
+      - name: Install crane
+        run: |
+          curl -fsSL -o crane.tar.gz \
+            https://github.com/google/go-containerregistry/releases/latest/download/go-containerregistry_Linux_x86_64.tar.gz
+          tar xzf crane.tar.gz crane
+          sudo mv crane /usr/local/bin/crane
+          rm crane.tar.gz
+
+      - name: Install ArgoCD Core (headless - no UI, no API server)
+        run: |
+          kubectl create namespace argocd
+          kubectl apply -n argocd --server-side --force-conflicts \
+            -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/core-install.yaml
+          # kubectl wait on a pod label selector fails immediately if it
+          # matches zero pods right now — it doesn't wait for pods to
+          # appear, only for a condition on pods that already exist. The
+          # apply just finished, so no pods exist yet. rollout status
+          # waits on the named controller object instead, which does exist.
+          kubectl rollout status deployment/argocd-repo-server -n argocd --timeout=3m
+          kubectl rollout status deployment/argocd-redis -n argocd --timeout=3m
+          kubectl rollout status deployment/argocd-applicationset-controller -n argocd --timeout=3m
+          kubectl rollout status statefulset/argocd-application-controller -n argocd --timeout=3m
+          # The full install's API server bootstraps the default AppProject
+          # on startup; Core mode has no API server, so it never gets
+          # created on its own.
+          kubectl apply -f test/e2e/fixtures/argocd-default-appproject.yaml
+
+      - name: Install argocd-image-updater
+        run: |
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj-labs/argocd-image-updater/stable/config/install.yaml
+          kubectl apply -n argocd -f test/e2e/fixtures/argocd-image-updater-registries.yaml
+          kubectl apply -f test/e2e/fixtures/argocd-image-updater-rbac.yaml
+          kubectl apply -f test/e2e/fixtures/gitea-git-creds.yaml
+          kubectl rollout restart deployment/argocd-image-updater-controller -n argocd
+          kubectl rollout status deployment/argocd-image-updater-controller -n argocd --timeout=2m
+
+      - name: Install Gitea (minimal dev instance - sqlite, no persistence)
+        run: |
+          helm repo add gitea-charts https://dl.gitea.com/charts/
+          helm repo update
+          helm install gitea gitea-charts/gitea \
+            -n gitea --create-namespace \
+            --set valkey.enabled=false \
+            --set postgresql.enabled=false \
+            --set postgresql-ha.enabled=false \
+            --set persistence.enabled=false \
+            --set gitea.config.database.DB_TYPE=sqlite3 \
+            --set gitea.config.session.PROVIDER=memory \
+            --set gitea.config.cache.ADAPTER=memory \
+            --set gitea.config.queue.TYPE=level \
+            --wait --timeout 3m
+
+      - name: Install NORA (in-cluster OCI registry)
+        run: |
+          helm repo add nora https://getnora-io.github.io/helm-charts
+          helm repo update
+          helm install nora nora/nora \
+            -n nora --create-namespace \
+            --set config.server.public_url=http://nora.nora.svc.cluster.local:4000 \
+            --set service.type=NodePort \
+            --wait --timeout 3m
+          # A .svc.cluster.local name only resolves inside pod network
+          # namespaces; the kind node's own containerd (which does the
+          # kubelet's image pulls) uses the node's own resolver and can
+          # never resolve it, no matter how NORA or the image is
+          # configured. Pin a NodePort instead: reachable at
+          # localhost:<port> from the node itself. The chart has no values
+          # field for this, so patch it in after install; a fixed port
+          # (rather than one Kubernetes assigns) lets it be hardcoded in
+          # the values file ArgoCD renders from git.
+          kubectl patch service nora -n nora --type merge -p \
+            '{"spec":{"ports":[{"name":"http","port":4000,"targetPort":"http","protocol":"TCP","nodePort":30500}]}}'
+          # Still plain HTTP, so containerd also needs explicit trust for
+          # this endpoint; it defaults to requiring HTTPS otherwise.
+          mkdir -p /tmp/certs.d/localhost:30500
+          cat > /tmp/certs.d/localhost:30500/hosts.toml <<'EOF'
+          [host."http://localhost:30500"]
+            capabilities = ["pull", "resolve"]
+          EOF
+          docker exec e2e-argocd-control-plane mkdir -p /etc/containerd/certs.d/localhost:30500
+          docker cp /tmp/certs.d/localhost:30500/hosts.toml \
+            e2e-argocd-control-plane:/etc/containerd/certs.d/localhost:30500/hosts.toml
+
+      - name: Bootstrap Gitea repo and push test images to NORA
+        run: |
+          bash test/e2e/scripts/bootstrap-argocd-repo.sh
+          bash test/e2e/scripts/push-test-image.sh
+
+      - name: Apply the Application
+        run: kubectl apply -f test/e2e/fixtures/argocd-application.yaml
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/argocd --config test/e2e/chainsaw/argocd-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::Application"
+          kubectl get application e2e-app -n argocd -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::ImageUpdater"
+          kubectl get imageupdater -n argocd -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::ArgoCD component logs"
+          kubectl logs -n argocd -l app.kubernetes.io/part-of=argocd --all-containers --prefix --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::argocd-image-updater logs"
+          kubectl logs -n argocd deployment/argocd-image-updater-controller --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::App pods"
+          kubectl get pods -n "$NAMESPACE" -o wide || true
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp || true
+          echo "::endgroup::"

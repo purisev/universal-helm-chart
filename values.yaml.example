@@ -178,10 +178,11 @@ serviceAccount:
   name: myapp
   annotations:
     eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/myapp-role
+  automountServiceAccountToken: false    # object-level default; pods can still override below
 
 rbac:
   enabled: true
-  clusterScoped: false                   # set true for ClusterRole + ClusterRoleBinding
+  clusterScoped: true                    # ClusterRole + ClusterRoleBinding (false renders Role + RoleBinding)
   rules:
     - apiGroups: [""]
       resources: ["configmaps"]
@@ -189,7 +190,19 @@ rbac:
     - apiGroups: ["coordination.k8s.io"]
       resources: ["leases"]
       verbs: ["get", "create", "update"]
+  # aggregationRule only applies to ClusterRole. Once set, Kubernetes' own
+  # ClusterRole controller overwrites .rules on every reconcile with the
+  # union of every ClusterRole matching the selector below — the rules
+  # hardcoded above do NOT keep applying alongside it and will be replaced.
+  # Combine static rules with aggregation only via a separate ClusterRole
+  # (one static, one aggregating) if you need both.
+  aggregationRule:
+    clusterRoleSelectors:
+      - matchLabels:
+          rbac.myapp.example.com/aggregate-to-myapp: "true"
 
+# Pod-level default; distinct from serviceAccount.automountServiceAccountToken above
+# (this one can be overridden per-workload, that one is the ServiceAccount object's own default)
 automountServiceAccountToken: false
 
 # ---------------------------------------------------------------------------
@@ -299,6 +312,7 @@ configMaps:
 podDisruptionBudget:
   enabled: true
   minAvailable: 1
+  unhealthyPodEvictionPolicy: AlwaysAllow  # let already-unhealthy pods be evicted during node drains
 
 # Disabled at root; opted in per-workload below
 verticalPodAutoscaler:
@@ -437,14 +451,16 @@ referenceGrants:
 deployments:
 
   # --- api: main HTTP API ---
-  # Features: service ports, HPA, VPA, PDB, sidecar, initContainer, probes,
-  #           lifecycle, networkPolicy, httpRoute shorthand, ServiceMonitor (CRD)
+  # Features: service ports, appProtocol, internalTrafficPolicy, HPA, VPA,
+  #           PDB, sidecar, initContainer, probes, lifecycle, networkPolicy,
+  #           httpRoute shorthand, ServiceMonitor (CRD)
   api:
     replicaCount: 2
 
     service:
       enabled: true
       type: ClusterIP
+      internalTrafficPolicy: Local        # route in-cluster traffic only to same-node pods
       ports:
         http:
           port: 80
@@ -452,6 +468,10 @@ deployments:
         grpc:
           port: 9000
           targetPort: 9000
+          # Lets Gateway API implementations (e.g. GRPCRoute backends) know
+          # this port speaks HTTP/2 cleartext, so they configure the
+          # upstream as h2c instead of assuming HTTP/1.1.
+          appProtocol: kubernetes.io/h2c
         admin:
           port: 8081
           targetPort: 8081
@@ -629,7 +649,8 @@ deployments:
 
   # --- worker: background processor ---
   # Features: KEDA, PodMonitor (type=pod, discovery=crd), inherit overrides,
-  #           workload-level tolerations replacing root
+  #           workload-level tolerations replacing root, resizePolicy,
+  #           resourceClaims (DRA)
   worker:
     image:
       repository: ghcr.io/example/worker
@@ -671,9 +692,28 @@ deployments:
         memory: 128Mi
       limits:
         memory: 256Mi
+      # DRA: name must match an entry in resourceClaims below
+      claims:
+        - name: gpu
+
+    # In-place resize: apply new cpu/memory without restarting the container.
+    # Memory usually needs RestartContainer since most runtimes can't shrink
+    # their heap live; cpu defaults to NotRequired if omitted.
+    resizePolicy:
+      - resourceName: cpu
+        restartPolicy: NotRequired
+      - resourceName: memory
+        restartPolicy: RestartContainer
+
+    # Dynamic Resource Allocation (DRA) — only meaningful on a cluster with the
+    # DRA feature and a matching device driver installed; shown here for shape.
+    resourceClaims:
+      - name: gpu
+        source:
+          resourceClaimTemplateName: worker-gpu-template
 
   # --- frontend: shows annotations-based metrics discovery ---
-  # Features: single port, prometheus.io/* annotations (no ServiceMonitor CRD)
+  # Features: single port, prometheus.io/* annotations (no ServiceMonitor CRD), paused
   frontend:
     image:
       repository: ghcr.io/example/frontend
@@ -695,6 +735,8 @@ deployments:
     podDisruptionBudget:
       enabled: false                    # opt out of root PDB
 
+    paused: false                       # true freezes the rollout (Deployment-only field)
+
     resources:
       requests:
         cpu: 50m
@@ -708,57 +750,71 @@ deployments:
 
 statefulSets:
 
-  # --- db: PostgreSQL ---
-  # Features: volumeClaimTemplates (list), headless service, podManagementPolicy,
-  #           per-workload envSecrets, NetworkPolicy, ServiceMonitor
-  db:
+  # --- web: nginx serving from a per-replica PVC ---
+  # Features: volumeClaimTemplates (list), independent client Service alongside
+  #           a minimal governing headlessService, persistentVolumeClaimRetentionPolicy,
+  #           ordinals, podManagementPolicy, NetworkPolicy
+  #
+  # This deliberately is NOT the "replicated database" shape (that needs
+  # peer-to-peer pod DNS, so headlessService itself carries ports/
+  # publishNotReadyAddresses and there's usually no separate client Service).
+  # Here the StatefulSet exists purely for stable per-replica storage — nginx
+  # replicas are interchangeable and don't need to find each other by name, so
+  # the client-facing Service is what actually matters and headlessService is
+  # left at its default (only there because spec.serviceName requires it).
+  web:
     image:
-      repository: postgres
-      tag: "16.3"
+      repository: nginx
+      tag: "1.27"
 
-    replicaCount: 1
+    replicaCount: 3
     podManagementPolicy: Parallel
 
-    # Headless service (default); adds non-headless ClusterIP service for metrics scrape
+    # Deletes PVCs left over from scale-down/deletion instead of retaining them forever
+    persistentVolumeClaimRetentionPolicy:
+      whenDeleted: Retain
+      whenScaled: Delete
+
+    ordinals:
+      start: 0                          # default; shown for reference
+
+    # Governing headless Service (clusterIP: None) — required for spec.serviceName
+    # and stable per-pod DNS. Left empty: only headless-appropriate fields are
+    # accepted here (ports, annotations, publishNotReadyAddresses, ipFamilies,
+    # ipFamilyPolicy) — type/loadBalancer*/traffic-policy fields have no meaning
+    # without a virtual IP, so headlessService doesn't accept them at all.
+    headlessService: {}
+
+    # Independent, regular Service for client traffic — always its own object,
+    # coexists with headlessService above without ever touching serviceName.
     service:
       enabled: true
-      ports:
-        postgres:
-          port: 5432
-          targetPort: 5432
-        metrics:
-          port: 9187
-          targetPort: 9187
+      type: ClusterIP
+      port: 80
+      targetPort: 80
 
-    env:
-      POSTGRES_DB:
-        value: appdb
-      POSTGRES_USER:
-        value: app
-
-    envSecrets:
-      - app-secrets                     # picks up DB_PASSWORD
-
+    # Plain nginx has no /metrics endpoint; opt out of the global monitoring
+    # default (integrations.monitoring.defaults.enabled: true above) instead
+    # of getting a ServiceMonitor that scrapes a port nothing is listening on.
     metrics:
-      enabled: true
-      port: metrics                     # port named "metrics" in service.ports above
+      enabled: false
 
     # PVC templates — must be a list (Kubernetes native form)
     volumeClaimTemplates:
       - metadata:
-          name: data
+          name: html
         spec:
           accessModes:
             - ReadWriteOnce
           storageClassName: standard
           resources:
             requests:
-              storage: 10Gi
+              storage: 5Gi
 
-    # Per-pod volumeMount referencing the PVC template named "data"
+    # Per-pod volumeMount referencing the PVC template named "html"
     volumeMounts:
-      data:
-        mountPath: /var/lib/postgresql/data
+      html:
+        mountPath: /usr/share/nginx/html
 
     networkPolicy:
       enabled: true
@@ -770,17 +826,17 @@ statefulSets:
                 matchLabels:
                   app.kubernetes.io/name: api
           ports:
-            - port: 5432
+            - port: 80
               protocol: TCP
 
     resources:
       requests:
-        cpu: 200m
-        memory: 512Mi
+        cpu: 100m
+        memory: 128Mi
       limits:
-        memory: 1Gi
+        memory: 256Mi
 
-    # Disable auto-mount of chart-owned configmap (db doesn't need app config)
+    # Disable auto-mount of chart-owned configmap (this workload doesn't need app config)
     inherit:
       configMapMount: false
 
@@ -852,3 +908,38 @@ jobGroups:
         command: |
           echo "Deploy complete at $(date)"
         ttlSecondsAfterFinished: 300
+
+  # --- bulk-export: parallel sharded export ---
+  # Features: completions/parallelism, completionMode: Indexed (required by
+  #           backoffLimitPerIndex/successPolicy), podFailurePolicy,
+  #           podReplacementPolicy, suspend
+  bulk-export:
+    kind: Job
+    image:
+      repository: ghcr.io/example/exporter
+      tag: v1.4.0
+    completionMode: Indexed
+    completions: 5
+    parallelism: 5
+    backoffLimitPerIndex: 2            # retries are scoped per index instead of the whole Job
+    successPolicy:
+      rules:
+        - succeededIndexes: "0-4"
+          succeededCount: 5
+    podFailurePolicy:
+      rules:
+        - action: FailIndex             # OOM on this index: stop retrying that shard
+          onExitCodes:
+            containerName: export
+            operator: In
+            values: [137]
+        - action: Ignore                # node drain/preemption: retry, don't count against backoff
+          onPodConditions:
+            - type: DisruptionTarget
+              status: "True"
+    podReplacementPolicy: Failed
+    suspend: false                      # true pauses pod creation without renaming the Job
+    jobs:
+      export:
+        command: |
+          export-shard --index=$JOB_COMPLETION_INDEX --total=5

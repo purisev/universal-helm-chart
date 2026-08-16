@@ -1,0 +1,25 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: e2e-gateway
+spec:
+  gatewayClassName: agentgateway
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    # Passthrough: agentgateway routes on the SNI seen in the ClientHello
+    # without decrypting anything, so the backend must terminate TLS
+    # itself — see the tlsroute-passthrough test.
+    - name: tls
+      protocol: TLS
+      port: 8443
+      hostname: tlsroute.e2e.local
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: Same

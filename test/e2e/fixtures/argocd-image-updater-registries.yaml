@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-image-updater-config
+data:
+  # The install manifest's Role/RoleBinding only cover the argocd
+  # namespace, so cluster-wide watch needs matching cluster-wide RBAC;
+  # see argocd-image-updater-rbac.yaml.
+  watch.namespaces: "*"
+  interval: "30s"
+  # prefix must match the image reference host the chart actually renders
+  # (localhost:30500, NORA's fixed NodePort — the kind node's containerd
+  # can't resolve NORA's .svc.cluster.local name, see the kind cluster
+  # config and the "Install NORA" workflow step). api_url is the address
+  # this controller pod itself uses to query the registry API, which is
+  # a separate concern: pods, unlike the node's own containerd, resolve
+  # cluster-internal DNS fine.
+  registries.conf: |
+    registries:
+    - name: In-cluster NORA registry
+      prefix: localhost:30500
+      api_url: http://nora.nora.svc.cluster.local:4000
+      insecure: true
+      default: true

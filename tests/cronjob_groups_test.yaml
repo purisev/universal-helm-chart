@@ -212,6 +212,30 @@ tests:
           path: spec.jobTemplate.spec.template.spec.containers[0].name
           value: job-completed
 
+  - it: should fall back to the root securityContext default on the job-completed sidecar
+    # Regression guard: same issue as the Job-kind case — job-completed is
+    # hardcoded directly in cronjob-groups.yaml rather than going through
+    # uhc.containerSpecWithOptions, so it used to miss the root
+    # securityContext fallback every other container gets.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.tasks.step.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].name
+          value: job-completed
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+
   - it: should label resource with truncated group-job name
     set:
       image.repository: nginx
@@ -251,3 +275,135 @@ tests:
             name: cm-app-cfg
             mountPath: /etc/app
             readOnly: true
+
+  - it: should inherit root tolerations when group and job declare none
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      tolerations:
+        - key: dedicated
+          operator: Equal
+          value: stage
+          effect: NoSchedule
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.tolerations
+          value:
+            - key: dedicated
+              operator: Equal
+              value: stage
+              effect: NoSchedule
+
+  - it: should render completions and parallelism on jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.completions: 3
+      jobGroups.cron.parallelism: 1
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.completions
+          value: 3
+      - equal:
+          path: spec.jobTemplate.spec.parallelism
+          value: 1
+
+  - it: should render podFailurePolicy inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        cron:
+          enabled: true
+          kind: CronJob
+          podFailurePolicy:
+            rules:
+              - action: FailJob
+                onExitCodes:
+                  operator: In
+                  values: [42]
+          jobs:
+            run:
+              enabled: true
+              schedule: "0 0 * * *"
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.podFailurePolicy.rules[0].action
+          value: FailJob
+      - isNull:
+          path: spec.podFailurePolicy
+
+  - it: should render suspend on CronJobSpec, not inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.suspend: true
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.suspend
+          value: true
+      - isNull:
+          path: spec.jobTemplate.spec.suspend
+
+  - it: should render podReplacementPolicy inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.podReplacementPolicy: TerminatingOrFailed
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.podReplacementPolicy
+          value: TerminatingOrFailed
+      - isNull:
+          path: spec.podReplacementPolicy
+
+  - it: should render Indexed jobGroups fields inside jobTemplate.spec
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups:
+        cron:
+          enabled: true
+          kind: CronJob
+          completionMode: Indexed
+          completions: 3
+          backoffLimitPerIndex: 1
+          successPolicy:
+            rules:
+              - succeededCount: 2
+          jobs:
+            run:
+              enabled: true
+              schedule: "0 0 * * *"
+              command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.completionMode
+          value: Indexed
+      - equal:
+          path: spec.jobTemplate.spec.backoffLimitPerIndex
+          value: 1
+      - equal:
+          path: spec.jobTemplate.spec.successPolicy.rules[0].succeededCount
+          value: 2

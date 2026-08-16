@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 helm upgrade --install minimal \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 2.0.0 \
+  --version 3.0.0 \
   --namespace minimal \
   --create-namespace \
   -f values.yaml

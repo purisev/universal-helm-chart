@@ -1,0 +1,90 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: grpcroute-routing
+spec:
+  steps:
+    - name: the grpcroute renders correctly and agentgateway actually proxies a real gRPC call through it
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: GRPCRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - grpcroute.e2e.local
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              GW_ADDR="${GW_SVC}.${NAMESPACE}.svc.cluster.local:80"
+
+              # grpcurl's image has no shell (FROM scratch), so the proto is
+              # mounted from a ConfigMap instead of relying on server
+              # reflection through the gateway — a unary call is a much
+              # simpler thing for the gateway to proxy correctly than the
+              # bidi-streaming reflection RPC turned out to be.
+              kubectl apply -n "$NAMESPACE" -f - <<EOF
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: grpcbin-proto
+              data:
+                grpcbin.proto: |
+                  syntax = "proto3";
+                  package grpcbin;
+                  service GRPCBin {
+                    rpc DummyUnary(DummyMessage) returns (DummyMessage) {}
+                  }
+                  message DummyMessage {
+                    string f_string = 1;
+                  }
+              ---
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: grpc-prober
+              spec:
+                restartPolicy: Never
+                terminationGracePeriodSeconds: 1
+                containers:
+                  - name: grpcurl
+                    image: fullstorydev/grpcurl:v1.9.3
+                    args:
+                      - -plaintext
+                      - -authority=grpcroute.e2e.local
+                      - -proto=/protos/grpcbin.proto
+                      - -import-path=/protos
+                      - -d={"f_string":"e2e-grpcroute"}
+                      - $GW_ADDR
+                      - grpcbin.GRPCBin/DummyUnary
+                    volumeMounts:
+                      - name: protos
+                        mountPath: /protos
+                volumes:
+                  - name: protos
+                    configMap:
+                      name: grpcbin-proto
+              EOF
+
+              for i in $(seq 1 20); do
+                PHASE=$(kubectl get pod grpc-prober -n "$NAMESPACE" -o jsonpath='{.status.phase}')
+                [ "$PHASE" = "Succeeded" ] || [ "$PHASE" = "Failed" ] && break
+                sleep 2
+              done
+
+              echo "phase=$PHASE"
+              kubectl logs grpc-prober -n "$NAMESPACE"
+              kubectl delete pod grpc-prober -n "$NAMESPACE" --ignore-not-found
+              kubectl delete configmap grpcbin-proto -n "$NAMESPACE" --ignore-not-found
+            check:
+              ($error): ~
+              (contains($stdout, 'phase=Succeeded')): true
+              (contains($stdout, 'e2e-grpcroute')): true

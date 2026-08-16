@@ -1260,6 +1260,30 @@ tests:
           path: spec.template.spec.containers[0].ports
           count: 1
 
+  - it: should NOT duplicate metrics container port when ports.metrics is already declared directly
+    # Regression guard: the metrics-port-already-present check used to look
+    # only at service.ports, never at the workload's own direct `ports`
+    # (rendered via renderDirectPorts on Deployment/StatefulSet main
+    # containers), so a workload declaring ports.metrics itself alongside
+    # exposeService got two "metrics" container ports — rejected by the
+    # API server.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.ports.metrics.containerPort: 9090
+      deployments.web.ports.metrics.protocol: TCP
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.targetPort: 9090
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].ports
+          count: 1
+
   - it: should render imagePullSecrets as name entries
     set:
       image.repository: nginx
@@ -1548,3 +1572,96 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "exceeds 63 characters"
+
+  - it: should render resizePolicy on the main container
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          resizePolicy:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resizePolicy
+          value:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+
+  - it: should not render resizePolicy when unset
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].resizePolicy
+
+  - it: should render pod-level resourceClaims (DRA)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          resourceClaims:
+            - name: gpu-claim
+              source:
+                resourceClaimTemplateName: gpu-template
+    asserts:
+      - equal:
+          path: spec.template.spec.resourceClaims
+          value:
+            - name: gpu-claim
+              source:
+                resourceClaimTemplateName: gpu-template
+
+  - it: should render paused when set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          paused: true
+    asserts:
+      - equal:
+          path: spec.paused
+          value: true
+
+  - it: should not render paused when unset
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.paused
+
+  - it: should pass container-level resources.claims through unchanged (DRA)
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments:
+        web:
+          enabled: true
+          resources:
+            requests:
+              cpu: 100m
+            claims:
+              - name: gpu-claim
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resources.claims
+          value:
+            - name: gpu-claim

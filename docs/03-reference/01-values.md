@@ -2,7 +2,7 @@
 
 `values.yaml` at the chart root carries machine-readable defaults only — no inline comments. This page is the annotated reference: a topical index of every top-level key grouped by feature, with cross-links to the relevant ADR and example folder, plus a cross-cutting rules cheatsheet for behaviours that span multiple keys.
 
-For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). For supported Kubernetes / CRD versions, see [`03-compatibility.md`](03-compatibility.md). For a complete working example with every chart feature enabled (passes `helm template`), see [`values.yaml.example`](../../values.yaml.example) at the chart root.
+For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). For supported Kubernetes / CRD versions, see [`03-compatibility.md`](03-compatibility.md). For a complete working example with every chart feature enabled (passes `helm template`), see [`values.yaml.example`](https://github.com/purisev/universal-helm-chart/blob/main/values.yaml.example) at the chart root.
 
 ## Topical index
 
@@ -25,7 +25,7 @@ For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). Fo
 | Argo CD integrations | `integrations.argocd.syncWaves`, `integrations.argocd.imageUpdater` | [ADR 010](../05-adr/010-argocd-sync-waves.md) |
 | Stakater Reloader | `integrations.stakater.reloader` | [ADR 017](../05-adr/017-reloader-annotation-injection.md) |
 
-For a working configuration in each area, follow the example links above. For the full value shape, see [`values.schema.json`](../../values.schema.json).
+For a working configuration in each area, follow the example links above. For the full value shape, see [`values.schema.json`](https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json).
 
 ## Cross-cutting rules
 
@@ -58,6 +58,21 @@ http (if present)  →  others alphabetically  →  metrics (if present)
 ```
 
 Auto-injected metrics port (from `integrations.monitoring.defaults.exposeService`) lands last. See [ADR 014](../05-adr/014-deterministic-ordering.md) and [ADR 016](../05-adr/016-metrics-port-auto-exposure.md).
+
+### Service port `appProtocol`
+
+Both Service port shapes accept an optional `appProtocol` — the single-port `service.port`/`service.targetPort` form and the `service.ports.<name>` map form (and their `headlessService` equivalents on StatefulSets). It passes straight through to `spec.ports[].appProtocol`, the native Kubernetes Service field.
+
+Set it when a port speaks something other than plain HTTP/1.1 and the consumer needs to know — most commonly `kubernetes.io/h2c` on a gRPC port, so a Gateway API implementation routing a GRPCRoute to that Service configures the upstream connection as HTTP/2 cleartext instead of assuming HTTP/1.1:
+
+```yaml
+service:
+  ports:
+    grpc:
+      port: 9000
+      targetPort: 9000
+      appProtocol: kubernetes.io/h2c
+```
 
 ### `jobGroups` group → job merge
 

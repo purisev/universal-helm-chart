@@ -1,0 +1,83 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: imageupdater-detects-tag
+spec:
+  steps:
+    - name: the real argocd-image-updater controller matches the Application and polls the image
+      try:
+        - assert:
+            timeout: 90s
+            resource:
+              apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+              kind: ImageUpdater
+              metadata:
+                name: e2e
+                namespace: argocd
+              status:
+                applicationsMatched: 1
+                imagesManaged: 1
+        - script:
+            content: |
+              set -e
+              CHECKED=$(kubectl get imageupdater e2e -n argocd -o jsonpath='{.status.lastCheckedAt}')
+              [ -n "$CHECKED" ] && echo "last-checked=$CHECKED result=checked" || echo "result=never-checked"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=checked')): true
+
+    - name: a real update writes back to git, and the Application resyncs to a running pod on the new tag
+      try:
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              # The controller has no way to notify us; poll status.recentUpdates
+              # for evidence a real update cycle has committed to Gitea.
+              WRITTEN=no
+              for i in $(seq 1 18); do
+                RECENT=$(kubectl get imageupdater e2e -n argocd -o jsonpath='{.status.recentUpdates}' 2>/dev/null || true)
+                if [ -n "$RECENT" ] && [ "$RECENT" != "[]" ]; then
+                  WRITTEN=yes
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "$WRITTEN" != "yes" ]; then
+                echo "--- imageupdater status ---"
+                kubectl get imageupdater e2e -n argocd -o yaml || true
+                echo "result=not-written"
+                exit 0
+              fi
+
+              # Write-back is a plain git push, not an API call against the
+              # Application, so ArgoCD has no immediate signal; force a
+              # refresh instead of waiting on its default 3-minute poll.
+              kubectl patch application e2e-app -n argocd --type merge \
+                -p '{"metadata":{"annotations":{"argocd.argoproj.io/refresh":"hard"}}}'
+
+              RESULT=not-synced
+              for i in $(seq 1 18); do
+                IMAGE=$(kubectl get deployment e2e-api -n e2e-argocd -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || true)
+                READY=$(kubectl get deployment e2e-api -n e2e-argocd -o jsonpath='{.status.readyReplicas}' 2>/dev/null || true)
+                if [ "$IMAGE" = "localhost:30500/test-image:1.1.0" ] && [ "$READY" = "1" ]; then
+                  RESULT=synced
+                  break
+                fi
+                sleep 5
+              done
+
+              if [ "$RESULT" != "synced" ]; then
+                echo "--- application status ---"
+                kubectl get application e2e-app -n argocd -o yaml || true
+                echo "--- deployment status ---"
+                kubectl get deployment e2e-api -n e2e-argocd -o yaml || true
+                echo "--- pods ---"
+                kubectl get pods -n e2e-argocd -o wide || true
+              fi
+
+              echo "written=$WRITTEN image=$IMAGE ready=$READY result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=synced')): true

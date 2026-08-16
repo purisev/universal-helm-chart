@@ -28,6 +28,9 @@ spec:
   {{- else }}
   maxUnavailable: 1
   {{- end }}
+  {{- with $pdbSpec.unhealthyPodEvictionPolicy }}
+  unhealthyPodEvictionPolicy: {{ . }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
@@ -61,6 +64,9 @@ spec:
   minAvailable: {{ $pdbSpec.minAvailable }}
   {{- else }}
   maxUnavailable: 1
+  {{- end }}
+  {{- with $pdbSpec.unhealthyPodEvictionPolicy }}
+  unhealthyPodEvictionPolicy: {{ . }}
   {{- end }}
   selector:
     matchLabels:

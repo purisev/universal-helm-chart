@@ -538,3 +538,97 @@ tests:
       - equal:
           path: metadata.annotations["example.com/criticality"]
           value: tier-1
+
+  - it: should render persistentVolumeClaimRetentionPolicy when set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          persistentVolumeClaimRetentionPolicy:
+            whenDeleted: Delete
+            whenScaled: Retain
+    asserts:
+      - equal:
+          path: spec.persistentVolumeClaimRetentionPolicy.whenDeleted
+          value: Delete
+      - equal:
+          path: spec.persistentVolumeClaimRetentionPolicy.whenScaled
+          value: Retain
+
+  - it: should not render persistentVolumeClaimRetentionPolicy when unset
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.persistentVolumeClaimRetentionPolicy
+
+  - it: should render ordinals.start when set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          ordinals:
+            start: 3
+    asserts:
+      - equal:
+          path: spec.ordinals.start
+          value: 3
+
+  - it: should not render ordinals when unset
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+    asserts:
+      - isNull:
+          path: spec.ordinals
+
+  - it: should render resizePolicy on the main container
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          resizePolicy:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].resizePolicy
+          value:
+            - resourceName: cpu
+              restartPolicy: NotRequired
+            - resourceName: memory
+              restartPolicy: RestartContainer
+
+  - it: should render pod-level resourceClaims (DRA)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          resourceClaims:
+            - name: gpu-claim
+              source:
+                resourceClaimName: my-gpu-claim
+    asserts:
+      - equal:
+          path: spec.template.spec.resourceClaims
+          value:
+            - name: gpu-claim
+              source:
+                resourceClaimName: my-gpu-claim

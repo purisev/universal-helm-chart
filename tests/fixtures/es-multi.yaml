@@ -1,0 +1,17 @@
+integrations:
+  eso:
+    externalSecrets:
+      db-creds:
+        enabled: true
+        secretStore: vault-store
+        data:
+          DB_PASSWORD:
+            remoteKey: my-app/db
+            property: password
+      api-token:
+        enabled: true
+        secretStore: vault-store
+        data:
+          API_TOKEN:
+            remoteKey: my-app/api
+            property: token

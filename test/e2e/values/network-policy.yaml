@@ -1,0 +1,65 @@
+fullnameOverride: e2e
+
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  server:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
+deployments:
+  server:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # Ingress allowed only from pods labeled network-policy-test: allowed;
+    # everything else (including plain cluster traffic that isn't from a
+    # matching pod) is denied once this NetworkPolicy selects the pod.
+    # Egress is likewise restricted to pods labeled
+    # network-policy-egress-test: allowed — this server has no legitimate
+    # reason to call out anywhere else, so the same object exercises both
+    # policyTypes together (the chart renders ingress and egress into one
+    # NetworkPolicy per workload).
+    networkPolicy:
+      enabled: true
+      policyTypes:
+        - Ingress
+        - Egress
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  network-policy-test: allowed
+          ports:
+            - protocol: TCP
+              port: 8080
+      egress:
+        - to:
+            - podSelector:
+                matchLabels:
+                  network-policy-egress-test: allowed
+          ports:
+            - protocol: TCP
+              port: 8080

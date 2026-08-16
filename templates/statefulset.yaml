@@ -24,6 +24,14 @@ spec:
   {{- with $wl.podManagementPolicy }}
   podManagementPolicy: {{ . }}
   {{- end }}
+  {{- with $wl.persistentVolumeClaimRetentionPolicy }}
+  persistentVolumeClaimRetentionPolicy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $wl.ordinals }}
+  ordinals:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- if not (and $wl.keda $wl.keda.enabled) }}
   {{- if not (and $wl.hpa $wl.hpa.enabled) }}
   {{- $replicas := 1 }}
@@ -75,7 +83,7 @@ spec:
         {{- include "uhc.initContainersSpec" (dict "ctx" $ctx "wl" $wl) | trim | nindent 8 }}
       {{- end }}
       containers:
-        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName) | trim | nindent 8 }}
+        {{- include "uhc.containerSpec" (dict "ctx" $ctx "wl" $wl "containerName" $wlName "renderDirectPorts" true) | trim | nindent 8 }}
         {{- $sidecars := include "uhc.sidecarsSpec" (dict "ctx" $ctx "wl" $wl) | trim }}
         {{- if $sidecars }}
         {{- $sidecars | nindent 8 }}
