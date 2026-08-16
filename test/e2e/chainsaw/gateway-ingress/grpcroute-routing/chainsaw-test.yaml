@@ -28,9 +28,10 @@ spec:
               # `kubectl run --rm -i` can lose the container's own output if
               # the attach races the pod's deletion, so this runs the pod
               # detached, waits for it to finish, and reads its logs
-              # explicitly instead.
+              # explicitly instead. No --command: the image's own
+              # ENTRYPOINT is already grpcurl, so these tokens are its args.
               kubectl run grpc-prober -n "$NAMESPACE" --image=fullstorydev/grpcurl:v1.9.3 \
-                --restart=Never --command -- \
+                --restart=Never -- \
                 -plaintext -authority=grpcroute.e2e.local \
                 "${GW_SVC}.${NAMESPACE}.svc.cluster.local:80" \
                 grpcbin.GRPCBin/DummyUnary -d '{"f_string":"e2e-grpcroute"}'
