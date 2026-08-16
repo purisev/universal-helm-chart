@@ -31,24 +31,27 @@ jobs:
         run: helm unittest .
 
   gate:
-    name: Check security-scan label
+    name: Check security-scan / publish-preview labels
     # Only PRs need gating — a push to main has already been reviewed, and
     # there's no PR label to read at that point anyway.
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
-      run: ${{ steps.check.outputs.run }}
+      security-scan: ${{ steps.check.outputs.security-scan }}
+      publish-preview: ${{ steps.check.outputs.publish-preview }}
     steps:
-      - name: Decide whether security scans should run
+      - name: Decide which label-gated jobs should run
         id: check
         env:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          if jq -e 'index("security-scan") != null' <<<"$LABELS_JSON" >/dev/null; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "run=false" >> "$GITHUB_OUTPUT"
-          fi
+          for label in security-scan publish-preview; do
+            if jq -e --arg l "$label" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
+              echo "$label=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$label=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
 
   misconfig-scan:
     name: Trivy misconfiguration scan
@@ -56,7 +59,7 @@ jobs:
     # Runs unconditionally on push (main); on a PR, only with the
     # security-scan label — trivy-action's own container-image download is
     # slow enough that it's not worth paying on every PR.
-    if: always() && needs.lint-test.result == 'success' && (github.event_name != 'pull_request' || needs.gate.outputs.run == 'true')
+    if: always() && needs.lint-test.result == 'success' && (github.event_name != 'pull_request' || needs.gate.outputs.security-scan == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -86,6 +89,12 @@ jobs:
           output: 'trivy-results.sarif'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
+          # SARIF format ignores `severity` by default and always includes
+          # every finding regardless — exit-code then fails the build on
+          # MEDIUM/LOW findings too (e.g. values.yaml.example's placeholder
+          # ghcr.io/example/* images tripping the "untrusted registry"
+          # check). This makes severity actually apply.
+          limit-severities-for-sarif: true
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: always()
@@ -95,12 +104,23 @@ jobs:
 
   publish-branch:
     name: Publish branch build to GHCR
-    needs: lint-test
+    needs: [lint-test, gate, misconfig-scan]
     runs-on: ubuntu-latest
     # Fork PRs run with packages: write stripped by GitHub, so the publish
     # step can never push to GHCR. Skip the job entirely on forks to keep
     # those runs green; the lint-test job above is fork-safe and still runs.
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false && !github.event.pull_request.head.repo.fork
+    # Gated by its own label (publish-preview), and only proceeds once
+    # lint-test has actually succeeded — misconfig-scan may legitimately
+    # be *skipped* (its own label wasn't set), which is fine, but must not
+    # have *failed*.
+    if: |
+      always() &&
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      !github.event.pull_request.head.repo.fork &&
+      needs.gate.outputs.publish-preview == 'true' &&
+      needs.lint-test.result == 'success' &&
+      needs.misconfig-scan.result != 'failure'
     permissions:
       contents: read
       packages: write

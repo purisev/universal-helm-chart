@@ -31,7 +31,7 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 
 ## Branch builds (PR previews)
 
-[`ci.yaml`](../../.github/workflows/ci.yaml) also publishes a preview artifact for every non-draft PR, tagged `<chart-version>-<branch-slug>` — for example `3.0.0-feat-xyz`. Reviewers can pull it directly without cloning:
+[`ci.yaml`](../../.github/workflows/ci.yaml) can also publish a preview artifact, tagged `<chart-version>-<branch-slug>` — for example `3.0.0-feat-xyz`. It's gated behind the `publish-preview` label (not automatic on every PR) and only runs once linting/tests have actually passed. Apply the label to a non-draft, non-fork PR to trigger it. Reviewers can then pull it directly without cloning:
 
 ```bash
 helm template demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0-feat-xyz -f my-values.yaml
