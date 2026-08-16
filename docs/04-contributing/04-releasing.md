@@ -1,6 +1,6 @@
 # Releasing
 
-The chart is published to GHCR as an OCI artifact under the maintainer's namespace (`oci://ghcr.io/purisev/universal-helm-chart` for this repo; `${{ github.repository_owner }}` for forks — see [Forks](#forks) below). Two CI workflows under [`.github/workflows/`](../../.github/workflows/) handle the publishing automatically.
+The chart is published to GHCR as an OCI artifact under the maintainer's namespace (`oci://ghcr.io/purisev/universal-helm-chart` for this repo; `${{ github.repository_owner }}` for forks — see [Forks](#forks) below). Two CI workflows under [`.github/workflows/`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows) handle the publishing automatically.
 
 ## Cutting a release (tagged build)
 
@@ -13,7 +13,7 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
    git push origin v3.0.0
    ```
 
-3. **CI takes over.** [`release.yaml`](../../.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, packages the chart, pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`), and signs it keylessly via [Sigstore/cosign](https://docs.sigstore.dev/) — no key management, the signature is tied to this repo's GitHub Actions OIDC identity.
+3. **CI takes over.** [`release.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, packages the chart, pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`), and signs it keylessly via [Sigstore/cosign](https://docs.sigstore.dev/) — no key management, the signature is tied to this repo's GitHub Actions OIDC identity.
 4. **Verify the artifact:**
 
    ```bash
@@ -31,7 +31,7 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 
 ## Branch builds (PR previews)
 
-[`ci.yaml`](../../.github/workflows/ci.yaml) can also publish a preview artifact, tagged `<chart-version>-<branch-slug>` — for example `3.0.0-feat-xyz`. It's gated behind the `publish-preview` label (not automatic on every PR) and only runs once linting/tests have actually passed. Apply the label to a non-draft, non-fork PR to trigger it. Reviewers can then pull it directly without cloning:
+[`ci.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/ci.yaml) can also publish a preview artifact, tagged `<chart-version>-<branch-slug>` — for example `3.0.0-feat-xyz`. It's gated behind the `publish-preview` label (not automatic on every PR) and only runs once linting/tests have actually passed. Apply the label to a non-draft, non-fork PR to trigger it. Reviewers can then pull it directly without cloning:
 
 ```bash
 helm template demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0-feat-xyz -f my-values.yaml
@@ -39,7 +39,7 @@ helm template demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0-fe
 
 ## What gets published
 
-The OCI artifact contains only what chart consumers need: `Chart.yaml`, `templates/`, `values.yaml`, `values.schema.json`, `README.md`, `LICENSE`, `NOTICE`, `SECURITY.md`. Everything else (`docs/`, `tests/`, `.github/`, `.claude/`) is excluded via [`.helmignore`](../../.helmignore).
+The OCI artifact contains only what chart consumers need: `Chart.yaml`, `templates/`, `values.yaml`, `values.schema.json`, `README.md`, `LICENSE`, `NOTICE`, `SECURITY.md`. Everything else (`docs/`, `tests/`, `.github/`, `.claude/`) is excluded via [`.helmignore`](https://github.com/purisev/universal-helm-chart/blob/main/.helmignore).
 
 ## Forks
 

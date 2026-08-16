@@ -41,7 +41,7 @@ Two recurring shapes:
 }
 ```
 
-For the full schema source, see [`values.schema.json`](../../values.schema.json).
+For the full schema source, see [`values.schema.json`](https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json).
 
 ## IDE setup
 

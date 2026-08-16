@@ -1,0 +1,39 @@
+name: Deploy docs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - 'book.toml'
+      - '.github/workflows/docs-deploy.yaml'
+
+jobs:
+  deploy:
+    name: Build and deploy mdBook to GitHub Pages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # to push the built site to gh-pages
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdbook
+        run: |
+          tag=$(curl -fsSL 'https://api.github.com/repos/rust-lang/mdbook/releases/latest' | jq -r '.tag_name')
+          url="https://github.com/rust-lang/mdbook/releases/download/${tag}/mdbook-${tag}-x86_64-unknown-linux-gnu.tar.gz"
+          mkdir mdbook-bin
+          curl -fsSL "$url" | tar -xz --directory=./mdbook-bin
+          echo "$(pwd)/mdbook-bin" >> "$GITHUB_PATH"
+
+      - name: Build book
+        run: mdbook build
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./book
+          # PR previews live under pr-preview/ on this same branch (see
+          # docs-preview.yaml) — keep_files stops this job's force-push from
+          # wiping them out on every production deploy.
+          keep_files: true

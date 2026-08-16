@@ -2,7 +2,7 @@
 
 `values.yaml` at the chart root carries machine-readable defaults only — no inline comments. This page is the annotated reference: a topical index of every top-level key grouped by feature, with cross-links to the relevant ADR and example folder, plus a cross-cutting rules cheatsheet for behaviours that span multiple keys.
 
-For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). For supported Kubernetes / CRD versions, see [`03-compatibility.md`](03-compatibility.md). For a complete working example with every chart feature enabled (passes `helm template`), see [`values.yaml.example`](../../values.yaml.example) at the chart root.
+For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). For supported Kubernetes / CRD versions, see [`03-compatibility.md`](03-compatibility.md). For a complete working example with every chart feature enabled (passes `helm template`), see [`values.yaml.example`](https://github.com/purisev/universal-helm-chart/blob/main/values.yaml.example) at the chart root.
 
 ## Topical index
 
@@ -25,7 +25,7 @@ For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). Fo
 | Argo CD integrations | `integrations.argocd.syncWaves`, `integrations.argocd.imageUpdater` | [ADR 010](../05-adr/010-argocd-sync-waves.md) |
 | Stakater Reloader | `integrations.stakater.reloader` | [ADR 017](../05-adr/017-reloader-annotation-injection.md) |
 
-For a working configuration in each area, follow the example links above. For the full value shape, see [`values.schema.json`](../../values.schema.json).
+For a working configuration in each area, follow the example links above. For the full value shape, see [`values.schema.json`](https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json).
 
 ## Cross-cutting rules
 
