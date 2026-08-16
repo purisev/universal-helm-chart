@@ -18,12 +18,14 @@ jobs:
     outputs:
       run: ${{ steps.check.outputs.run }}
     steps:
+      # `pre-merge` (see ci.yaml / e2e.yaml) is the one-label "run all the
+      # things before I merge this" shortcut — it implies docs-preview too.
       - name: Decide whether to build a preview
         id: check
         env:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          if jq -e 'index("docs-preview") != null' <<<"$LABELS_JSON" >/dev/null; then
+          if jq -e 'index("docs-preview") != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"

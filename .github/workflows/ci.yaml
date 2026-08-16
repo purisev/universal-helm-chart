@@ -47,13 +47,15 @@ jobs:
       security-scan: ${{ steps.check.outputs.security-scan }}
       publish-preview: ${{ steps.check.outputs.publish-preview }}
     steps:
+      # `pre-merge` (see e2e.yaml too) is the one-label "run all the things
+      # before I merge this" shortcut — it implies both of the labels below.
       - name: Decide which label-gated jobs should run
         id: check
         env:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
           for label in security-scan publish-preview; do
-            if jq -e --arg l "$label" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
+            if jq -e --arg l "$label" 'index($l) != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$label=true" >> "$GITHUB_OUTPUT"
             else
               echo "$label=false" >> "$GITHUB_OUTPUT"

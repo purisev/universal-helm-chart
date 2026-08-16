@@ -29,6 +29,8 @@ jobs:
       argocd: ${{ steps.check.outputs.argocd }}
     steps:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
+      # `pre-merge` (see ci.yaml) also runs everything — it's the
+      # one-label "run all the things before I merge this" shortcut.
       # workflow_dispatch always runs everything (there's no label to read).
       - name: Decide which e2e jobs should run
         id: check
@@ -37,7 +39,7 @@ jobs:
         run: |
           FULL=false
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
-             jq -e 'index("e2e") != null' <<<"$LABELS_JSON" >/dev/null; then
+             jq -e 'index("e2e") != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
             FULL=true
           fi
 
