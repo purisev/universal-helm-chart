@@ -60,3 +60,35 @@ deployments:
             start: "0 0 * * *"
             end: "0 1 * * *"
             desiredReplicas: "2"
+
+  keda-scale-to-zero-demo:
+    image:
+      repository: busybox
+      tag: "1.36"
+    command: ["sh", "-c", "sleep infinity"]
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
+    # Same cron trigger shape as keda-demo, but this scenario proves KEDA
+    # scales back down to zero once the trigger goes inactive — keda-demo's
+    # own window stays open for the whole job's runtime, so it never
+    # exercises that path. cooldownPeriod is cut way down from KEDA's
+    # 5-minute default so the scale-down is observable within this test's
+    # own timeout rather than the whole job's; the keda-scale-to-zero test
+    # closes the window itself by patching the ScaledObject mid-test
+    # instead of waiting out real wall-clock time.
+    keda:
+      enabled: true
+      minReplicas: 0
+      maxReplicas: 2
+      pollingInterval: 5
+      cooldownPeriod: 10
+      triggers:
+        - type: cron
+          metadata:
+            timezone: UTC
+            start: "0 0 * * *"
+            end: "0 1 * * *"
+            desiredReplicas: "1"

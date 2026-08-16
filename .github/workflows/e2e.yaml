@@ -227,6 +227,8 @@ jobs:
             -f test/e2e/values/autoscaling.yaml \
             --set "deployments.keda-demo.keda.triggers[0].metadata.start=${CRON_START}" \
             --set "deployments.keda-demo.keda.triggers[0].metadata.end=${CRON_END}" \
+            --set "deployments.keda-scale-to-zero-demo.keda.triggers[0].metadata.start=${CRON_START}" \
+            --set "deployments.keda-scale-to-zero-demo.keda.triggers[0].metadata.end=${CRON_END}" \
             --wait --timeout 3m
 
       - name: Run Chainsaw tests
@@ -241,6 +243,7 @@ jobs:
 
           echo "::group::HPA describe"
           kubectl describe hpa -n "$NAMESPACE"
+          kubectl describe scaledobject -n "$NAMESPACE"
           echo "::endgroup::"
 
           echo "::group::VPA describe"
