@@ -1,0 +1,97 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: secrets
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: secrets
+  source:
+    repoURL: ghcr.io/purisev
+    chart: universal-helm-chart
+    targetRevision: 3.0.0
+    helm:
+      releaseName: secrets
+      values: |
+        integrations:
+          eso:
+            enabled: true
+            secretStores:
+              vault:
+                enabled: true
+                kind: SecretStore
+                provider:
+                  vault:
+                    server: https://vault.example.com
+                    path: secret
+                    version: v2
+                    auth:
+                      jwt:
+                        mountPath: jwt
+                        role: eso-app
+                        audiences:
+                          - vault
+                        expirationSeconds: 600
+            externalSecrets:
+              app-secrets:
+                enabled: true
+                secretStore: vault
+                storeKind: SecretStore
+                refreshInterval: 1h
+                targetName: app-secrets
+                type: Opaque
+                data:
+                  DB_PASSWORD:
+                    remoteKey: app/db
+                    property: password
+                  API_TOKEN:
+                    remoteKey: app/api
+                    property: token
+              bulk-config:
+                enabled: true
+                secretStore: vault
+                storeKind: SecretStore
+                refreshInterval: 1h
+                targetName: bulk-config
+                type: Opaque
+                dataFrom:
+                  - remoteKey: app/feature-flags
+                    conversionStrategy: Default
+                    decodingStrategy: None
+          stakater:
+            reloader:
+              enabled: true
+        serviceAccount:
+          create: true
+          name: eso-app
+        deployments:
+          web:
+            enabled: true
+            replicaCount: 2
+            image:
+              repository: ghcr.io/example/web
+              tag: v1.4.2
+            service:
+              enabled: true
+              ports:
+                http:
+                  port: 80
+                  targetPort: 8080
+            envSecrets:
+              - app-secrets
+              - bulk-config
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                memory: 256Mi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

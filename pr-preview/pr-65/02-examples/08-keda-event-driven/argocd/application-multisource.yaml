@@ -1,0 +1,28 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keda
+  sources:
+    - repoURL: ghcr.io/purisev
+      chart: universal-helm-chart
+      targetRevision: 3.0.0
+      helm:
+        releaseName: keda
+        valueFiles:
+          - $values/docs/02-examples/08-keda-event-driven/values.yaml
+    - repoURL: https://github.com/purisev/universal-helm-chart.git
+      targetRevision: v3.0.0
+      ref: values
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
