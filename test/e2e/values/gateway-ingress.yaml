@@ -142,8 +142,14 @@ ingress:
   enabled: true
   ingressClassName: nginx
   # Real TLS termination at ingress-nginx, using the cert-manager-issued
-  # cert for e2e.local (see ingress-tls-termination) — the http:// prober
-  # request above still works too, since this doesn't force a redirect.
+  # cert for e2e.local (see ingress-tls-termination). ingress-nginx turns
+  # on ssl-redirect by default the moment a host has a tls: entry, which
+  # broke the plain-HTTP ingress-routing test (wget follows the redirect
+  # to https://e2e.local/, a hostname that only resolves via the Host
+  # header trick, never in real DNS) — disabled explicitly so both keep
+  # working side by side.
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
   tls:
     - hosts:
         - e2e.local
