@@ -1,0 +1,39 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: grpcroute-routing
+spec:
+  steps:
+    - name: the grpcroute renders correctly and agentgateway actually proxies a real gRPC call through it
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: GRPCRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                hostnames:
+                  - grpcroute.e2e.local
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              # grpcurl has no proto for grpcbin.GRPCBin, so it discovers the
+              # method via the backend's own server reflection — that call
+              # only reaches grpcbin because the rendered rule has no
+              # `matches`, which makes it a catch-all for every RPC on this
+              # hostname (see gateway-ingress.yaml).
+              kubectl run grpc-prober -n "$NAMESPACE" --image=fullstorydev/grpcurl:v1.9.3 \
+                --restart=Never --rm -i --pod-running-timeout=30s -- \
+                -plaintext -authority=grpcroute.e2e.local \
+                "${GW_SVC}.${NAMESPACE}.svc.cluster.local:80" \
+                grpcbin.GRPCBin/DummyUnary -d '{"f_string":"e2e-grpcroute"}'
+            check:
+              ($error): ~
+              (contains($stdout, 'e2e-grpcroute')): true

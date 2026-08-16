@@ -42,6 +42,25 @@ deployments:
       rules:
         - {}
 
+  # Real gRPC backend (registers grpc.reflection too) for the grpcroute
+  # test to route actual traffic to, instead of just proving CRD admission.
+  grpcbin:
+    image:
+      repository: moul/grpcbin
+      tag: latest
+      pullPolicy: Always
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 9000
+      targetPort: 9000
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
 # Classic networking.k8s.io/v1 Ingress, routed through ingress-nginx.
 ingress:
   enabled: true
@@ -64,9 +83,11 @@ httpRoute:
   hostnames:
     - httproute.e2e.local
 
-# CRD-admission only below: no listener on the fixture Gateway actually
-# serves gRPC or TLS-passthrough traffic, so these just prove the chart
-# renders a schema-valid object the API server accepts.
+# Routed through the same agentgateway listener, to the real grpcbin
+# backend above. No `matches` on the rule is deliberate: an omitted match
+# catches every RPC on this hostname, which is what lets grpcurl's
+# reflection call (a different service than grpcbin.GRPCBin itself) reach
+# the backend too.
 grpcRoute:
   enabled: true
   parentRefs:
@@ -74,14 +95,13 @@ grpcRoute:
   hostnames:
     - grpcroute.e2e.local
   rules:
-    - matches:
-        - method:
-            type: Exact
-            service: com.example.ApiService
-      backendRefs:
-        - name: e2e-api
-          port: 80
+    - backendRefs:
+        - name: e2e-grpcbin
+          port: 9000
 
+# TLSRoute stays CRD-admission only: no listener on the fixture Gateway
+# terminates/passes through TLS, so this just proves the chart renders a
+# schema-valid object the API server accepts.
 tlsRoute:
   enabled: true
   parentRefs:
