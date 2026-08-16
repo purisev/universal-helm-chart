@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: ghcr.io/purisev
     chart: universal-helm-chart
-    targetRevision: 2.0.0
+    targetRevision: 3.0.0
     helm:
       releaseName: monitoring
       values: |

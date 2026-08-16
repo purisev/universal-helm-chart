@@ -50,7 +50,7 @@ For the full schema source, see [`values.schema.json`](../../values.schema.json)
 Add a directive at the top of any values file you author:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v2.0.0/values.schema.json
+# yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.0.0/values.schema.json
 deployments:
   api:
     image:
@@ -64,7 +64,7 @@ Autocompletion, hover docs and inline error squiggles work from this point on.
 
 `Settings` → `Languages & Frameworks` → `Schemas and DTDs` → `JSON Schema Mappings`:
 
-- **Schema file or URL:** `https://raw.githubusercontent.com/purisev/universal-helm-chart/v2.0.0/values.schema.json`
+- **Schema file or URL:** `https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.0.0/values.schema.json`
 - **Schema version:** JSON Schema 2020-12 (the latest)
 - **File path pattern:** `*values*.yaml` (or per-project glob).
 
@@ -87,4 +87,4 @@ Use this when iterating on overlay values in a config repo where Helm isn't inst
 
 ## Pinning the schema URL
 
-The `v2.0.0` segment in the schema URL above is a git tag. Replace it with the chart version you're targeting (or a branch name if you're tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on `helm template`/`helm install` automatically — IDE setup is only needed when authoring values outside an active `helm` invocation.
+The `v3.0.0` segment in the schema URL above is a git tag. Replace it with the chart version you're targeting (or a branch name if you're tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on `helm template`/`helm install` automatically — IDE setup is only needed when authoring values outside an active `helm` invocation.

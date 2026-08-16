@@ -17,7 +17,7 @@ deployments:
 Install:
 
 ```bash
-helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 2.0.0 -f values.yaml
+helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0 -f values.yaml
 ```
 
 A complete copy-and-deploy version of this scenario, including Argo CD and Flux manifests, lives at [`../02-examples/01-minimal/`](../02-examples/01-minimal/).

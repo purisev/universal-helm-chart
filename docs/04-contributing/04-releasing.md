@@ -8,24 +8,24 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 2. **Tag and push** from the matching release branch:
 
    ```bash
-   git checkout release-2.0.0
-   git tag v2.0.0
-   git push origin v2.0.0
+   git checkout release-3.0.0
+   git tag v3.0.0
+   git push origin v3.0.0
    ```
 
 3. **CI takes over.** [`release.yaml`](../../.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, packages the chart and pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`).
 4. **Verify the artifact:**
 
    ```bash
-   helm pull oci://ghcr.io/purisev/universal-helm-chart --version 2.0.0
+   helm pull oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0
    ```
 
 ## Branch builds (PR previews)
 
-[`ci.yaml`](../../.github/workflows/ci.yaml) also publishes a preview artifact for every non-draft PR, tagged `<chart-version>-<branch-slug>` — for example `2.0.0-feat-xyz`. Reviewers can pull it directly without cloning:
+[`ci.yaml`](../../.github/workflows/ci.yaml) also publishes a preview artifact for every non-draft PR, tagged `<chart-version>-<branch-slug>` — for example `3.0.0-feat-xyz`. Reviewers can pull it directly without cloning:
 
 ```bash
-helm template demo oci://ghcr.io/purisev/universal-helm-chart --version 2.0.0-feat-xyz -f my-values.yaml
+helm template demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0-feat-xyz -f my-values.yaml
 ```
 
 ## What gets published
