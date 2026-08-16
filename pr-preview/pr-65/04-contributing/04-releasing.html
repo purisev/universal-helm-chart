@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-5f250078.js";
+            window.path_to_searchindex_js = "../searchindex-42996870.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-447daa91.js"></script>
@@ -189,9 +189,9 @@
 </li>
 <li>
 <p><strong>Tag and push</strong> from the matching release branch:</p>
-<pre><code class="language-bash">git checkout release-3.0.0
-git tag v3.0.0
-git push origin v3.0.0
+<pre><code class="language-bash">git checkout release-&lt;X.Y.Z&gt;
+git tag v&lt;X.Y.Z&gt;
+git push origin v&lt;X.Y.Z&gt;
 </code></pre>
 </li>
 <li>
@@ -199,7 +199,7 @@ git push origin v3.0.0
 </li>
 <li>
 <p><strong>Verify the artifact:</strong></p>
-<pre><code class="language-bash">helm pull oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0
+<pre><code class="language-bash">helm pull oci://ghcr.io/purisev/universal-helm-chart --version &lt;X.Y.Z&gt;
 </code></pre>
 </li>
 <li>
@@ -207,13 +207,13 @@ git push origin v3.0.0
 <pre><code class="language-bash">cosign verify \
   --certificate-identity-regexp "^https://github.com/purisev/universal-helm-chart/" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/purisev/universal-helm-chart:3.0.0
+  ghcr.io/purisev/universal-helm-chart:&lt;X.Y.Z&gt;
 </code></pre>
 </li>
 </ol>
 <h2 id="branch-builds-pr-previews"><a class="header" href="#branch-builds-pr-previews">Branch builds (PR previews)</a></h2>
-<p><a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/ci.yaml"><code>ci.yaml</code></a> can also publish a preview artifact, tagged <code>&lt;chart-version&gt;-&lt;branch-slug&gt;</code> — for example <code>3.0.0-feat-xyz</code>. It’s gated behind the <code>publish-preview</code> label (not automatic on every PR) and only runs once linting/tests have actually passed. Apply the label to a non-draft, non-fork PR to trigger it. Reviewers can then pull it directly without cloning:</p>
-<pre><code class="language-bash">helm template demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0-feat-xyz -f my-values.yaml
+<p><a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/ci.yaml"><code>ci.yaml</code></a> can also publish a preview artifact, tagged <code>&lt;chart-version&gt;-&lt;branch-slug&gt;</code> — for example <code>&lt;X.Y.Z&gt;-feat-xyz</code>. It’s gated behind the <code>publish-preview</code> label (not automatic on every PR) and only runs once linting/tests have actually passed. Apply the label to a non-draft, non-fork PR to trigger it. Reviewers can then pull it directly without cloning:</p>
+<pre><code class="language-bash">helm template demo oci://ghcr.io/purisev/universal-helm-chart --version &lt;X.Y.Z&gt;-feat-xyz -f my-values.yaml
 </code></pre>
 <h2 id="what-gets-published"><a class="header" href="#what-gets-published">What gets published</a></h2>
 <p>The OCI artifact contains only what chart consumers need: <code>Chart.yaml</code>, <code>templates/</code>, <code>values.yaml</code>, <code>values.schema.json</code>, <code>README.md</code>, <code>LICENSE</code>, <code>NOTICE</code>, <code>SECURITY.md</code>. Everything else (<code>docs/</code>, <code>tests/</code>, <code>.github/</code>, <code>.claude/</code>) is excluded via <a href="https://github.com/purisev/universal-helm-chart/blob/main/.helmignore"><code>.helmignore</code></a>.</p>
