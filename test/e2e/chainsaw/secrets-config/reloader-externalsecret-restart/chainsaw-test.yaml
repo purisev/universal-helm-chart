@@ -1,0 +1,74 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: reloader-externalsecret-restart
+spec:
+  steps:
+    - name: changing the value in Vault flows through ESO's refresh into the Secret, and Reloader restarts the pod that consumes it
+      try:
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              OLD_POD=$(kubectl get pods -n "$NAMESPACE" \
+                -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
+                -o jsonpath='{.items[0].metadata.name}')
+
+              # bank-vaults' Kubernetes unseal backend stores the root
+              # token in this well-known Secret/key (its own examples use
+              # the same lookup to authenticate the CLI).
+              ROOT_TOKEN=$(kubectl get secret vault-unseal-keys -n vault -o jsonpath='{.data.vault-root}' | base64 -d)
+
+              kubectl exec -n vault vault-0 -- \
+                env VAULT_TOKEN="$ROOT_TOKEN" VAULT_ADDR=http://127.0.0.1:8200 \
+                vault kv put secret/e2e/app value=reloaded-vault-value
+
+              # ESO's refreshInterval on this ExternalSecret is 10s; give it
+              # room to re-read Vault and update the target Secret before
+              # asserting on Reloader's reaction to that update.
+              SECRET_RESULT=stale
+              for i in $(seq 1 20); do
+                VALUE=$(kubectl get secret app-secrets -n "$NAMESPACE" -o jsonpath='{.data.GREETING}')
+                if [ "$VALUE" = "cmVsb2FkZWQtdmF1bHQtdmFsdWU=" ]; then
+                  SECRET_RESULT=updated
+                  break
+                fi
+                sleep 3
+              done
+
+              RESULT=no-new-pod
+              for i in $(seq 1 30); do
+                NEW_POD=$(kubectl get pods -n "$NAMESPACE" \
+                  -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
+                  --field-selector=status.phase=Running \
+                  -o jsonpath='{.items[0].metadata.name}')
+                if [ -n "$NEW_POD" ] && [ "$NEW_POD" != "$OLD_POD" ]; then
+                  RESULT=restarted
+                  break
+                fi
+                sleep 3
+              done
+
+              # Put Vault back the way eso-vault-materialization (and this
+              # test, if re-run) expect it, regardless of test execution
+              # order — this mutated shared state, so it owns restoring it.
+              kubectl exec -n vault vault-0 -- \
+                env VAULT_TOKEN="$ROOT_TOKEN" VAULT_ADDR=http://127.0.0.1:8200 \
+                vault kv put secret/e2e/app value=vault-secret-value
+
+              RESTORE_RESULT=stale
+              for i in $(seq 1 20); do
+                VALUE=$(kubectl get secret app-secrets -n "$NAMESPACE" -o jsonpath='{.data.GREETING}')
+                if [ "$VALUE" = "dmF1bHQtc2VjcmV0LXZhbHVl" ]; then
+                  RESTORE_RESULT=restored
+                  break
+                fi
+                sleep 3
+              done
+
+              echo "secret-result=$SECRET_RESULT result=$RESULT restore-result=$RESTORE_RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'secret-result=updated')): true
+              (contains($stdout, 'result=restarted')): true
+              (contains($stdout, 'restore-result=restored')): true
