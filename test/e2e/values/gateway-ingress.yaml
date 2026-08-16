@@ -50,6 +50,19 @@ deployments:
       tag: latest
       pullPolicy: Always
 
+    # The image's secure listener (unused by this test — only the insecure
+    # :9000 listener matters) reads a bundled cert under /root/cert at
+    # startup and log.Fatalf()s the whole process, insecure listener
+    # included, if that read fails. /root isn't traversable by the chart's
+    # default non-root UID, so this workload runs as root to let it start.
+    podSecurityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+      runAsGroup: 0
+      fsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+
     service:
       enabled: true
       type: ClusterIP
