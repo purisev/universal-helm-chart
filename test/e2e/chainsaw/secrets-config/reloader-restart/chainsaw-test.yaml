@@ -34,8 +34,13 @@ spec:
                   RESULT=restarted
                 fi
 
+                # No --field-selector here (unlike the Deployment query
+                # above): applied to a single named `get` rather than a
+                # list, it silently never matched, which is what actually
+                # broke this check the first time around. The UID compare
+                # alone already proves it's a genuinely new pod.
                 NEW_STS_UID=$(kubectl get pod e2e-worker-0 -n "$NAMESPACE" \
-                  --field-selector=status.phase=Running -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
+                  -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
                 if [ -n "$NEW_STS_UID" ] && [ "$NEW_STS_UID" != "$OLD_STS_UID" ]; then
                   STS_RESULT=restarted
                 fi
