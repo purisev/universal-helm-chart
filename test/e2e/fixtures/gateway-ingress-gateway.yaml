@@ -11,3 +11,15 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same
+    # Passthrough: agentgateway routes on the SNI seen in the ClientHello
+    # without decrypting anything, so the backend must terminate TLS
+    # itself — see the tlsroute-passthrough test.
+    - name: tls
+      protocol: TLS
+      port: 8443
+      hostname: tlsroute.e2e.local
+      tls:
+        mode: Passthrough
+      allowedRoutes:
+        namespaces:
+          from: Same
