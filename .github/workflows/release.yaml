@@ -34,9 +34,12 @@ jobs:
         run: helm unittest .
 
       - name: Log in to GHCR
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io \
-            --username ${{ github.actor }} \
+          echo "$GHCR_TOKEN" | helm registry login ghcr.io \
+            --username "$GHCR_ACTOR" \
             --password-stdin
 
       # cosign authenticates via the standard Docker credential store
@@ -45,9 +48,12 @@ jobs:
       # registry. Without this, `cosign sign` fails with
       # "UNAUTHORIZED: unauthenticated".
       - name: Log in to GHCR for cosign
+        env:
+          GHCR_ACTOR: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io \
-            --username ${{ github.actor }} \
+          echo "$GHCR_TOKEN" | docker login ghcr.io \
+            --username "$GHCR_ACTOR" \
             --password-stdin
 
       - name: Package chart
@@ -57,6 +63,8 @@ jobs:
         run: helm push universal-helm-chart-*.tgz oci://ghcr.io/${{ github.repository_owner }}
 
       - name: Sign the published chart (keyless, via Sigstore)
+        env:
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           CHART_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
-          cosign sign --yes "ghcr.io/${{ github.repository_owner }}/universal-helm-chart:${CHART_VERSION}"
+          cosign sign --yes "ghcr.io/${REPO_OWNER}/universal-helm-chart:${CHART_VERSION}"
