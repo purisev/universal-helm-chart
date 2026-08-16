@@ -60,3 +60,9 @@ jobs:
         with:
           source-dir: ./book/
           preview-branch: gh-pages
+          # action: auto only recognizes opened/reopened/synchronize/closed
+          # — our label-gated trigger fires on `labeled` too, which auto
+          # treats as "nothing to do", silently skipping the deploy. The
+          # gate job above already decides *whether* to run; here we just
+          # need deploy vs remove.
+          action: ${{ github.event.action == 'closed' && 'remove' || 'deploy' }}
