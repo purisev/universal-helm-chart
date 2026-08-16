@@ -1260,6 +1260,30 @@ tests:
           path: spec.template.spec.containers[0].ports
           count: 1
 
+  - it: should NOT duplicate metrics container port when ports.metrics is already declared directly
+    # Regression guard: the metrics-port-already-present check used to look
+    # only at service.ports, never at the workload's own direct `ports`
+    # (rendered via renderDirectPorts on Deployment/StatefulSet main
+    # containers), so a workload declaring ports.metrics itself alongside
+    # exposeService got two "metrics" container ports — rejected by the
+    # API server.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.ports.metrics.containerPort: 9090
+      deployments.web.ports.metrics.protocol: TCP
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.exposeService.enabled: true
+      deployments.web.metrics.exposeService.targetPort: 9090
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].ports
+          count: 1
+
   - it: should render imagePullSecrets as name entries
     set:
       image.repository: nginx

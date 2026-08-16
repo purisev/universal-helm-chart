@@ -87,7 +87,7 @@ Output at zero indent; caller controls nindent.
   {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
   {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
   {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
-  {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
+  {{- $hasMetricsPortAlready := or (and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics")) (hasKey ($wl.ports | default dict) "metrics") -}}
   {{- if and .renderDirectPorts $wl.ports }}
   ports:
     {{- range $pName := include "uhc.orderedPortNames" $wl.ports | fromJsonArray }}
