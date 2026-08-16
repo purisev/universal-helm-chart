@@ -1,0 +1,50 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: keda-scale-to-zero
+spec:
+  steps:
+    - name: once the cron trigger's window closes, KEDA scales the deployment back down to zero
+      try:
+        - assert:
+            timeout: 3m
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: e2e-keda-scale-to-zero-demo
+              status:
+                readyReplicas: 1
+        - script:
+            timeout: 30s
+            content: |
+              set -e
+              # Closes the cron window deterministically instead of racing
+              # real wall-clock time against keda-demo's own window (which
+              # stays open for the whole job's runtime): a window that
+              # already fully elapsed a minute ago won't recur until the
+              # same time tomorrow, so the trigger goes inactive right away.
+              PAST_END=$(date -u -d '-1 minutes' +'%-M %-H * * *')
+              kubectl patch scaledobject e2e-keda-scale-to-zero-demo -n "$NAMESPACE" \
+                --type=json -p="[{\"op\":\"replace\",\"path\":\"/spec/triggers/0/metadata/end\",\"value\":\"$PAST_END\"}]"
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              # status.readyReplicas is omitempty on Deployment, so it's
+              # absent from the object rather than literally 0 once scaled
+              # down — a structural assert on the field would never match.
+              RESULT=not-yet
+              for i in $(seq 1 40); do
+                READY=$(kubectl get deployment e2e-keda-scale-to-zero-demo -n "$NAMESPACE" \
+                  -o jsonpath='{.status.readyReplicas}')
+                if [ -z "$READY" ] || [ "$READY" = "0" ]; then
+                  RESULT=scaled-to-zero
+                  break
+                fi
+                sleep 3
+              done
+              echo "result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=scaled-to-zero')): true
