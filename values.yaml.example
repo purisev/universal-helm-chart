@@ -190,8 +190,12 @@ rbac:
     - apiGroups: ["coordination.k8s.io"]
       resources: ["leases"]
       verbs: ["get", "create", "update"]
-  # aggregationRule only applies to ClusterRole; rules above still apply directly,
-  # aggregationRule adds more rules on top by aggregating any ClusterRole matching the selector
+  # aggregationRule only applies to ClusterRole. Once set, Kubernetes' own
+  # ClusterRole controller overwrites .rules on every reconcile with the
+  # union of every ClusterRole matching the selector below — the rules
+  # hardcoded above do NOT keep applying alongside it and will be replaced.
+  # Combine static rules with aggregation only via a separate ClusterRole
+  # (one static, one aggregating) if you need both.
   aggregationRule:
     clusterRoleSelectors:
       - matchLabels:

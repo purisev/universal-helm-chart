@@ -36,7 +36,7 @@ statefulSets:
         example.com/foo: bar
 ```
 
-`service` also gained the rest of the `ServiceSpec` fields (`externalName`, `loadBalancerSourceRanges`, `sessionAffinityConfig`, `trafficDistribution`, etc.), on both `service` and `headlessService`.
+`service` also gained the rest of the `ServiceSpec` fields (`externalName`, `loadBalancerSourceRanges`, `sessionAffinityConfig`, `trafficDistribution`, etc.) — `service` only, not `headlessService`: a headless Service has no virtual IP, so the load-balancer, traffic-policy, and session-affinity fields have no meaning there and the schema rejects them.
 
 ## 2.0.0
 
