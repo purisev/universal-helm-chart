@@ -14,6 +14,10 @@ tests/
 # Documentation, examples, ADRs — never shipped in the OCI artifact
 docs/
 
+# mdBook (docs/ -> GitHub Pages) — config and build output, not chart content
+book.toml
+book/
+
 # OS artifacts
 .DS_Store
 

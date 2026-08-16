@@ -1,6 +1,6 @@
 # Reference
 
-The authoritative per-field source is [`values.yaml`](../../values.yaml) (heavily annotated) and [`values.schema.json`](../../values.schema.json) (machine-checkable shape). The pages here add cross-cutting context that those files don't aggregate.
+The authoritative per-field source is [`values.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/values.yaml) (heavily annotated) and [`values.schema.json`](https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json) (machine-checkable shape). The pages here add cross-cutting context that those files don't aggregate.
 
 - [`01-values.md`](01-values.md) — topical index of every top-level key plus the cross-cutting rules (env merge, label precedence, port ordering, jobGroups merge, autoscaler exclusion, chart-owned vs external resolution).
 - [`02-schema.md`](02-schema.md) — what the schema does and doesn't catch, schema layout, and IDE setup for autocomplete and inline validation (yaml-language-server / Red Hat YAML, JetBrains, `helm lint`, `ajv-cli`).
