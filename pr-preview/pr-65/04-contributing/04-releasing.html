@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-42996870.js";
+            window.path_to_searchindex_js = "../searchindex-5c9a7cbb.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-447daa91.js"></script>
@@ -216,7 +216,7 @@ git push origin v&lt;X.Y.Z&gt;
 <pre><code class="language-bash">helm template demo oci://ghcr.io/purisev/universal-helm-chart --version &lt;X.Y.Z&gt;-feat-xyz -f my-values.yaml
 </code></pre>
 <h2 id="what-gets-published"><a class="header" href="#what-gets-published">What gets published</a></h2>
-<p>The OCI artifact contains only what chart consumers need: <code>Chart.yaml</code>, <code>templates/</code>, <code>values.yaml</code>, <code>values.schema.json</code>, <code>README.md</code>, <code>LICENSE</code>, <code>NOTICE</code>, <code>SECURITY.md</code>. Everything else (<code>docs/</code>, <code>tests/</code>, <code>.github/</code>, <code>.claude/</code>) is excluded via <a href="https://github.com/purisev/universal-helm-chart/blob/main/.helmignore"><code>.helmignore</code></a>.</p>
+<p>The OCI artifact contains only what chart consumers need: <code>Chart.yaml</code>, <code>templates/</code>, <code>values.yaml</code>, <code>values.yaml.example</code>, <code>values.schema.json</code>, <code>README.md</code>, <code>LICENSE</code>, <code>NOTICE</code>, <code>SECURITY.md</code>. Everything else (<code>docs/</code>, <code>tests/</code>, <code>test/</code>, <code>.github/</code>) is excluded via <a href="https://github.com/purisev/universal-helm-chart/blob/main/.helmignore"><code>.helmignore</code></a>.</p>
 <h2 id="forks"><a class="header" href="#forks">Forks</a></h2>
 <p>Both workflows resolve the GHCR namespace from <code>${{ github.repository_owner }}</code>, so a fork publishes to <code>oci://ghcr.io/&lt;your-github-user&gt;/universal-helm-chart</code> automatically — no workflow edits required. Tag a release on your fork’s <code>release-&lt;X.Y.Z&gt;</code> branch the same way and <code>release.yaml</code> runs against your own GHCR namespace using your repo’s <code>GITHUB_TOKEN</code>.</p>
 
