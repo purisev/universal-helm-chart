@@ -39,7 +39,7 @@ helm template demo oci://ghcr.io/purisev/universal-helm-chart --version <X.Y.Z>-
 
 ## What gets published
 
-The OCI artifact contains only what chart consumers need: `Chart.yaml`, `templates/`, `values.yaml`, `values.schema.json`, `README.md`, `LICENSE`, `NOTICE`, `SECURITY.md`. Everything else (`docs/`, `tests/`, `.github/`, `.claude/`) is excluded via [`.helmignore`](https://github.com/purisev/universal-helm-chart/blob/main/.helmignore).
+The OCI artifact contains only what chart consumers need: `Chart.yaml`, `templates/`, `values.yaml`, `values.yaml.example`, `values.schema.json`, `README.md`, `LICENSE`, `NOTICE`, `SECURITY.md`. Everything else (`docs/`, `tests/`, `test/`, `.github/`) is excluded via [`.helmignore`](https://github.com/purisev/universal-helm-chart/blob/main/.helmignore).
 
 ## Forks
 

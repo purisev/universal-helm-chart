@@ -9,6 +9,7 @@ CLAUDE.md
 # CI / test fixtures / repo workflows — not part of the chart artifact
 ci/
 tests/
+test/
 .github/
 
 # Documentation, examples, ADRs — never shipped in the OCI artifact
