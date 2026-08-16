@@ -37,6 +37,10 @@ Full documentation lives under [`docs/`](docs/) (not shipped in the OCI artifact
 - [`docs/04-contributing/`](docs/04-contributing/) — local dev, testing, releases.
 - [`docs/05-adr/`](docs/05-adr/) — Architecture Decision Records covering why the chart is shaped the way it is.
 
+## Feedback and contributing
+
+Bug reports and feature requests go through [GitHub Issues](https://github.com/purisev/universal-helm-chart/issues). Security vulnerabilities go through [private vulnerability reporting](https://github.com/purisev/universal-helm-chart/security/advisories/new) instead, per [`SECURITY.md`](SECURITY.md). For contributing changes, start at [`docs/04-contributing/`](docs/04-contributing/).
+
 ## License
 
 Apache-2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
