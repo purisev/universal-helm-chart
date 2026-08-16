@@ -4,7 +4,7 @@ metadata:
   name: reloader-restart
 spec:
   steps:
-    - name: changing the mounted configmap triggers a real rollout restart
+    - name: changing the mounted configmap triggers a real rollout restart on both the Deployment and the StatefulSet
       try:
         - script:
             timeout: 2m
@@ -14,10 +14,17 @@ spec:
                 -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
                 -o jsonpath='{.items[0].metadata.name}')
 
+              # StatefulSet pod names are ordinal-based and stay the same
+              # across a Reloader-triggered restart (unlike a Deployment's
+              # ReplicaSet-suffixed names), so this tracks the pod's UID
+              # instead to tell a fresh pod from the original one.
+              OLD_STS_UID=$(kubectl get pod e2e-worker-0 -n "$NAMESPACE" -o jsonpath='{.metadata.uid}')
+
               kubectl patch configmap e2e-app-config -n "$NAMESPACE" --type merge \
                 -p '{"data":{"GREETING":"hello-v2"}}'
 
               RESULT=no-new-pod
+              STS_RESULT=no-new-pod
               for i in $(seq 1 30); do
                 NEW_POD=$(kubectl get pods -n "$NAMESPACE" \
                   -l app.kubernetes.io/name=api,app.kubernetes.io/instance=e2e-api \
@@ -25,12 +32,20 @@ spec:
                   -o jsonpath='{.items[0].metadata.name}')
                 if [ -n "$NEW_POD" ] && [ "$NEW_POD" != "$OLD_POD" ]; then
                   RESULT=restarted
-                  break
                 fi
+
+                NEW_STS_UID=$(kubectl get pod e2e-worker-0 -n "$NAMESPACE" \
+                  --field-selector=status.phase=Running -o jsonpath='{.metadata.uid}' 2>/dev/null || true)
+                if [ -n "$NEW_STS_UID" ] && [ "$NEW_STS_UID" != "$OLD_STS_UID" ]; then
+                  STS_RESULT=restarted
+                fi
+
+                [ "$RESULT" = "restarted" ] && [ "$STS_RESULT" = "restarted" ] && break
                 sleep 3
               done
 
-              echo "result=$RESULT"
+              echo "result=$RESULT sts-result=$STS_RESULT"
             check:
               ($error): ~
               (contains($stdout, 'result=restarted')): true
+              (contains($stdout, 'sts-result=restarted')): true
