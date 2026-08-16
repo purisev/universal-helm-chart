@@ -12,7 +12,7 @@ There is no Helm "repo add" step — Helm 3.8+ pulls OCI charts directly:
 
 ```bash
 helm install my-app oci://ghcr.io/purisev/universal-helm-chart \
-  --version 2.0.0 \
+  --version 3.0.0 \
   -f values.yaml
 ```
 

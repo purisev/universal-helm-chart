@@ -5,6 +5,7 @@ A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus
 ## What this shows
 
 - `keda.enabled: true` on the worker, with a `kafka` trigger keyed on consumer-group lag.
+- `minReplicas: 1`, not `0` — this worker should never have a gap in consumption. Set `minReplicas: 0` instead when the workload can tolerate sitting idle (e.g. a `cron` trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.
 - `hpa.enabled: false` (default) — KEDA itself manages an internal HPA; mixing both would be rejected by the chart's mutual-exclusion guard.
 - `verticalPodAutoscaler.enabled: true` with `updateMode: Initial` — VPA sets the resource request the first time each pod is created. Works alongside KEDA because VPA touches `requests`, KEDA touches `replicas`. ([ADR 007](../../05-adr/007-autoscaler-mutual-exclusion.md))
 - `service.enabled: false` — pure consumer, no inbound traffic.

@@ -2,6 +2,42 @@
 
 What changes between releases that may require values-file edits when you upgrade. The chart's value surface is intentionally large; most edits are additive, but a few iterations on the `release-2.0.0` line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the **63-char enforcement** (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the `app.kubernetes.io/instance` label value the chart sets on the same resource.
 
+## 3.0.0
+
+### StatefulSet `service` no longer merges into the headless Service
+
+`statefulSets.<name>.service` always renders as its own, independent Service now. Previously, whenever `headlessService` stayed enabled (the default), `service.*` fields configured the single headless Service object instead of creating a separate one — so a StatefulSet couldn't have a headless Service for stable per-pod DNS *and* a regular client-facing Service at the same time without setting `serviceName` to work around it.
+
+Headless-specific fields moved from `service.*` to `headlessService.*`: `ports`, `annotations`, `publishNotReadyAddresses`, `ipFamilies`, `ipFamilyPolicy`.
+
+```yaml
+# Before — service.* configured the headless Service:
+statefulSets:
+  db:
+    service:
+      ports:
+        db:
+          port: 5432
+          targetPort: 5432
+      annotations:
+        example.com/foo: bar
+
+# After — headlessService.* configures the headless Service; service.* now
+# always renders a separate, independent client-facing Service and is
+# opt-in (set service.enabled: true, or any service.* field, to render it):
+statefulSets:
+  db:
+    headlessService:
+      ports:
+        db:
+          port: 5432
+          targetPort: 5432
+      annotations:
+        example.com/foo: bar
+```
+
+`service` also gained the rest of the `ServiceSpec` fields (`externalName`, `loadBalancerSourceRanges`, `sessionAffinityConfig`, `trafficDistribution`, etc.), on both `service` and `headlessService`.
+
 ## 2.0.0
 
 ### Per-workload `httpRoute` / `grpcRoute` / `tlsRoute` accept only `enabled`, `priority`, `rules`

@@ -1,6 +1,6 @@
 # Testing
 
-The chart's regression suite uses [`helm-unittest`](https://github.com/helm-unittest/helm-unittest). This page is the practical cookbook; for the design rationale see [ADR 018](../05-adr/018-testing-with-helm-unittest.md).
+The chart's regression suite uses [`helm-unittest`](https://github.com/helm-unittest/helm-unittest) — rendering-only, no live cluster. This page is the practical cookbook; for the design rationale see [ADR 018](../05-adr/018-testing-with-helm-unittest.md). For the live-cluster suite that proves rendered manifests actually work against real controllers, see [`03-e2e-testing.md`](03-e2e-testing.md).
 
 ## Layout
 

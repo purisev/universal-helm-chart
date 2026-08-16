@@ -7,4 +7,4 @@ spec:
   interval: 10m
   url: oci://ghcr.io/purisev/universal-helm-chart
   ref:
-    tag: "2.0.0"
+    tag: "3.0.0"

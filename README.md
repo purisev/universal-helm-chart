@@ -9,7 +9,7 @@ Published as an OCI artifact at `oci://ghcr.io/purisev/universal-helm-chart`.
 ```bash
 helm upgrade --install my-app \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 2.0.0 \
+  --version 3.0.0 \
   -f values.yaml
 ```
 

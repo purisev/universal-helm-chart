@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 helm upgrade --install orders-dev \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 2.0.0 \
+  --version 3.0.0 \
   --namespace orders-dev \
   --create-namespace \
   -f values-base.yaml \

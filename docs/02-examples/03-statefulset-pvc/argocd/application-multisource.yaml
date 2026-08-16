@@ -1,4 +1,4 @@
-# Argo CD Application — multi-source: chart from OCI, values from this chart's repo at v2.0.0.
+# Argo CD Application — multi-source: chart from OCI, values from this chart's repo at v3.0.0.
 # In your own setup, repoint the second source to your config repository and adjust valueFiles.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -13,13 +13,13 @@ spec:
   sources:
     - repoURL: ghcr.io/purisev
       chart: universal-helm-chart
-      targetRevision: 2.0.0
+      targetRevision: 3.0.0
       helm:
         releaseName: stateful
         valueFiles:
           - $values/docs/02-examples/03-statefulset-pvc/values.yaml
     - repoURL: https://github.com/purisev/universal-helm-chart.git
-      targetRevision: v2.0.0
+      targetRevision: v3.0.0
       ref: values
   syncPolicy:
     automated:
