@@ -1,0 +1,78 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ingress-tls-termination
+spec:
+  steps:
+    - name: the ingress renders its tls block and ingress-nginx actually terminates TLS with the cert-manager-issued cert
+      try:
+        - assert:
+            resource:
+              apiVersion: networking.k8s.io/v1
+              kind: Ingress
+              metadata:
+                name: e2e
+              spec:
+                tls:
+                  - hosts:
+                      - e2e.local
+                    secretName: e2e-ingress-tls
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              CONTROLLER_IP=$(kubectl get svc -n ingress-nginx \
+                -l app.kubernetes.io/component=controller \
+                -o jsonpath='{.items[0].spec.clusterIP}')
+
+              # curl needs the cert-manager-issued CA to verify ingress-nginx's
+              # leaf cert for real, instead of skipping verification with -k
+              # — for a self-signed Certificate, cert-manager writes the same
+              # cert into the Secret's ca.crt.
+              kubectl get secret e2e-ingress-tls -n "$NAMESPACE" -o jsonpath='{.data.ca\.crt}' \
+                | base64 -d > /tmp/ingress-ca.crt
+              kubectl create configmap ingress-ca -n "$NAMESPACE" \
+                --from-file=ca.crt=/tmp/ingress-ca.crt \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              kubectl apply -n "$NAMESPACE" -f - <<EOF
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: ingress-tls-prober
+              spec:
+                restartPolicy: Never
+                terminationGracePeriodSeconds: 1
+                containers:
+                  - name: curl
+                    image: curlimages/curl:8.11.0
+                    args:
+                      - -sS
+                      - --cacert
+                      - /ca/ca.crt
+                      - --resolve
+                      - e2e.local:443:$CONTROLLER_IP
+                      - https://e2e.local/
+                    volumeMounts:
+                      - name: ca
+                        mountPath: /ca
+                volumes:
+                  - name: ca
+                    configMap:
+                      name: ingress-ca
+              EOF
+
+              for i in $(seq 1 20); do
+                PHASE=$(kubectl get pod ingress-tls-prober -n "$NAMESPACE" -o jsonpath='{.status.phase}')
+                [ "$PHASE" = "Succeeded" ] || [ "$PHASE" = "Failed" ] && break
+                sleep 2
+              done
+
+              echo "phase=$PHASE"
+              kubectl logs ingress-tls-prober -n "$NAMESPACE"
+              kubectl delete pod ingress-tls-prober -n "$NAMESPACE" --ignore-not-found
+              kubectl delete configmap ingress-ca -n "$NAMESPACE" --ignore-not-found
+            check:
+              ($error): ~
+              (contains($stdout, 'phase=Succeeded')): true
+              (contains($stdout, 'Welcome to nginx')): true

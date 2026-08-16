@@ -332,7 +332,7 @@ jobs:
             sleep 2
           done
 
-      - name: Issue the TLSRoute self-signed certificate via cert-manager
+      - name: Issue self-signed certificates via cert-manager (TLSRoute + Ingress)
         run: |
           # cert-manager's webhook Deployment can report Available before
           # its CA bundle has actually propagated to the API server, so
@@ -342,6 +342,7 @@ jobs:
             sleep 4
           done
           kubectl wait --for=condition=Ready certificate/tlsroute-cert -n "$NAMESPACE" --timeout=2m
+          kubectl wait --for=condition=Ready certificate/ingress-cert -n "$NAMESPACE" --timeout=2m
 
       - name: Install chart
         run: |
@@ -376,6 +377,7 @@ jobs:
           echo "::group::cert-manager Issuer / Certificate / tls-backend"
           kubectl get issuer,certificate,secret -n "$NAMESPACE" -o wide
           kubectl describe certificate tlsroute-cert -n "$NAMESPACE" || true
+          kubectl describe certificate ingress-cert -n "$NAMESPACE" || true
           kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=tls-backend --tail=200 || true
           kubectl logs -n cert-manager -l app.kubernetes.io/component=webhook --tail=100 || true
           echo "::endgroup::"
