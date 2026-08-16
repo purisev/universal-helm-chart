@@ -353,6 +353,10 @@ jobs:
           kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" -o yaml
           echo "::endgroup::"
 
+          echo "::group::grpcbin logs"
+          kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=grpcbin --tail=200 || true
+          echo "::endgroup::"
+
           echo "::group::ingress-nginx controller logs"
           kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=200 || true
           echo "::endgroup::"

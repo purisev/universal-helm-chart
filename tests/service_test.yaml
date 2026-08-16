@@ -353,6 +353,63 @@ tests:
           path: spec.ports[1].port
           value: 9090
 
+  - it: should render appProtocol on a single-port service
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.grpc.enabled: true
+      deployments.grpc.service.enabled: true
+      deployments.grpc.service.port: 9000
+      deployments.grpc.service.targetPort: 9000
+      deployments.grpc.service.appProtocol: kubernetes.io/h2c
+    asserts:
+      - equal:
+          path: spec.ports[0].appProtocol
+          value: kubernetes.io/h2c
+
+  - it: should render appProtocol on a service port from the ports map
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.grpc.enabled: true
+      deployments.grpc.service.enabled: true
+      deployments.grpc.service.ports.grpc.port: 9000
+      deployments.grpc.service.ports.grpc.targetPort: 9000
+      deployments.grpc.service.ports.grpc.appProtocol: kubernetes.io/h2c
+      deployments.grpc.service.ports.http.port: 80
+      deployments.grpc.service.ports.http.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.ports[0].appProtocol
+      - equal:
+          path: spec.ports[1].appProtocol
+          value: kubernetes.io/h2c
+
+  - it: should not render appProtocol when unset
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - isNull:
+          path: spec.ports[0].appProtocol
+
+  - it: should render appProtocol on a StatefulSet headless Service
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.port: 9000
+      statefulSets.db.headlessService.targetPort: 9000
+      statefulSets.db.headlessService.appProtocol: kubernetes.io/h2c
+    asserts:
+      - equal:
+          path: spec.ports[0].appProtocol
+          value: kubernetes.io/h2c
+
   # --- explicit pass-through Service fields ---
 
   - it: should render service.loadBalancerIP on Deployment

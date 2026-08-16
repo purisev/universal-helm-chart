@@ -42,6 +42,45 @@ deployments:
       rules:
         - {}
 
+  # Real gRPC backend (registers grpc.reflection too) for the grpcroute
+  # test to route actual traffic to, instead of just proving CRD admission.
+  grpcbin:
+    image:
+      repository: moul/grpcbin
+      tag: latest
+      pullPolicy: Always
+
+    # The image's secure listener (unused by this test — only the insecure
+    # :9000 listener matters) reads a bundled cert under /root/cert at
+    # startup and log.Fatalf()s the whole process, insecure listener
+    # included, if that read fails. /root isn't traversable by the chart's
+    # default non-root UID, so this workload runs as root to let it start.
+    podSecurityContext:
+      runAsNonRoot: false
+      runAsUser: 0
+      runAsGroup: 0
+      fsGroup: 0
+      seccompProfile:
+        type: RuntimeDefault
+
+    # appProtocol tells agentgateway this port speaks HTTP/2 cleartext, so
+    # it configures the upstream as h2c instead of assuming HTTP/1.1 —
+    # without it grpcurl gets "invalid HTTP version parsed" through the
+    # gateway even though the GRPCRoute itself is routed correctly.
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        grpc:
+          port: 9000
+          targetPort: 9000
+          appProtocol: kubernetes.io/h2c
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
 # Classic networking.k8s.io/v1 Ingress, routed through ingress-nginx.
 ingress:
   enabled: true
@@ -64,9 +103,8 @@ httpRoute:
   hostnames:
     - httproute.e2e.local
 
-# CRD-admission only below: no listener on the fixture Gateway actually
-# serves gRPC or TLS-passthrough traffic, so these just prove the chart
-# renders a schema-valid object the API server accepts.
+# Routed through the same agentgateway listener, to the real grpcbin
+# backend above.
 grpcRoute:
   enabled: true
   parentRefs:
@@ -77,11 +115,15 @@ grpcRoute:
     - matches:
         - method:
             type: Exact
-            service: com.example.ApiService
+            service: grpcbin.GRPCBin
+            method: DummyUnary
       backendRefs:
-        - name: e2e-api
-          port: 80
+        - name: e2e-grpcbin
+          port: 9000
 
+# TLSRoute stays CRD-admission only: no listener on the fixture Gateway
+# terminates/passes through TLS, so this just proves the chart renders a
+# schema-valid object the API server accepts.
 tlsRoute:
   enabled: true
   parentRefs:

@@ -94,12 +94,18 @@ spec:
       port: {{ $p.port }}
       targetPort: {{ $p.targetPort }}
       protocol: {{ $p.protocol | default "TCP" }}
+      {{- with $p.appProtocol }}
+      appProtocol: {{ . }}
+      {{- end }}
     {{- end }}
     {{- else }}
     - port: {{ $svc.port }}
       targetPort: {{ $svc.targetPort }}
       protocol: TCP
       name: http
+      {{- with $svc.appProtocol }}
+      appProtocol: {{ . }}
+      {{- end }}
     {{- end }}
     {{- if .injectMetricsPort }}
     {{- $expose := .exposeJson | fromJson }}
@@ -167,12 +173,18 @@ spec:
       port: {{ $p.port | default $p.targetPort }}
       targetPort: {{ $p.targetPort }}
       protocol: {{ $p.protocol | default "TCP" }}
+      {{- with $p.appProtocol }}
+      appProtocol: {{ . }}
+      {{- end }}
     {{- end }}
     {{- else if or $hs.port $hs.targetPort }}
     - name: http
       port: {{ $hs.port | default $hs.targetPort }}
       targetPort: {{ $hs.targetPort }}
       protocol: TCP
+      {{- with $hs.appProtocol }}
+      appProtocol: {{ . }}
+      {{- end }}
     {{- else }}
     - name: http
       port: 80
