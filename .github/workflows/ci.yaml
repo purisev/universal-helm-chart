@@ -141,9 +141,15 @@ jobs:
 
       - name: Compute version
         id: version
+        # HEAD_REF is passed via env rather than interpolated directly into the
+        # script (${{ github.head_ref }}) - the branch name is attacker-controlled
+        # on a PR, and inline interpolation would let it break out of the
+        # surrounding shell command (script injection).
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           CHART_VERSION=$(grep '^version:' Chart.yaml | awk '{print $2}')
-          BRANCH=$(echo "${{ github.head_ref }}" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-//;s/-$//')
+          BRANCH=$(echo "$HEAD_REF" | sed 's/[^a-zA-Z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-//;s/-$//')
           echo "version=${CHART_VERSION}-${BRANCH}" >> "$GITHUB_OUTPUT"
           echo "Chart version: ${CHART_VERSION}, branch: ${BRANCH}, result: ${CHART_VERSION}-${BRANCH}"
 
