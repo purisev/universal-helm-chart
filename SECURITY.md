@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes land on the current release line (the branch matching the version published to `oci://ghcr.io/purisev/universal-helm-chart`, currently `release-3.0.0`). Older release lines do not receive backported fixes.
+Security fixes land on the current release line: the `release-<X.Y.Z>` branch matching the version currently published to `oci://ghcr.io/purisev/universal-helm-chart`. Older release lines do not receive backported fixes.
 
 ## Reporting a vulnerability
 
