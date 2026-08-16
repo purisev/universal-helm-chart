@@ -191,6 +191,29 @@ tests:
           path: spec.template.spec.containers[0].image
           value: alpine:3.21
 
+  - it: should fall back to the root securityContext default on the job-completed sidecar
+    # Regression guard: job-completed is hardcoded directly in job-groups.yaml
+    # rather than going through uhc.containerSpecWithOptions, so it used to
+    # miss the root securityContext fallback every other container gets —
+    # a jobGroup using tasks with no explicit securityContext rendered that
+    # sidecar with none at all.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.enabled: true
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.tasks.schema.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: job-completed
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+
   - it: should override completionImage when set
     set:
       image.repository: nginx

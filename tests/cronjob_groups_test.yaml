@@ -212,6 +212,30 @@ tests:
           path: spec.jobTemplate.spec.template.spec.containers[0].name
           value: job-completed
 
+  - it: should fall back to the root securityContext default on the job-completed sidecar
+    # Regression guard: same issue as the Job-kind case — job-completed is
+    # hardcoded directly in cronjob-groups.yaml rather than going through
+    # uhc.containerSpecWithOptions, so it used to miss the root
+    # securityContext fallback every other container gets.
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.cron.enabled: true
+      jobGroups.cron.kind: CronJob
+      jobGroups.cron.jobs.run.enabled: true
+      jobGroups.cron.jobs.run.schedule: "0 0 * * *"
+      jobGroups.cron.jobs.run.tasks.step.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].name
+          value: job-completed
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.readOnlyRootFilesystem
+          value: true
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.containers[0].securityContext.allowPrivilegeEscalation
+          value: false
+
   - it: should label resource with truncated group-job name
     set:
       image.repository: nginx

@@ -30,6 +30,69 @@ jobs:
       - name: Run unit tests
         run: helm unittest .
 
+  gate:
+    name: Check security-scan label
+    # Only PRs need gating — a push to main has already been reviewed, and
+    # there's no PR label to read at that point anyway.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check.outputs.run }}
+    steps:
+      - name: Decide whether security scans should run
+        id: check
+        env:
+          LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if jq -e 'index("security-scan") != null' <<<"$LABELS_JSON" >/dev/null; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  misconfig-scan:
+    name: Trivy misconfiguration scan
+    needs: [lint-test, gate]
+    # Runs unconditionally on push (main); on a PR, only with the
+    # security-scan label — trivy-action's own container-image download is
+    # slow enough that it's not worth paying on every PR.
+    if: always() && needs.lint-test.result == 'success' && (github.event_name != 'pull_request' || needs.gate.outputs.run == 'true')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: latest
+
+      # Scanning the raw templates/ directory would feed Trivy Go-template
+      # syntax it can't parse as YAML. values.yaml.example exercises every
+      # chart feature (the default values.yaml renders almost nothing — no
+      # deployments/statefulSets/jobGroups are set), so it's what gives the
+      # scanner real manifests to check.
+      - name: Render chart with every feature enabled
+        run: helm template . -f values.yaml.example > /tmp/rendered.yaml
+
+      - name: Run Trivy config scan
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: 'config'
+          scan-ref: '/tmp/rendered.yaml'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          exit-code: '1'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
+        with:
+          sarif_file: 'trivy-results.sarif'
+
   publish-branch:
     name: Publish branch build to GHCR
     needs: lint-test

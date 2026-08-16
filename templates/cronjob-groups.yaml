@@ -103,7 +103,7 @@ spec:
               image: {{ default (default "alpine:3.21" $ctx.Values.jobCompletionImage) $merged.completionImage | quote }}
               imagePullPolicy: IfNotPresent
               command: ["sh", "-c", "echo SUCCESS"]
-              {{- with $merged.securityContext }}
+              {{- with ($merged.securityContext | default $ctx.Values.securityContext) }}
               securityContext:
                 {{- toYaml . | nindent 16 }}
               {{- end }}
