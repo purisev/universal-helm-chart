@@ -1,7 +1,8 @@
 # universal-helm-chart
 
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/purisev/universal-helm-chart/badge)](https://scorecard.dev/viewer/?uri=github.com/purisev/universal-helm-chart)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14101/baseline)](https://www.bestpractices.dev/projects/14101)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14101/badge)](https://www.bestpractices.dev/projects/14101)
+[![OpenSSF Best Practices Baseline](https://www.bestpractices.dev/projects/14101/baseline)](https://www.bestpractices.dev/projects/14101)
 [![CI](https://github.com/purisev/universal-helm-chart/actions/workflows/ci.yaml/badge.svg)](https://github.com/purisev/universal-helm-chart/actions/workflows/ci.yaml)
 [![E2E](https://github.com/purisev/universal-helm-chart/actions/workflows/e2e.yaml/badge.svg)](https://github.com/purisev/universal-helm-chart/actions/workflows/e2e.yaml)
 [![License](https://img.shields.io/github/license/purisev/universal-helm-chart)](LICENSE)
