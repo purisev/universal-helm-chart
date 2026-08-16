@@ -104,10 +104,7 @@ httpRoute:
     - httproute.e2e.local
 
 # Routed through the same agentgateway listener, to the real grpcbin
-# backend above. No `matches` on the rule is deliberate: an omitted match
-# catches every RPC on this hostname, which is what lets grpcurl's
-# reflection call (a different service than grpcbin.GRPCBin itself) reach
-# the backend too.
+# backend above.
 grpcRoute:
   enabled: true
   parentRefs:
@@ -115,7 +112,12 @@ grpcRoute:
   hostnames:
     - grpcroute.e2e.local
   rules:
-    - backendRefs:
+    - matches:
+        - method:
+            type: Exact
+            service: grpcbin.GRPCBin
+            method: DummyUnary
+      backendRefs:
         - name: e2e-grpcbin
           port: 9000
 

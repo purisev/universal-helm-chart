@@ -24,20 +24,55 @@ spec:
               GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
                 -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
                 -o jsonpath='{.items[0].metadata.name}')
+              GW_ADDR="${GW_SVC}.${NAMESPACE}.svc.cluster.local:80"
 
-              # `kubectl run --rm -i` can lose the container's own output if
-              # the attach races the pod's deletion, so this runs the pod
-              # detached, waits for it to finish, and reads its logs
-              # explicitly instead. No --command: the image's own
-              # ENTRYPOINT is already grpcurl, so these tokens are its args.
-              # grpcurl parses flags-then-positionals, so -d must come
-              # before the address/symbol, not after — trailing flags are
-              # rejected with "Too many arguments".
-              kubectl run grpc-prober -n "$NAMESPACE" --image=fullstorydev/grpcurl:v1.9.3 \
-                --restart=Never -- \
-                -plaintext -authority=grpcroute.e2e.local -d '{"f_string":"e2e-grpcroute"}' \
-                "${GW_SVC}.${NAMESPACE}.svc.cluster.local:80" \
-                grpcbin.GRPCBin/DummyUnary
+              # grpcurl's image has no shell (FROM scratch), so the proto is
+              # mounted from a ConfigMap instead of relying on server
+              # reflection through the gateway — a unary call is a much
+              # simpler thing for the gateway to proxy correctly than the
+              # bidi-streaming reflection RPC turned out to be.
+              kubectl apply -n "$NAMESPACE" -f - <<EOF
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: grpcbin-proto
+              data:
+                grpcbin.proto: |
+                  syntax = "proto3";
+                  package grpcbin;
+                  service GRPCBin {
+                    rpc DummyUnary(DummyMessage) returns (DummyMessage) {}
+                  }
+                  message DummyMessage {
+                    string f_string = 1;
+                  }
+              ---
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: grpc-prober
+              spec:
+                restartPolicy: Never
+                terminationGracePeriodSeconds: 1
+                containers:
+                  - name: grpcurl
+                    image: fullstorydev/grpcurl:v1.9.3
+                    args:
+                      - -plaintext
+                      - -authority=grpcroute.e2e.local
+                      - -proto=/protos/grpcbin.proto
+                      - -import-path=/protos
+                      - -d={"f_string":"e2e-grpcroute"}
+                      - $GW_ADDR
+                      - grpcbin.GRPCBin/DummyUnary
+                    volumeMounts:
+                      - name: protos
+                        mountPath: /protos
+                volumes:
+                  - name: protos
+                    configMap:
+                      name: grpcbin-proto
+              EOF
 
               for i in $(seq 1 20); do
                 PHASE=$(kubectl get pod grpc-prober -n "$NAMESPACE" -o jsonpath='{.status.phase}')
@@ -46,13 +81,9 @@ spec:
               done
 
               echo "phase=$PHASE"
-              # grpcurl has no proto for grpcbin.GRPCBin, so it discovers the
-              # method via the backend's own server reflection — that call
-              # only reaches grpcbin because the rendered rule has no
-              # `matches`, which makes it a catch-all for every RPC on this
-              # hostname (see gateway-ingress.yaml).
               kubectl logs grpc-prober -n "$NAMESPACE"
               kubectl delete pod grpc-prober -n "$NAMESPACE" --ignore-not-found
+              kubectl delete configmap grpcbin-proto -n "$NAMESPACE" --ignore-not-found
             check:
               ($error): ~
               (contains($stdout, 'phase=Succeeded')): true
