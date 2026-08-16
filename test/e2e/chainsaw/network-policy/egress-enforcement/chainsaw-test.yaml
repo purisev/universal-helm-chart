@@ -1,0 +1,67 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: egress-enforcement
+spec:
+  steps:
+    - name: the server can only reach the pod its egress rule allows
+      try:
+        - apply:
+            file: allowed-target.yaml
+        - apply:
+            file: denied-target.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: egress-allowed-target
+              status:
+                phase: Running
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: egress-denied-target
+              status:
+                phase: Running
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              SERVER_POD=$(kubectl get pods -n "$NAMESPACE" \
+                -l app.kubernetes.io/name=server,app.kubernetes.io/instance=e2e-server \
+                -o jsonpath='{.items[0].metadata.name}')
+              ALLOWED_IP=$(kubectl get pod egress-allowed-target -n "$NAMESPACE" -o jsonpath='{.status.podIP}')
+              DENIED_IP=$(kubectl get pod egress-denied-target -n "$NAMESPACE" -o jsonpath='{.status.podIP}')
+
+              # Felix (Calico's per-node agent) takes a moment to program
+              # the dataplane after the NetworkPolicy and pods exist, so
+              # this polls both outcomes together instead of checking once.
+              RESULT=not-yet
+              for i in $(seq 1 20); do
+                ALLOWED_OK=no
+                if kubectl exec "$SERVER_POD" -n "$NAMESPACE" -- \
+                    wget -q -O- --timeout=5 "http://${ALLOWED_IP}:8080/" 2>/dev/null \
+                    | grep -q "Welcome to nginx"; then
+                  ALLOWED_OK=yes
+                fi
+
+                DENIED_BLOCKED=no
+                if ! kubectl exec "$SERVER_POD" -n "$NAMESPACE" -- \
+                    wget -q -O- --timeout=5 "http://${DENIED_IP}:8080/" >/dev/null 2>&1; then
+                  DENIED_BLOCKED=yes
+                fi
+
+                if [ "$ALLOWED_OK" = "yes" ] && [ "$DENIED_BLOCKED" = "yes" ]; then
+                  RESULT=enforced
+                  break
+                fi
+                sleep 3
+              done
+
+              echo "allowed-ok=$ALLOWED_OK denied-blocked=$DENIED_BLOCKED result=$RESULT"
+            check:
+              ($error): ~
+              (contains($stdout, 'result=enforced')): true
