@@ -6,6 +6,10 @@ language = "en"
 src = "docs"
 
 [output.html]
+# The example/ADR pages already carry their own "02 — ..." / "001 — ..."
+# prefix in SUMMARY.md link text, matching the actual filenames — mdBook's
+# own auto-numbering ("2.2.", "5.4.", …) on top of that just doubles up.
+no-section-label = true
 git-repository-url = "https://github.com/purisev/universal-helm-chart"
 git-repository-icon = "fab-github"
 edit-url-template = "https://github.com/purisev/universal-helm-chart/edit/main/{path}"
