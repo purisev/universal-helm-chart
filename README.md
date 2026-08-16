@@ -1,5 +1,14 @@
 # universal-helm-chart
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/purisev/universal-helm-chart/badge)](https://scorecard.dev/viewer/?uri=github.com/purisev/universal-helm-chart)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14101/badge)](https://www.bestpractices.dev/projects/14101)
+[![OpenSSF Best Practices Baseline](https://www.bestpractices.dev/projects/14101/baseline)](https://www.bestpractices.dev/projects/14101)
+[![CI](https://github.com/purisev/universal-helm-chart/actions/workflows/ci.yaml/badge.svg)](https://github.com/purisev/universal-helm-chart/actions/workflows/ci.yaml)
+[![E2E](https://github.com/purisev/universal-helm-chart/actions/workflows/e2e.yaml/badge.svg)](https://github.com/purisev/universal-helm-chart/actions/workflows/e2e.yaml)
+[![License](https://img.shields.io/github/license/purisev/universal-helm-chart)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/purisev/universal-helm-chart?sort=semver)](https://github.com/purisev/universal-helm-chart/releases)
+[![Docs](https://img.shields.io/badge/docs-uhc.purisev.com-blue)](https://uhc.purisev.com/)
+
 A single Helm chart that covers the common Kubernetes workload shapes — Deployments, StatefulSets, Jobs and CronJobs — together with the networking, autoscaling, monitoring, secrets and policy resources that almost every release ends up needing. One template, one place to fix bugs, one place to roll out fleet-wide defaults.
 
 Published as an OCI artifact at `oci://ghcr.io/purisev/universal-helm-chart`.
