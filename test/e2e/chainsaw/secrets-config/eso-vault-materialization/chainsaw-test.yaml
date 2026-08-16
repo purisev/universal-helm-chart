@@ -1,0 +1,39 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: eso-vault-materialization
+spec:
+  steps:
+    - name: ESO reads a real value from a real in-cluster Vault through a SecretStore
+      try:
+        - assert:
+            timeout: 60s
+            resource:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: app-secrets
+                # Reloader's annotation propagates through the ExternalSecret's
+                # target template to the materialized Secret itself.
+                annotations:
+                  reloader.stakater.com/auto: "true"
+              data:
+                # base64("vault-secret-value") — written into Vault's real KV
+                # engine by the workflow (vault kv put secret/e2e/app), read
+                # back through the chart's own vault provider rendering, not
+                # a stand-in.
+                GREETING: dmF1bHQtc2VjcmV0LXZhbHVl
+
+    - name: the same Vault path reads identically through a ClusterSecretStore
+      try:
+        - assert:
+            timeout: 60s
+            resource:
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: app-secrets-cluster
+                annotations:
+                  reloader.stakater.com/auto: "true"
+              data:
+                GREETING: dmF1bHQtc2VjcmV0LXZhbHVl

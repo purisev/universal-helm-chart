@@ -468,6 +468,7 @@
                         "mountPath": {"type": "string"},
                         "role": {"type": "string"},
                         "serviceAccountRef": {"type": "string"},
+                        "serviceAccountNamespace": {"type": "string"},
                         "audiences": {"type": "array", "items": {"type": "string"}},
                         "expirationSeconds": {"type": "integer", "minimum": 1}
                       }
