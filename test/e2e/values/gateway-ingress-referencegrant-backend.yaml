@@ -1,0 +1,18 @@
+fullnameOverride: e2e-rg-backend
+
+deployments:
+  backend:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 8080
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi

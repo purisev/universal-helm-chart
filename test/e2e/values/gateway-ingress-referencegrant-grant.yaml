@@ -1,0 +1,13 @@
+# Applied mid-test via `helm template ... --show-only templates/referencegrant.yaml
+# | kubectl apply -f -` against the e2e-gateway-ingress-backend namespace, to
+# prove the chart's own ReferenceGrant template is what unblocks the
+# cross-namespace HTTPRoute (not a hand-written grant).
+referenceGrant:
+  enabled: true
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: e2e-gateway-ingress
+  to:
+    - group: ""
+      kind: Service

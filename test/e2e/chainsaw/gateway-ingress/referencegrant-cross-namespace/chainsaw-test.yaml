@@ -1,0 +1,93 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: referencegrant-cross-namespace
+spec:
+  steps:
+    - name: without a ReferenceGrant, the cross-namespace backendRef is refused and traffic is blocked
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              STATUS=unknown
+              REASON=unknown
+              for i in $(seq 1 20); do
+                STATUS=$(kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" \
+                  -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}')
+                REASON=$(kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" \
+                  -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].reason}')
+                [ "$STATUS" = "False" ] && break
+                sleep 3
+              done
+              echo "status=$STATUS reason=$REASON"
+            check:
+              ($error): ~
+              (contains($stdout, 'status=False')): true
+              (contains($stdout, 'reason=RefNotPermitted')): true
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 30s
+            content: |
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              BLOCKED=no
+              if ! kubectl exec prober -n "$NAMESPACE" -- \
+                  wget -q -O- --timeout=5 --header="Host: referencegrant.e2e.local" \
+                  "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/" >/dev/null 2>&1; then
+                BLOCKED=yes
+              fi
+              echo "blocked=$BLOCKED"
+            check:
+              ($error): ~
+              (contains($stdout, 'blocked=yes')): true
+
+    - name: applying the chart's own ReferenceGrant template flips ResolvedRefs to True and unblocks real traffic
+      try:
+        - script:
+            timeout: 30s
+            content: |
+              set -e
+              helm template e2e-rg-backend "$GITHUB_WORKSPACE" \
+                -n e2e-gateway-ingress-backend \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/gateway-ingress-referencegrant-grant.yaml" \
+                --show-only templates/referencegrant.yaml \
+                | kubectl apply -n e2e-gateway-ingress-backend -f -
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              STATUS=unknown
+              for i in $(seq 1 20); do
+                STATUS=$(kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" \
+                  -o jsonpath='{.status.parents[0].conditions[?(@.type=="ResolvedRefs")].status}')
+                [ "$STATUS" = "True" ] && break
+                sleep 3
+              done
+              echo "status=$STATUS"
+            check:
+              ($error): ~
+              (contains($stdout, 'status=True')): true
+        - script:
+            timeout: 30s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -q -O- --timeout=5 --header="Host: referencegrant.e2e.local" \
+                "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
