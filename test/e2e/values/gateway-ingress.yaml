@@ -63,11 +63,18 @@ deployments:
       seccompProfile:
         type: RuntimeDefault
 
+    # appProtocol tells agentgateway this port speaks HTTP/2 cleartext, so
+    # it configures the upstream as h2c instead of assuming HTTP/1.1 —
+    # without it grpcurl gets "invalid HTTP version parsed" through the
+    # gateway even though the GRPCRoute itself is routed correctly.
     service:
       enabled: true
       type: ClusterIP
-      port: 9000
-      targetPort: 9000
+      ports:
+        grpc:
+          port: 9000
+          targetPort: 9000
+          appProtocol: kubernetes.io/h2c
 
     resources:
       requests:

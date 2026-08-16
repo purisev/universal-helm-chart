@@ -447,9 +447,9 @@ referenceGrants:
 deployments:
 
   # --- api: main HTTP API ---
-  # Features: service ports, internalTrafficPolicy, HPA, VPA, PDB, sidecar,
-  #           initContainer, probes, lifecycle, networkPolicy, httpRoute
-  #           shorthand, ServiceMonitor (CRD)
+  # Features: service ports, appProtocol, internalTrafficPolicy, HPA, VPA,
+  #           PDB, sidecar, initContainer, probes, lifecycle, networkPolicy,
+  #           httpRoute shorthand, ServiceMonitor (CRD)
   api:
     replicaCount: 2
 
@@ -464,6 +464,10 @@ deployments:
         grpc:
           port: 9000
           targetPort: 9000
+          # Lets Gateway API implementations (e.g. GRPCRoute backends) know
+          # this port speaks HTTP/2 cleartext, so they configure the
+          # upstream as h2c instead of assuming HTTP/1.1.
+          appProtocol: kubernetes.io/h2c
         admin:
           port: 8081
           targetPort: 8081
