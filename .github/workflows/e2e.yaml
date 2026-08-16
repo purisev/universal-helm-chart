@@ -1,6 +1,8 @@
 name: E2E
 
 on:
+  push:
+    branches: [main]
   pull_request:
     types: [labeled, synchronize]
   workflow_dispatch: {}
@@ -31,7 +33,10 @@ jobs:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
       # `pre-merge` (see ci.yaml) also runs everything — it's the
       # one-label "run all the things before I merge this" shortcut.
-      # workflow_dispatch always runs everything (there's no label to read).
+      # workflow_dispatch and a push to main (post-merge) always run
+      # everything — there's no label to read in either case, and a push
+      # to main is exactly when we want the full suite to reverify the
+      # merged/squashed result.
       - name: Decide which e2e jobs should run
         id: check
         env:
@@ -39,6 +44,7 @@ jobs:
         run: |
           FULL=false
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || \
+             [[ "${{ github.event_name }}" == "push" ]] || \
              jq -e 'index("e2e") != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
             FULL=true
           fi
