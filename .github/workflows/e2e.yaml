@@ -310,6 +310,15 @@ jobs:
             --namespace ingress-nginx --create-namespace \
             --wait --timeout 3m
 
+      - name: Install cert-manager
+        run: |
+          helm upgrade -i cert-manager oci://quay.io/jetstack/charts/cert-manager \
+            --version v1.21.1 \
+            --namespace cert-manager --create-namespace \
+            --set crds.enabled=true \
+            --wait --timeout 3m
+          kubectl wait --for=condition=Available deployment --all -n cert-manager --timeout=2m
+
       - name: Create namespace and Gateway fixture
         run: |
           kubectl create namespace "$NAMESPACE"
@@ -322,6 +331,17 @@ jobs:
             [ "$COUNT" -gt 0 ] && break
             sleep 2
           done
+
+      - name: Issue the TLSRoute self-signed certificate via cert-manager
+        run: |
+          # cert-manager's webhook Deployment can report Available before
+          # its CA bundle has actually propagated to the API server, so
+          # this retries the apply instead of trusting readiness alone.
+          for i in $(seq 1 15); do
+            kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/gateway-ingress-tls-issuer.yaml && break
+            sleep 4
+          done
+          kubectl wait --for=condition=Ready certificate/tlsroute-cert -n "$NAMESPACE" --timeout=2m
 
       - name: Install chart
         run: |
@@ -351,6 +371,13 @@ jobs:
           echo "::group::ReferenceGrant / cross-namespace backend"
           kubectl get referencegrant,httproute,svc -n e2e-gateway-ingress-backend -o wide
           kubectl get httproute e2e-referencegrant-cross-ns -n "$NAMESPACE" -o yaml
+          echo "::endgroup::"
+
+          echo "::group::cert-manager Issuer / Certificate / tls-backend"
+          kubectl get issuer,certificate,secret -n "$NAMESPACE" -o wide
+          kubectl describe certificate tlsroute-cert -n "$NAMESPACE" || true
+          kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=tls-backend --tail=200 || true
+          kubectl logs -n cert-manager -l app.kubernetes.io/component=webhook --tail=100 || true
           echo "::endgroup::"
 
           echo "::group::grpcbin logs"

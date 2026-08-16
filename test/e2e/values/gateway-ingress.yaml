@@ -7,6 +7,12 @@ volumes:
     emptyDir: {}
   tmp:
     emptyDir: {}
+  tls-certs:
+    secret:
+      secretName: tlsroute-tls
+  tls-backend-conf:
+    configMap:
+      name: e2e-tls-backend-config
 
 volumeMounts:
   api:
@@ -16,6 +22,19 @@ volumeMounts:
       mountPath: /var/run
     tmp:
       mountPath: /tmp
+  tls-backend:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+    tls-certs:
+      mountPath: /certs
+      readOnly: true
+    tls-backend-conf:
+      mountPath: /etc/nginx/conf.d/tls.conf
+      subPath: tls.conf
 
 deployments:
   api:
@@ -81,6 +100,43 @@ deployments:
         cpu: 50m
         memory: 32Mi
 
+  # TLS passthrough means agentgateway never decrypts anything — this
+  # backend terminates TLS itself, using the cert-manager-issued cert
+  # mounted from the tlsroute-tls Secret. tls.conf is an extra server
+  # block dropped into the image's own conf.d (nginx.conf already
+  # includes conf.d/*.conf), so the plain-HTTP default.conf server stays
+  # intact alongside it.
+  tls-backend:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    createConfigmap: true
+    configData:
+      tls.conf: |
+        server {
+          listen 8443 ssl;
+          ssl_certificate     /certs/tls.crt;
+          ssl_certificate_key /certs/tls.key;
+          location / {
+            add_header Content-Type text/plain always;
+            return 200 "tls-backend-ok\n";
+          }
+        }
+
+    service:
+      enabled: true
+      type: ClusterIP
+      ports:
+        tls:
+          port: 8443
+          targetPort: 8443
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 32Mi
+
 # Classic networking.k8s.io/v1 Ingress, routed through ingress-nginx.
 ingress:
   enabled: true
@@ -121,19 +177,21 @@ grpcRoute:
         - name: e2e-grpcbin
           port: 9000
 
-# TLSRoute stays CRD-admission only: no listener on the fixture Gateway
-# terminates/passes through TLS, so this just proves the chart renders a
-# schema-valid object the API server accepts.
+# Real TLS passthrough: the Gateway's "tls" listener (see the fixture)
+# routes on SNI alone, straight through to tls-backend, which terminates
+# TLS with the cert-manager-issued cert. sectionName picks that listener
+# specifically now that the Gateway has two (http and tls).
 tlsRoute:
   enabled: true
   parentRefs:
     - name: e2e-gateway
+      sectionName: tls
   hostnames:
     - tlsroute.e2e.local
   rules:
     - backendRefs:
-        - name: e2e-api
-          port: 80
+        - name: e2e-tls-backend
+          port: 8443
 
 # Separate HTTPRoute with a backendRef into another namespace, exercised by
 # the referencegrant-cross-namespace test: agentgateway must refuse to

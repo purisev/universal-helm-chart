@@ -1,15 +1,12 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: grpcroute-tlsroute-admission
+  name: grpcroute-tlsroute-shape
 spec:
   steps:
-    # TLSRoute has no listener on the fixture Gateway that actually
-    # terminates/passes through TLS, so it's admission-level only here:
-    # proof that the chart renders a schema-valid object the API server
-    # accepts, not that real traffic flows through it. GRPCRoute gets real
-    # traffic coverage in the grpcroute-routing test instead — this just
-    # asserts its shape too, for a single place to check both routes exist.
+    # Both routes get real-traffic coverage elsewhere (grpcroute-routing,
+    # tlsroute-passthrough) — this is just a single place to check both
+    # objects render with the right parentRefs/hostnames.
     - name: grpcroute and tlsroute are schema-valid and accepted by the API server
       try:
         - assert:

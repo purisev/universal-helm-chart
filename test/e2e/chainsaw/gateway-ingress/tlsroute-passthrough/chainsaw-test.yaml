@@ -1,0 +1,82 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: tlsroute-passthrough
+spec:
+  steps:
+    - name: the tlsroute renders correctly and agentgateway passes real TLS traffic through by SNI to the backend, which terminates it with the cert-manager-issued cert
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1alpha2
+              kind: TLSRoute
+              metadata:
+                name: e2e
+              spec:
+                parentRefs:
+                  - name: e2e-gateway
+                    sectionName: tls
+                hostnames:
+                  - tlsroute.e2e.local
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              GW_IP=$(kubectl get svc "$GW_SVC" -n "$NAMESPACE" -o jsonpath='{.spec.clusterIP}')
+
+              # curl needs the cert-manager-issued CA to verify the
+              # backend's leaf cert for real, instead of skipping
+              # verification with -k — for a self-signed Certificate,
+              # cert-manager writes the same cert into the Secret's ca.crt.
+              kubectl get secret tlsroute-tls -n "$NAMESPACE" -o jsonpath='{.data.ca\.crt}' \
+                | base64 -d > /tmp/tlsroute-ca.crt
+              kubectl create configmap tlsroute-ca -n "$NAMESPACE" \
+                --from-file=ca.crt=/tmp/tlsroute-ca.crt \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              # curlimages/curl has a real shell in its entrypoint, unlike
+              # grpcurl's scratch image, but this still runs detached and
+              # reads logs explicitly for the same reason: --rm -i can
+              # lose output if the attach races the pod's deletion.
+              kubectl apply -n "$NAMESPACE" -f - <<EOF
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: tls-prober
+              spec:
+                restartPolicy: Never
+                terminationGracePeriodSeconds: 1
+                containers:
+                  - name: curl
+                    image: curlimages/curl:8.11.0
+                    args:
+                      - -sS
+                      - --cacert=/ca/ca.crt
+                      - --resolve=tlsroute.e2e.local:8443:$GW_IP
+                      - https://tlsroute.e2e.local:8443/
+                    volumeMounts:
+                      - name: ca
+                        mountPath: /ca
+                volumes:
+                  - name: ca
+                    configMap:
+                      name: tlsroute-ca
+              EOF
+
+              for i in $(seq 1 20); do
+                PHASE=$(kubectl get pod tls-prober -n "$NAMESPACE" -o jsonpath='{.status.phase}')
+                [ "$PHASE" = "Succeeded" ] || [ "$PHASE" = "Failed" ] && break
+                sleep 2
+              done
+
+              echo "phase=$PHASE"
+              kubectl logs tls-prober -n "$NAMESPACE"
+              kubectl delete pod tls-prober -n "$NAMESPACE" --ignore-not-found
+              kubectl delete configmap tlsroute-ca -n "$NAMESPACE" --ignore-not-found
+            check:
+              ($error): ~
+              (contains($stdout, 'phase=Succeeded')): true
+              (contains($stdout, 'tls-backend-ok')): true
