@@ -5,6 +5,15 @@ on:
     types: [labeled, synchronize]
   workflow_dispatch: {}
 
+# Every label add (and every push once at least one e2e label is already
+# present) triggers a fresh run; without this, rapid successive label
+# additions pile up concurrent, resource-heavy kind-cluster runs instead of
+# the new one cancelling the now-stale old one. workflow_dispatch runs each
+# get their own group via run_id, since there's no PR to key on.
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   gate:
     name: Check e2e labels

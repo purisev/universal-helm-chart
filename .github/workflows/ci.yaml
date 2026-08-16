@@ -6,6 +6,13 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, labeled]
 
+# Every push and every label add on a PR triggers a fresh run; without this,
+# rapid successive label additions (or a push right after one) pile up
+# concurrent runs instead of the new one cancelling the now-stale old one.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-test:
     name: Lint and Test
