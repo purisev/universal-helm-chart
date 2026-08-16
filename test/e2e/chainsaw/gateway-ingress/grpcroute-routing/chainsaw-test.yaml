@@ -24,16 +24,32 @@ spec:
               GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
                 -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
                 -o jsonpath='{.items[0].metadata.name}')
+
+              # `kubectl run --rm -i` can lose the container's own output if
+              # the attach races the pod's deletion, so this runs the pod
+              # detached, waits for it to finish, and reads its logs
+              # explicitly instead.
+              kubectl run grpc-prober -n "$NAMESPACE" --image=fullstorydev/grpcurl:v1.9.3 \
+                --restart=Never --command -- \
+                -plaintext -authority=grpcroute.e2e.local \
+                "${GW_SVC}.${NAMESPACE}.svc.cluster.local:80" \
+                grpcbin.GRPCBin/DummyUnary -d '{"f_string":"e2e-grpcroute"}'
+
+              for i in $(seq 1 20); do
+                PHASE=$(kubectl get pod grpc-prober -n "$NAMESPACE" -o jsonpath='{.status.phase}')
+                [ "$PHASE" = "Succeeded" ] || [ "$PHASE" = "Failed" ] && break
+                sleep 2
+              done
+
+              echo "phase=$PHASE"
               # grpcurl has no proto for grpcbin.GRPCBin, so it discovers the
               # method via the backend's own server reflection — that call
               # only reaches grpcbin because the rendered rule has no
               # `matches`, which makes it a catch-all for every RPC on this
               # hostname (see gateway-ingress.yaml).
-              kubectl run grpc-prober -n "$NAMESPACE" --image=fullstorydev/grpcurl:v1.9.3 \
-                --restart=Never --rm -i --pod-running-timeout=30s -- \
-                -plaintext -authority=grpcroute.e2e.local \
-                "${GW_SVC}.${NAMESPACE}.svc.cluster.local:80" \
-                grpcbin.GRPCBin/DummyUnary -d '{"f_string":"e2e-grpcroute"}'
+              kubectl logs grpc-prober -n "$NAMESPACE"
+              kubectl delete pod grpc-prober -n "$NAMESPACE" --ignore-not-found
             check:
               ($error): ~
+              (contains($stdout, 'phase=Succeeded')): true
               (contains($stdout, 'e2e-grpcroute')): true
