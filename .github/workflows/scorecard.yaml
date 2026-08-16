@@ -7,12 +7,10 @@ on:
   schedule:
     # Weekly on Saturdays.
     - cron: '30 1 * * 6'
-  # Lets this run manually on a non-default branch to sanity-check the
-  # pipeline (permissions, action pins, steps completing) before this
-  # workflow file ever lands on main, where push/schedule actually take
-  # over. The Scorecard action's own docs flag workflow_dispatch as
-  # "experimental" — publish_results may not behave the same as a real
-  # push-to-main run, but that's fine for this purpose.
+  # Manual re-run on demand (e.g. right after landing a security fix,
+  # without waiting for the Saturday cron) — same pattern as e2e.yaml.
+  # Note: GitHub only lets you dispatch a workflow that's present on the
+  # default branch, so this has no effect until this file lands on main.
   workflow_dispatch: {}
 
 permissions: read-all
