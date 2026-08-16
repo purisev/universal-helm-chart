@@ -52,10 +52,14 @@ spec:
                 containers:
                   - name: curl
                     image: curlimages/curl:8.11.0
+                    # This curl build rejects --flag=value ("is unknown"),
+                    # confirmed locally — long options need a separate arg.
                     args:
                       - -sS
-                      - --cacert=/ca/ca.crt
-                      - --resolve=tlsroute.e2e.local:8443:$GW_IP
+                      - --cacert
+                      - /ca/ca.crt
+                      - --resolve
+                      - tlsroute.e2e.local:8443:$GW_IP
                       - https://tlsroute.e2e.local:8443/
                     volumeMounts:
                       - name: ca
