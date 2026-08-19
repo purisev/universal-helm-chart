@@ -91,6 +91,16 @@ integrations:
                   - vault
                 expirationSeconds: 600
 
+      aws-secrets-manager:
+        enabled: true
+        kind: SecretStore
+        provider:
+          aws:
+            service: SecretsManager
+            region: eu-west-1
+            auth:
+              jwt: {}
+
     externalSecrets:
       app-secrets:
         enabled: true
@@ -306,6 +316,13 @@ configMaps:
         log_level: info
         db_host: db.default.svc.cluster.local
 
+  feature-flags:
+    enabled: true
+    mountPath: /etc/feature-flags
+    data:
+      flags.yaml: |
+        new-checkout: true
+
 # ---------------------------------------------------------------------------
 # Cluster-wide PodDisruptionBudget (applied to all workloads unless overridden)
 # ---------------------------------------------------------------------------
@@ -361,6 +378,16 @@ ingresses:
             pathType: Prefix
             servicePort: 80
 
+  admin:
+    enabled: true
+    ingressClassName: nginx-internal
+    hosts:
+      admin.internal.example.com:
+        paths:
+          - path: /
+            pathType: Prefix
+            servicePort: 8081
+
 # ---------------------------------------------------------------------------
 # Networking — Gateway API
 # ---------------------------------------------------------------------------
@@ -389,6 +416,18 @@ httpRoutes:
           - name: myapp-api
             port: 8081
 
+  status:
+    enabled: true
+    parentRefs:
+      - name: internal-gateway
+        namespace: gateway-system
+    hostnames:
+      - status.example.com
+    rules:
+      - backendRefs:
+          - name: myapp-api
+            port: 8082
+
 # Singleton GRPCRoute
 grpcRoute:
   enabled: true
@@ -407,6 +446,25 @@ grpcRoute:
         - name: myapp-api
           port: 9000
 
+# Additional named GRPCRoutes
+grpcRoutes:
+  worker:
+    enabled: true
+    parentRefs:
+      - name: internal-gateway
+        namespace: gateway-system
+        sectionName: grpc
+    hostnames:
+      - worker-grpc.example.com
+    rules:
+      - matches:
+          - method:
+              type: Exact
+              service: com.example.WorkerService
+        backendRefs:
+          - name: myapp-worker
+            port: 9001
+
 # Singleton TLSRoute
 tlsRoute:
   enabled: true
@@ -420,6 +478,21 @@ tlsRoute:
     - backendRefs:
         - name: myapp-api
           port: 8443
+
+# Additional named TLSRoutes
+tlsRoutes:
+  worker:
+    enabled: true
+    parentRefs:
+      - name: internal-gateway
+        namespace: gateway-system
+        sectionName: tls-passthrough
+    hostnames:
+      - worker-secure.example.com
+    rules:
+      - backendRefs:
+          - name: myapp-worker
+            port: 8444
 
 # Singleton ReferenceGrant
 referenceGrant:
@@ -439,6 +512,16 @@ referenceGrants:
     from:
       - group: gateway.networking.k8s.io
         kind: GRPCRoute
+        namespace: gateway-system
+    to:
+      - group: ""
+        kind: Service
+
+  from-tls-gw:
+    enabled: true
+    from:
+      - group: gateway.networking.k8s.io
+        kind: TLSRoute
         namespace: gateway-system
     to:
       - group: ""
