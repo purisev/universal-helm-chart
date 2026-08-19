@@ -2,12 +2,24 @@
 # | kubectl apply -f -` against the e2e-gateway-ingress-backend namespace, to
 # prove the chart's own ReferenceGrant template is what unblocks the
 # cross-namespace HTTPRoute (not a hand-written grant).
+#
+# from[].namespace and to[].name are tpl expressions rather than the
+# literal "e2e-gateway-ingress" / "e2e-rg-backend-backend" strings, to
+# prove tpl evaluation for ReferenceGrant on a real cluster too (see
+# ADR 020). Both resolve to the exact same values as before: this
+# namespace ("e2e-gateway-ingress-backend", passed via `helm template -n`)
+# always ends in "-backend" by this job's own naming convention, so
+# trimming that suffix recovers the main namespace name; and this
+# release's name ("e2e-rg-backend") plus "-backend" is exactly the
+# chart's own <fullname>-<workloadName> pattern for the "backend"
+# workload's Service.
 referenceGrant:
   enabled: true
   from:
     - group: gateway.networking.k8s.io
       kind: HTTPRoute
-      namespace: e2e-gateway-ingress
+      namespace: "{{ trimSuffix \"-backend\" .Release.Namespace }}"
   to:
     - group: ""
       kind: Service
+      name: "{{ .Release.Name }}-backend"

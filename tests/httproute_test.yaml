@@ -981,3 +981,30 @@ tests:
       - equal:
           path: spec.rules[0].sessionPersistence.sessionName
           value: sticky-api
+
+  # --- tpl evaluation ---
+
+  - it: should evaluate templated hostnames and parentRefs through tpl
+    values:
+      - fixtures/httproute-templated.yaml
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: test-ns.example.com
+      - equal:
+          path: spec.parentRefs[0].name
+          value: test-release-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: test-ns
+
+  - it: should fail fast when a templated parentRefs name evaluates to empty
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: "{{ if false }}never{{ end }}"
+      httpRoute.hostnames:
+        - example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "parentRefs entry's name templated to an empty string"

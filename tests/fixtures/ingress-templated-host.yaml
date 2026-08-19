@@ -1,0 +1,12 @@
+ingress:
+  enabled: true
+  hosts:
+    "{{ .Release.Namespace }}.example.com":
+      paths:
+        - path: /
+          pathType: Prefix
+          servicePort: 80
+  tls:
+    - secretName: myapp-tls
+      hosts:
+        - "{{ .Release.Namespace }}.example.com"

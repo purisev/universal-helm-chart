@@ -39,12 +39,12 @@ metadata:
 spec:
   {{- if .Values.grpcRoute.parentRefs }}
   parentRefs:
-    {{- include "uhc.gatewayParentRefs" .Values.grpcRoute.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" (dict "ctx" $ctx "refs" .Values.grpcRoute.parentRefs) | nindent 4 }}
   {{- end }}
   {{- if .Values.grpcRoute.hostnames }}
   hostnames:
     {{- range .Values.grpcRoute.hostnames }}
-    - {{ . | quote }}
+    - {{ tpl . $ctx | trim | quote }}
     {{- end }}
   {{- end }}
   rules:
@@ -112,12 +112,12 @@ metadata:
 spec:
   {{- if $route.parentRefs }}
   parentRefs:
-    {{- include "uhc.gatewayParentRefs" $route.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" (dict "ctx" $ctx "refs" $route.parentRefs) | nindent 4 }}
   {{- end }}
   {{- if $route.hostnames }}
   hostnames:
     {{- range $route.hostnames }}
-    - {{ . | quote }}
+    - {{ tpl . $ctx | trim | quote }}
     {{- end }}
   {{- end }}
   rules:

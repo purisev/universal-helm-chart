@@ -313,3 +313,30 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "additional properties 'unknownKey' not allowed"
+
+  # --- tpl evaluation ---
+
+  - it: should evaluate templated hostnames and parentRefs through tpl
+    values:
+      - fixtures/tlsroute-templated.yaml
+    asserts:
+      - equal:
+          path: spec.hostnames[0]
+          value: test-ns.example.com
+      - equal:
+          path: spec.parentRefs[0].name
+          value: test-release-gateway
+      - equal:
+          path: spec.parentRefs[0].namespace
+          value: test-ns
+
+  - it: should fail fast when a templated hostname evaluates to empty
+    set:
+      tlsRoute.enabled: true
+      tlsRoute.parentRefs:
+        - name: gw
+      tlsRoute.hostnames:
+        - "{{ if false }}never{{ end }}"
+    asserts:
+      - failedTemplate:
+          errorPattern: "tlsRoute.hostnames entry templated to an empty string"
