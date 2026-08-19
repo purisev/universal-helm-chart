@@ -1,0 +1,327 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Concepts - universal-helm-chart</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A single Helm chart for the common Kubernetes workload shapes, plus the networking, autoscaling, monitoring, secrets and policy resources most releases need.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-f949d0e2.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-447daa91.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">universal-helm-chart</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/purisev/universal-helm-chart" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/01-getting-started/01-concepts.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="concepts"><a class="header" href="#concepts">Concepts</a></h1>
+<p>This page is the “why” of the chart — what it actually does for you that a hand-rolled <code>helm create</code> chart doesn’t, and the small set of ideas you need in your head to read any <code>values.yaml</code>.</p>
+<p>For the full design rationale of any item below, follow the linked ADR.</p>
+<h2 id="what-this-chart-is"><a class="header" href="#what-this-chart-is">What this chart is</a></h2>
+<p><strong>One Helm chart that covers every common Kubernetes workload shape — and the supporting cast every release ends up needing.</strong> Deployment, StatefulSet, Job and CronJob, plus their Services, Ingresses, Gateway API routes, autoscalers, monitors, ExternalSecrets, NetworkPolicies, PodDisruptionBudgets, RBAC, sync-wave annotations and Image Updater configs.</p>
+<p>It replaces the typical pattern of “one chart per service, all subtly different” with <strong>one well-tested template</strong> consumed by N services. Bug fixes and security defaults land once and propagate to every consumer on next upgrade. (<a href="../05-adr/001-universal-chart-scope.html">ADR 001</a>)</p>
+<h2 id="the-four-primitives"><a class="header" href="#the-four-primitives">The four primitives</a></h2>
+<p>These four ideas explain almost every line of <code>values.yaml</code>. The rest is detail.</p>
+<h3 id="1-workloads-as-keyed-maps"><a class="header" href="#1-workloads-as-keyed-maps">1. Workloads as keyed maps</a></h3>
+<p><code>deployments</code>, <code>statefulSets</code> and <code>jobGroups</code> are <strong>maps</strong>, not lists. The map key is the workload’s logical name and becomes part of the rendered resource name (<code>&lt;release-fullname&gt;-&lt;key&gt;</code>). One release can ship many workloads of the same kind without template duplication, and overlay values can target a single entry without rewriting the rest.</p>
+<pre><code class="language-yaml">deployments:
+  api:
+    image:
+      repository: my/api
+      tag: v1
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+  worker:
+    image:
+      repository: my/worker
+      tag: v1
+    service:
+      enabled: false
+</code></pre>
+<p>→ two Deployments, one Service for the API, one shared release. (<a href="../05-adr/002-multi-workload-keyed-maps.html">ADR 002</a>)</p>
+<h3 id="2-jobgroups-for-both-job-and-cronjob"><a class="header" href="#2-jobgroups-for-both-job-and-cronjob">2. <code>jobGroups</code> for both Job and CronJob</a></h3>
+<p>A <code>jobGroup</code> has a <code>kind</code> (<code>Job</code> | <code>CronJob</code>) and a <code>jobs:</code> map. Per-job fields override group-level fields with shape-specific rules — scalars take the job’s value or fall back to the group’s; lists concat group-then-job; nested maps (<code>env</code>, <code>image</code>, <code>resources</code>, <code>securityContext</code>, <code>inherit</code>, <code>hooks.*</code>, etc.) deep-merge with the job winning on key collision; name-keyed maps (<code>volumes</code>, <code>volumeMounts</code>) replace whole entries by name. The same shape covers schema migrations, nightly cleanups, smoke checks. (<a href="../05-adr/005-jobgroups-unification.html">ADR 005</a>)</p>
+<p>Crucially: every Job’s name carries an <strong>8-char hash of its rendered spec</strong>. Same spec → same name → Argo CD/Flux see “no change” and skip. Spec changes → new name → new Job runs once. Old Jobs are GC’d by <code>ttlSecondsAfterFinished</code>. <strong>Migrations never re-run on every sync.</strong> (<a href="../05-adr/012-job-spec-hashing-for-idempotency.html">ADR 012</a>)</p>
+<h3 id="3-integrations"><a class="header" href="#3-integrations">3. <code>integrations</code></a></h3>
+<p>Every external system — Argo CD, Stakater Reloader, External Secrets Operator, Prometheus / VictoriaMetrics Operators, KEDA — lives under <code>integrations.*</code> with an <code>enabled</code> toggle and a config block. One block to skim, one place to add the next integration. (<a href="../05-adr/006-integrations-namespace.html">ADR 006</a>)</p>
+<h3 id="4-layered-inheritance-with-explicit-override"><a class="header" href="#4-layered-inheritance-with-explicit-override">4. Layered inheritance with explicit override</a></h3>
+<p>Environment variables, ConfigMap mounts, Secret mounts, labels, annotations, scheduling parameters — all cascade through four layers:</p>
+<pre><code>global  →  root  →  workload  →  container
+</code></pre>
+<p>Maps replace per key, lists concat, <code>inherit.*</code> flags opt out per-workload. A platform team can ship <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> in <code>global.env</code> once and have every workload pick it up; a single noisy worker can opt out without touching ancestor configuration. (<a href="../05-adr/003-layered-inheritance-and-override.html">ADR 003</a>)</p>
+<h2 id="killer-features"><a class="header" href="#killer-features">Killer features</a></h2>
+<p>Things this chart gives you that you’d otherwise build yourself.</p>
+<h3 id="one-chart-every-common-workload"><a class="header" href="#one-chart-every-common-workload">One chart, every common workload</a></h3>
+<p>Deployment, StatefulSet, Job, CronJob — all in one chart, all sharing labels / inheritance / monitoring / secrets / sync-waves. No subcharts. No “but this is the API chart, the migrations chart is over there.” (<a href="../05-adr/001-universal-chart-scope.html">ADR 001</a>)</p>
+<h3 id="multiple-workloads-per-release"><a class="header" href="#multiple-workloads-per-release">Multiple workloads per release</a></h3>
+<p>A real microservice often ships as <code>api + worker + cron + migrate</code> — four resources that share an image, env, secrets and labels. Declare them once, in one values file, and the chart renders four resources with the right cross-references. (<a href="../05-adr/002-multi-workload-keyed-maps.html">ADR 002</a>)</p>
+<h3 id="job-idempotency-under-gitops"><a class="header" href="#job-idempotency-under-gitops">Job idempotency under GitOps</a></h3>
+<p>Argo CD on a 1-minute sync interval doesn’t re-run your migrations. Hash-suffixed Job names make the Job’s identity a function of its spec. Image bump → new Job. Spec unchanged → no Job runs. With Argo CD Image Updater + <code>update-strategy: digest</code>, even mutable tags (<code>dev</code>, <code>main</code>) get re-runs on actual image change, not on tag-name unchanged. (<a href="../05-adr/012-job-spec-hashing-for-idempotency.html">ADR 012</a>)</p>
+<h3 id="multi-provider-monitoring"><a class="header" href="#multi-provider-monitoring">Multi-provider monitoring</a></h3>
+<p>A three-axis matrix: <strong>provider</strong> (Prometheus | VictoriaMetrics) × <strong>discovery</strong> (CRD | annotations) × <strong>target</strong> (service | pod). Eight combinations behind one mental model. Chart works in clusters running Prometheus Operator, VictoriaMetrics Operator, both, or neither. Switching providers is one values key. (<a href="../05-adr/008-multi-provider-monitoring.html">ADR 008</a>)</p>
+<h3 id="auto-exposed-metrics-port"><a class="header" href="#auto-exposed-metrics-port">Auto-exposed metrics port</a></h3>
+<p><code>integrations.monitoring.defaults.exposeService.enabled: true</code> — the chart appends a <code>metrics</code> port to every Service and pod template, fixed name, last position. Workloads with no main Service get a dedicated metrics-only Service. No more boilerplate port pairs across N workloads. (<a href="../05-adr/016-metrics-port-auto-exposure.html">ADR 016</a>)</p>
+<h3 id="dual-networking-stack"><a class="header" href="#dual-networking-stack">Dual networking stack</a></h3>
+<p>Ingress and Gateway API co-exist. Pick whichever fits the controller you have. Each has both a singleton shape (one routing object per release, the common case) and a multi-resource map (one per controller / parent / hostname). Per-workload route shorthand merges into the singleton with explicit <code>priority</code> for ordering. Cross-namespace <code>ReferenceGrant</code> is a one-block declaration. (<a href="../05-adr/009-dual-networking-stack.html">ADR 009</a>)</p>
+<h3 id="argo-cd-sync-waves-out-of-the-box"><a class="header" href="#argo-cd-sync-waves-out-of-the-box">Argo CD sync-waves out of the box</a></h3>
+<p>Clean first-time syncs in Argo CD: ServiceAccount → SecretStore → ExternalSecret/ConfigMap → Service → workloads → derived (HPA/VPA/monitors) → routes. No flickering “Degraded” on a fresh install. Override per kind, opt-out per kind, disable wholesale — your call. (<a href="../05-adr/010-argocd-sync-waves.html">ADR 010</a>)</p>
+<h3 id="external-secrets-operator-with-smart-disambiguation"><a class="header" href="#external-secrets-operator-with-smart-disambiguation">External Secrets Operator with smart disambiguation</a></h3>
+<p><code>SecretStore</code> and <code>ExternalSecret</code> resources, both <code>data</code> (map keyed by <code>secretKey</code>) and <code>dataFrom</code> (list, bulk extraction). Chart-owned ConfigMaps and Secrets win over external references on name collisions — no silent shadowing surprises. ESO target template annotations propagate to the generated Secret so Reloader picks up rotations. (<a href="../05-adr/015-eso-data-vs-datafrom.html">ADR 015</a>)</p>
+<h3 id="reloader-integration"><a class="header" href="#reloader-integration">Reloader integration</a></h3>
+<p>One toggle injects <code>reloader.stakater.com/auto: "true"</code> onto Deployments, StatefulSets, ConfigMaps and ExternalSecret target templates. Secret rotation in your Vault store → ESO updates the K8s Secret → Reloader bounces the workload. End to end. (<a href="../05-adr/017-reloader-annotation-injection.html">ADR 017</a>)</p>
+<h3 id="argo-cd-image-updater"><a class="header" href="#argo-cd-image-updater">Argo CD Image Updater</a></h3>
+<p>Shorthand mode tracks an image with <code>update-strategy: digest</code>, writing the new tag back via Argo CD parameter overrides. Mutable tags become safe — the digest is what changes, not the tag name. Combined with hash-suffixed Jobs, migrations re-run on actual image change. (See <code>integrations.argocd.imageUpdater</code> in <code>values.yaml</code>.)</p>
+<h3 id="hpa--keda--vpa-with-mutual-exclusion-guards"><a class="header" href="#hpa--keda--vpa-with-mutual-exclusion-guards">HPA / KEDA / VPA with mutual-exclusion guards</a></h3>
+<p>HPA on metrics, KEDA on events, VPA on resource requests. The chart fail-fasts on HPA + KEDA on the same workload (they’d both fight for <code>replicas</code>). VPA is orthogonal. <code>spec.replicas</code> is omitted from the rendered manifest when an HPA-class scaler is on, so Helm doesn’t bounce the count on every apply. (<a href="../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a>)</p>
+<h3 id="standard-wins-labels-with-invariant-selectors"><a class="header" href="#standard-wins-labels-with-invariant-selectors">Standard-wins labels with invariant selectors</a></h3>
+<p>Set <code>commonLabels</code> for fleet-wide labels (cost-center, team, environment) without ever risking a selector break. The chart-managed <code>app.kubernetes.io/{name,instance}</code> are emitted on workload selectors <strong>regardless of any toggle</strong> — the API server forbids selector mutation, and we make sure you can’t accidentally mutate them. The other <code>app.kubernetes.io/*</code> labels follow your toggles, on singletons. (<a href="../05-adr/011-standard-wins-labels-and-invariant-selectors.html">ADR 011</a>)</p>
+<h3 id="schema-driven-validation"><a class="header" href="#schema-driven-validation">Schema-driven validation</a></h3>
+<p><code>values.schema.json</code> catches typos at install time, not at runtime. <code>additionalProperties: false</code> on closed objects, conditional validation via <code>if/then</code>, regex on map keys. IDEs with yaml-language-server light up <code>values.yaml</code> with autocomplete and inline errors. Templates render only — no <code>regexMatch</code> / <code>kindIs</code> / <code>required</code> sprinkled across helpers. (<a href="../05-adr/013-schema-driven-validation.html">ADR 013</a>)</p>
+<h3 id="maps-over-lists-deterministic-ordering"><a class="header" href="#maps-over-lists-deterministic-ordering">Maps over lists, deterministic ordering</a></h3>
+<p>The whole values API leans on maps with a natural key. Overlay merging targets one entry; duplicates are caught by the YAML parser; per-entry disabling is <code>enabled: false</code>. Iteration is alphabetical except where convention says otherwise (<code>http</code> first, <code>metrics</code> last for ports; explicit <code>priority</code> for Gateway API rules). <code>helm template</code> on identical inputs produces byte-identical output. (<a href="../05-adr/004-maps-over-lists.html">ADR 004</a>, <a href="../05-adr/014-deterministic-ordering.html">ADR 014</a>)</p>
+<h3 id="sane-secure-defaults"><a class="header" href="#sane-secure-defaults">Sane secure defaults</a></h3>
+<p>Out of the box: <code>runAsNonRoot: true</code>, <code>runAsUser: 1000</code>, <code>seccompProfile: RuntimeDefault</code>, <code>readOnlyRootFilesystem: true</code>, <code>capabilities.drop: [ALL]</code>, <code>automountServiceAccountToken: false</code>, <code>terminationGracePeriodSeconds: 30</code>. Override per workload. Pod Security Standards “Restricted” level without thinking about it.</p>
+<h3 id="tested"><a class="header" href="#tested">Tested</a></h3>
+<p>The chart ships with a comprehensive <code>helm-unittest</code> suite that runs on every PR. Templates are dense; the test suite catches drift before it lands on consumers. Fixtures double as executable documentation for non-trivial scenarios. (<a href="../05-adr/018-testing-with-helm-unittest.html">ADR 018</a>)</p>
+<h2 id="what-this-chart-is-not"><a class="header" href="#what-this-chart-is-not">What this chart is <strong>not</strong></a></h2>
+<ul>
+<li><strong>A platform.</strong> It renders Kubernetes resources from values. It does not deploy itself, manage namespaces, or own cluster-wide policy.</li>
+<li><strong>A subchart factory.</strong> No nested subcharts of its own — composition is by <code>values.yaml</code>, not by chart hierarchy. <em>That said, this chart works <strong>excellently as a subchart itself</strong>:</em> drop it under <code>dependencies:</code> in your umbrella chart and the parent’s <code>global.env</code>, <code>global.image</code>, etc. propagate into every workload via the four-layer cascade. One umbrella chart consuming N instances of this chart is a first-class use case.</li>
+<li><strong>A DaemonSet / ReplicaSet shop — for now.</strong> Out of scope in the current release (<a href="../05-adr/001-universal-chart-scope.html">ADR 001</a>). DaemonSet support may land later if there is demand; ReplicaSet is unlikely (Deployment is the right abstraction in almost every case).</li>
+<li><strong>Opinionated about your CI/CD tool.</strong> Examples cover Argo CD (single + multi-source), Flux (<code>OCIRepository</code> + <code>HelmRelease</code>) and the plain <code>helm</code> CLI. Pick whichever; the chart doesn’t care.</li>
+</ul>
+<h2 id="where-to-go-next"><a class="header" href="#where-to-go-next">Where to go next</a></h2>
+<ul>
+<li>Need to install the chart → <a href="02-installation.html"><code>02-installation.md</code></a>.</li>
+<li>Just want to deploy something quickly → <a href="03-quickstart.html"><code>03-quickstart.md</code></a>.</li>
+<li>Want to copy a working scenario → <a href="../02-examples/"><code>../02-examples/</code></a>.</li>
+<li>Want the long-form rationale for any feature above → <a href="../05-adr/"><code>../05-adr/</code></a>.</li>
+<li>Want to look up a specific values key → <a href="../03-reference/"><code>../03-reference/</code></a>.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../01-getting-started/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../01-getting-started/02-installation.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../01-getting-started/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../01-getting-started/02-installation.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

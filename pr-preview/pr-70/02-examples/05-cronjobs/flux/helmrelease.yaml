@@ -1,0 +1,72 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: batch
+  namespace: batch
+spec:
+  interval: 5m
+  releaseName: batch
+  chartRef:
+    kind: OCIRepository
+    name: universal-helm-chart
+    namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    jobGroups:
+      migrations:
+        enabled: true
+        kind: Job
+        image:
+          repository: ghcr.io/example/migrator
+          tag: v1.0.0
+        envSecrets:
+          - db-credentials
+        hooks:
+          argocd:
+            hook: PreSync
+            syncWave: "-2"
+        backoffLimit: 2
+        ttlSecondsAfterFinished: 3600
+        hashSuffix: true
+        jobs:
+          schema:
+            enabled: true
+            tasks:
+              01-structure:
+                enabled: true
+                command: |
+                  psql -c "CREATE TABLE IF NOT EXISTS schema_version (id SERIAL PRIMARY KEY)"
+              02-seed:
+                enabled: true
+                args:
+                  - "seed"
+                  - "--rows=100"
+      nightly:
+        enabled: true
+        kind: CronJob
+        image:
+          repository: ghcr.io/example/maintenance
+          tag: v0.5.0
+        env:
+          LOG_LEVEL:
+            value: info
+        jobs:
+          cleanup:
+            enabled: true
+            schedule: "0 2 * * *"
+            timeZone: UTC
+            concurrencyPolicy: Forbid
+            successfulJobsHistoryLimit: 3
+            failedJobsHistoryLimit: 1
+            command: ./cleanup.sh
+            backoffLimit: 1
+          report:
+            enabled: true
+            schedule: "0 6 * * *"
+            timeZone: UTC
+            concurrencyPolicy: Replace
+            successfulJobsHistoryLimit: 7
+            failedJobsHistoryLimit: 3
+            command: ./report.sh
+            backoffLimit: 0
