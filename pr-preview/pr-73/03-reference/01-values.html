@@ -1,0 +1,427 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Values reference - universal-helm-chart</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A single Helm chart for the common Kubernetes workload shapes, plus the networking, autoscaling, monitoring, secrets and policy resources most releases need.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-7ef1a33e.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-447daa91.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">universal-helm-chart</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/purisev/universal-helm-chart" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/03-reference/01-values.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                            <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="values-reference"><a class="header" href="#values-reference">Values reference</a></h1>
+<p><code>values.yaml</code> at the chart root carries machine-readable defaults only — no inline comments. This page is the annotated reference: a topical index of every top-level key grouped by feature, with cross-links to the relevant ADR and example folder, plus a cross-cutting rules cheatsheet for behaviours that span multiple keys.</p>
+<p>For the schema’s machine-checkable shape, see <a href="02-schema.html"><code>02-schema.md</code></a>. For supported Kubernetes / CRD versions, see <a href="03-compatibility.html"><code>03-compatibility.md</code></a>. For a complete working example with every chart feature enabled (passes <code>helm template</code>), see <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.yaml.example"><code>values.yaml.example</code></a> at the chart root.</p>
+<h2 id="topical-index"><a class="header" href="#topical-index">Topical index</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Topic</th><th>Top-level keys</th><th>Read more</th></tr>
+</thead>
+<tbody>
+<tr><td>Identity &amp; metadata</td><td><code>commonLabels</code>, <code>commonAnnotations</code>, <code>labels.standard</code>, <code>nameOverride</code>, <code>fullnameOverride</code></td><td><a href="../05-adr/011-standard-wins-labels-and-invariant-selectors.html">ADR 011</a></td></tr>
+<tr><td>Environment &amp; config</td><td><code>global.env</code>, <code>env</code>, <code>envSecrets</code>, <code>envConfigMaps</code>, <code>configMaps</code>, <code>podAnnotations</code>, <code>jobPodAnnotations</code></td><td><a href="../05-adr/003-layered-inheritance-and-override.html">ADR 003</a> · <a href="../05-adr/015-eso-data-vs-datafrom.html">ADR 015</a></td></tr>
+<tr><td>Image &amp; pulls</td><td><code>image</code>, <code>imagePullSecrets</code>, <code>jobCompletionImage</code></td><td><a href="../02-examples/01-minimal/"><code>02-examples/01-minimal/</code></a></td></tr>
+<tr><td>Deployments / StatefulSets</td><td><code>deployments</code>, <code>statefulSets</code>, <code>strategy</code>, <code>statefulSetUpdateStrategy</code>, <code>revisionHistoryLimit</code>, <code>progressDeadlineSeconds</code>, <code>minReadySeconds</code></td><td><a href="../05-adr/002-multi-workload-keyed-maps.html">ADR 002</a> · <a href="../02-examples/03-statefulset-pvc/"><code>02-examples/03-statefulset-pvc/</code></a></td></tr>
+<tr><td>Per-pod containers</td><td>per-workload <code>initContainers</code>, <code>sidecars</code></td><td><a href="../05-adr/002-multi-workload-keyed-maps.html">ADR 002</a> · <a href="../05-adr/014-deterministic-ordering.html">ADR 014</a> · <a href="../02-examples/10-init-containers/"><code>02-examples/10-init-containers/</code></a></td></tr>
+<tr><td>Job groups</td><td><code>jobGroups</code></td><td><a href="../05-adr/005-jobgroups-unification.html">ADR 005</a> · <a href="../05-adr/012-job-spec-hashing-for-idempotency.html">ADR 012</a> · <a href="../02-examples/05-cronjobs/"><code>02-examples/05-cronjobs/</code></a></td></tr>
+<tr><td>Networking — Ingress</td><td><code>ingress</code> (<code>hosts</code>, <code>tls</code> as native k8s list, <code>defaultBackend</code>), <code>ingresses</code></td><td><a href="../05-adr/009-dual-networking-stack.html">ADR 009</a> · <a href="../02-examples/02-web-app-ingress/"><code>02-examples/02-web-app-ingress/</code></a></td></tr>
+<tr><td>Networking — Gateway API</td><td><code>httpRoute</code>, <code>httpRoutes</code>, <code>grpcRoute</code>, <code>grpcRoutes</code>, <code>tlsRoute</code>, <code>tlsRoutes</code>, <code>referenceGrant</code>, <code>referenceGrants</code></td><td><a href="../05-adr/009-dual-networking-stack.html">ADR 009</a> · <a href="../02-examples/04-gateway-api/"><code>02-examples/04-gateway-api/</code></a></td></tr>
+<tr><td>Autoscaling</td><td>per-workload <code>hpa</code>, <code>keda</code>, <code>verticalPodAutoscaler</code></td><td><a href="../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a> · <a href="../02-examples/08-keda-event-driven/"><code>02-examples/08-keda-event-driven/</code></a></td></tr>
+<tr><td>Monitoring</td><td><code>integrations.monitoring.defaults</code>, per-workload <code>metrics</code>, auto-exposed metrics port</td><td><a href="../05-adr/008-multi-provider-monitoring.html">ADR 008</a> · <a href="../05-adr/016-metrics-port-auto-exposure.html">ADR 016</a> · <a href="../02-examples/06-monitoring/"><code>02-examples/06-monitoring/</code></a></td></tr>
+<tr><td>Secrets (ESO)</td><td><code>integrations.eso.enabled</code>, <code>integrations.eso.secretStores</code>, <code>integrations.eso.externalSecrets</code></td><td><a href="../05-adr/015-eso-data-vs-datafrom.html">ADR 015</a> · <a href="../02-examples/07-external-secrets/"><code>02-examples/07-external-secrets/</code></a></td></tr>
+<tr><td>Identity &amp; RBAC</td><td><code>serviceAccount</code> (<code>create</code> defaults to <code>true</code>), <code>rbac</code> (<code>enabled</code>, <code>clusterScoped</code>, <code>rules</code>), <code>automountServiceAccountToken</code></td><td><a href="../02-examples/07-external-secrets/"><code>02-examples/07-external-secrets/</code></a></td></tr>
+<tr><td>Pod-level policies</td><td><code>podSecurityContext</code>, <code>securityContext</code>, <code>resources</code> (root-level defaults: <code>cpu: 10m</code>, <code>memory: 32Mi</code>), <code>terminationGracePeriodSeconds</code>, <code>podDisruptionBudget</code>, <code>topologySpreadConstraints</code> (native k8s list), <code>priorityClassName</code>, <code>nodeSelector</code>, <code>affinity</code>, <code>tolerations</code>, <code>hostAliases</code></td><td>—</td></tr>
+<tr><td>Volumes</td><td><code>volumes</code>, <code>volumeMounts</code> (root-level maps; per-workload override)</td><td><a href="../05-adr/004-maps-over-lists.html">ADR 004</a></td></tr>
+<tr><td>Argo CD integrations</td><td><code>integrations.argocd.syncWaves</code>, <code>integrations.argocd.imageUpdater</code></td><td><a href="../05-adr/010-argocd-sync-waves.html">ADR 010</a></td></tr>
+<tr><td>Stakater Reloader</td><td><code>integrations.stakater.reloader</code></td><td><a href="../05-adr/017-reloader-annotation-injection.html">ADR 017</a></td></tr>
+</tbody>
+</table>
+</div>
+<p>For a working configuration in each area, follow the example links above. For the full value shape, see <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json"><code>values.schema.json</code></a>.</p>
+<h2 id="cross-cutting-rules"><a class="header" href="#cross-cutting-rules">Cross-cutting rules</a></h2>
+<p>The behaviours below span multiple keys; reading the <code>values.yaml</code> comment on any single one doesn’t tell you the whole story.</p>
+<h3 id="environment-variable-merge-order"><a class="header" href="#environment-variable-merge-order">Environment variable merge order</a></h3>
+<p>For each container, env is composed in this order (later layers win on key collision; non-colliding keys union):</p>
+<pre><code>NAMESPACE (fieldRef)  →  global.env  →  env  →  workload.env  →  container.env
+</code></pre>
+<p>Per-workload opt-out: <code>inherit.env.{global,root}: false</code> (skip env layers), <code>inherit.envSecrets: false</code> (exclude root <code>envSecrets</code> from <code>envFrom</code>), <code>inherit.configMaps: false</code> (skip root <code>envConfigMaps</code>). See <a href="../05-adr/003-layered-inheritance-and-override.html">ADR 003</a>.</p>
+<h3 id="label-precedence-on-workload-resources"><a class="header" href="#label-precedence-on-workload-resources">Label precedence on workload resources</a></h3>
+<ul>
+<li><code>app.kubernetes.io/name</code> and <code>app.kubernetes.io/instance</code> are <strong>always</strong> emitted on workload selectors and pod template labels, regardless of any toggle. The Kubernetes API forbids selector mutation; the chart guarantees they’re present.</li>
+<li><code>commonLabels</code> cannot shadow chart-managed <code>app.kubernetes.io/*</code> keys — chart values silently win.</li>
+<li><code>labels.standard.{partOf,version,managedBy,enabled}</code> toggles affect singletons (ServiceAccount, Ingress, Routes, etc.) but not workload selectors.</li>
+</ul>
+<p>See <a href="../05-adr/011-standard-wins-labels-and-invariant-selectors.html">ADR 011</a>.</p>
+<h3 id="port-ordering-inside-service--pod-template"><a class="header" href="#port-ordering-inside-service--pod-template">Port ordering inside Service / pod template</a></h3>
+<p>When a workload’s <code>service.ports</code> (or per-container <code>ports</code>) is iterated:</p>
+<pre><code>http (if present)  →  others alphabetically  →  metrics (if present)
+</code></pre>
+<p>Auto-injected metrics port (from <code>integrations.monitoring.defaults.exposeService</code>) lands last. See <a href="../05-adr/014-deterministic-ordering.html">ADR 014</a> and <a href="../05-adr/016-metrics-port-auto-exposure.html">ADR 016</a>.</p>
+<h3 id="service-port-appprotocol"><a class="header" href="#service-port-appprotocol">Service port <code>appProtocol</code></a></h3>
+<p>Both Service port shapes accept an optional <code>appProtocol</code> — the single-port <code>service.port</code>/<code>service.targetPort</code> form and the <code>service.ports.&lt;name&gt;</code> map form (and their <code>headlessService</code> equivalents on StatefulSets). It passes straight through to <code>spec.ports[].appProtocol</code>, the native Kubernetes Service field.</p>
+<p>Set it when a port speaks something other than plain HTTP/1.1 and the consumer needs to know — most commonly <code>kubernetes.io/h2c</code> on a gRPC port, so a Gateway API implementation routing a GRPCRoute to that Service configures the upstream connection as HTTP/2 cleartext instead of assuming HTTP/1.1:</p>
+<pre><code class="language-yaml">service:
+  ports:
+    grpc:
+      port: 9000
+      targetPort: 9000
+      appProtocol: kubernetes.io/h2c
+</code></pre>
+<h3 id="jobgroups-group--job-merge"><a class="header" href="#jobgroups-group--job-merge"><code>jobGroups</code> group → job merge</a></h3>
+<p>For each per-job field:</p>
+<ul>
+<li><strong>maps</strong> (env, podAnnotations, metadataAnnotations) — replace per key; later wins.</li>
+<li><strong>lists</strong> (envSecrets, envConfigMaps, tolerations) — concat.</li>
+<li><strong>volumes / volumeMounts</strong> — replace by name (a volume can’t be partially <code>emptyDir</code> and partially <code>configMap</code>).</li>
+</ul>
+<p><code>hashSuffix: true</code> together with a delete-policy that removes the Job after success is rejected fail-fast — the Job would re-run on every sync. See <a href="../05-adr/005-jobgroups-unification.html">ADR 005</a> and <a href="../05-adr/012-job-spec-hashing-for-idempotency.html">ADR 012</a>.</p>
+<h3 id="httproute-rule-fields-name-timeouts-retry-sessionpersistence"><a class="header" href="#httproute-rule-fields-name-timeouts-retry-sessionpersistence">HTTPRoute rule fields (<code>name</code>, <code>timeouts</code>, <code>retry</code>, <code>sessionPersistence</code>)</a></h3>
+<p>Every HTTPRoute rule (in <code>httpRoute.rules</code>, <code>httpRoutes.&lt;n&gt;.rules</code>, and per-workload <code>deployments.&lt;w&gt;.httpRoute.rules</code> / <code>statefulSets.&lt;w&gt;.httpRoute.rules</code>) accepts four optional field groups beyond <code>matches</code>, <code>filters</code>, and <code>backendRefs</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>name</code></td><td><code>string</code> (<code>SectionName</code>: lowercase RFC 1123 label, optionally dotted, max 253 chars)</td><td>Identifies the rule. Surfaced in Gateway API status conditions, access logs, and distributed traces. MUST be unique within the route.</td></tr>
+<tr><td><code>timeouts.request</code></td><td><code>string</code> (Gateway API Duration, <a href="https://gateway-api.sigs.k8s.io/geps/gep-2257/">GEP-2257</a>)</td><td>Total time budget for the complete HTTP request/response cycle, measured from when the gateway forwards the request. <code>"0s"</code> disables the timeout. Example: <code>"30s"</code>.</td></tr>
+<tr><td><code>timeouts.backendRequest</code></td><td><code>string</code> (Gateway API Duration)</td><td>Time budget for the backend to process the request. Must be ≤ <code>timeouts.request</code>. Example: <code>"10s"</code>.</td></tr>
+<tr><td><code>retry.attempts</code></td><td><code>integer (≥ 0)</code></td><td>Maximum number of retry attempts.</td></tr>
+<tr><td><code>retry.codes</code></td><td><code>array of integer (400–599)</code></td><td>HTTP status codes that trigger a retry (e.g. <code>[503, 504]</code>). Implementations MUST support 500/502/503/504 as retriable.</td></tr>
+<tr><td><code>retry.backoff</code></td><td><code>string</code> (Gateway API Duration)</td><td>Minimum wait between retry attempts. Example: <code>"1s"</code>.</td></tr>
+<tr><td><code>sessionPersistence.sessionName</code></td><td><code>string</code> (1–128 chars)</td><td>Identifier the implementation uses for the persistence value (cookie name or header name, depending on <code>type</code>).</td></tr>
+<tr><td><code>sessionPersistence.type</code></td><td><code>enum</code>: <code>Cookie</code> | <code>Header</code></td><td>Persistence mechanism. Defaults to <code>Cookie</code> server-side when omitted.</td></tr>
+<tr><td><code>sessionPersistence.absoluteTimeout</code></td><td><code>string</code> (Gateway API Duration)</td><td>Maximum lifetime of the session, regardless of activity. Example: <code>"1h"</code>.</td></tr>
+<tr><td><code>sessionPersistence.idleTimeout</code></td><td><code>string</code> (Gateway API Duration)</td><td>Maximum idle time before the session expires. Example: <code>"10m"</code>.</td></tr>
+<tr><td><code>sessionPersistence.cookieConfig.lifetimeType</code></td><td><code>enum</code>: <code>Permanent</code> | <code>Session</code></td><td>Cookie lifetime style (relevant only when <code>type: Cookie</code>).</td></tr>
+</tbody>
+</table>
+</div>
+<p>All four field groups are optional and independently combinable — you can set <code>timeouts</code> without <code>retry</code>, or <code>name</code> without either. Fields absent from a rule are omitted from the rendered manifest; they do not inherit from sibling rules or the route root.</p>
+<blockquote>
+<p><strong>Schema strictness.</strong> Each rule entry is validated against a strict schema (<code>additionalProperties: false</code>) listing only the fields above plus <code>matches</code>, <code>filters</code>, <code>backendRefs</code>, <code>serviceName</code>, and <code>servicePort</code>. Unknown keys (typos, deprecated fields, or Gateway API fields not yet wired into the chart) fail at <code>helm template</code> time with a clear validation error rather than being silently dropped. If you depend on a Gateway API HTTPRouteRule field not in this list, open an issue or submit a PR — see <a href="../05-adr/009-dual-networking-stack.html">ADR 009</a>.</p>
+</blockquote>
+<h4 id="gateway-api-channel-and-version-requirements"><a class="header" href="#gateway-api-channel-and-version-requirements">Gateway API channel and version requirements</a></h4>
+<p>The chart’s CRD-channel detection runs at template time when <code>gateway.networking.k8s.io/v1</code> is present in <code>Capabilities.APIVersions</code> and emits a fail-fast error if the field’s required CRD channel is missing. Detection is skipped when rendering offline (<code>helm template</code> without <code>--api-versions</code>).</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Minimum Gateway API</th><th>Channel</th><th>Detection marker</th></tr>
+</thead>
+<tbody>
+<tr><td><code>name</code></td><td>v1.4.0 (Standard) <strong>or</strong> v1.2.0+ (Experimental)</td><td>Standard since v1.4.0; Experimental from v1.2 to v1.3</td><td><code>gateway.networking.k8s.io/v1/BackendTLSPolicy</code> (Standard, graduated in v1.4.0) <strong>or</strong> <code>gateway.networking.k8s.io/v1alpha2/TCPRoute</code> (Experimental)</td></tr>
+<tr><td><code>timeouts.*</code></td><td>v1.2.0</td><td>Standard</td><td>none — implied by <code>gateway.networking.k8s.io/v1</code></td></tr>
+<tr><td><code>retry.*</code></td><td>v1.2.0</td><td><strong>Experimental only</strong> (still Experimental as of v1.5.1)</td><td><code>gateway.networking.k8s.io/v1alpha2/TCPRoute</code> (Experimental)</td></tr>
+<tr><td><code>sessionPersistence.*</code></td><td>v1.2.0</td><td><strong>Experimental only</strong> (still Experimental as of v1.5.1)</td><td><code>gateway.networking.k8s.io/v1alpha2/TCPRoute</code> (Experimental)</td></tr>
+</tbody>
+</table>
+</div>
+<p>If your cluster runs <strong>Standard</strong> channel CRDs older than v1.4 and you need <code>name</code>, you must install the Experimental channel; if you need <code>retry</code> or <code>sessionPersistence</code> at all, you must install the Experimental channel — Standard CRDs reject those fields.</p>
+<p>See the <a href="../02-examples/04-gateway-api/"><code>04-gateway-api</code> example</a> for a working configuration and Gateway API’s <a href="https://gateway-api.sigs.k8s.io/concepts/versioning/#release-channels">release channels</a> for installation guidance.</p>
+<h3 id="grpcroute-rule-fields-name-sessionpersistence"><a class="header" href="#grpcroute-rule-fields-name-sessionpersistence">GRPCRoute rule fields (<code>name</code>, <code>sessionPersistence</code>)</a></h3>
+<p>Every GRPCRoute rule (in <code>grpcRoute.rules</code>, <code>grpcRoutes.&lt;n&gt;.rules</code>, and per-workload <code>deployments.&lt;w&gt;.grpcRoute.rules</code> / <code>statefulSets.&lt;w&gt;.grpcRoute.rules</code>) accepts two optional field groups beyond <code>matches</code>, <code>filters</code>, and <code>backendRefs</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>name</code></td><td><code>string</code> (<code>SectionName</code>: lowercase RFC 1123 label, optionally dotted, max 253 chars)</td><td>Identifies the rule. Surfaced in Gateway API status conditions and traces. MUST be unique within the route.</td></tr>
+<tr><td><code>sessionPersistence.sessionName</code></td><td><code>string</code> (1–128 chars)</td><td>Identifier the implementation uses for the persistence value (cookie name or header name, depending on <code>type</code>).</td></tr>
+<tr><td><code>sessionPersistence.type</code></td><td><code>enum</code>: <code>Cookie</code> | <code>Header</code></td><td>Persistence mechanism. Defaults to <code>Cookie</code> server-side when omitted.</td></tr>
+<tr><td><code>sessionPersistence.absoluteTimeout</code></td><td><code>string</code> (Gateway API Duration)</td><td>Maximum lifetime of the session, regardless of activity. Example: <code>"1h"</code>.</td></tr>
+<tr><td><code>sessionPersistence.idleTimeout</code></td><td><code>string</code> (Gateway API Duration)</td><td>Maximum idle time before the session expires. Example: <code>"10m"</code>.</td></tr>
+<tr><td><code>sessionPersistence.cookieConfig.lifetimeType</code></td><td><code>enum</code>: <code>Permanent</code> | <code>Session</code></td><td>Cookie lifetime style (relevant only when <code>type: Cookie</code>).</td></tr>
+</tbody>
+</table>
+</div>
+<p>Both groups are independently optional. <strong>GRPCRouteRule has no <code>timeouts</code> or <code>retry</code></strong> — those are HTTPRoute-only fields in the Gateway API spec.</p>
+<blockquote>
+<p><strong>Schema strictness.</strong> Each rule entry is validated against a strict schema (<code>additionalProperties: false</code>) listing only <code>name</code>, <code>matches</code>, <code>filters</code>, <code>backendRefs</code>, <code>serviceName</code>, <code>servicePort</code>, and <code>sessionPersistence</code>. Unknown keys fail at <code>helm template</code> time.</p>
+</blockquote>
+<h4 id="gateway-api-channel-and-version-requirements-1"><a class="header" href="#gateway-api-channel-and-version-requirements-1">Gateway API channel and version requirements</a></h4>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Minimum Gateway API</th><th>Channel</th><th>Detection marker</th></tr>
+</thead>
+<tbody>
+<tr><td><code>name</code></td><td>v1.4.0 (Standard) <strong>or</strong> v1.2.0+ (Experimental)</td><td>Standard since v1.4.0; Experimental from v1.2 to v1.3</td><td><code>gateway.networking.k8s.io/v1/BackendTLSPolicy</code> (Standard, graduated in v1.4.0) <strong>or</strong> <code>gateway.networking.k8s.io/v1alpha2/TCPRoute</code> (Experimental)</td></tr>
+<tr><td><code>sessionPersistence.*</code></td><td>v1.2.0</td><td><strong>Experimental only</strong> (still Experimental as of v1.5.1)</td><td><code>gateway.networking.k8s.io/v1alpha2/TCPRoute</code> (Experimental)</td></tr>
+</tbody>
+</table>
+</div>
+<p>The chart fails fast at <code>helm template</code> time when <code>gateway.networking.k8s.io/v1</code> is present but the required channel marker is not. Detection is skipped offline (<code>helm template</code> without <code>--api-versions</code>).</p>
+<h3 id="tlsroute-rule-fields-name"><a class="header" href="#tlsroute-rule-fields-name">TLSRoute rule fields (<code>name</code>)</a></h3>
+<p>Every TLSRoute rule (in <code>tlsRoute.rules</code>, <code>tlsRoutes.&lt;n&gt;.rules</code>, and per-workload <code>deployments.&lt;w&gt;.tlsRoute.rules</code> / <code>statefulSets.&lt;w&gt;.tlsRoute.rules</code>) accepts one optional field beyond <code>backendRefs</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Type</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>name</code></td><td><code>string</code> (<code>SectionName</code>: lowercase RFC 1123 label, optionally dotted, max 253 chars)</td><td>Identifies the rule. MUST be unique within the route.</td></tr>
+</tbody>
+</table>
+</div>
+<p><strong>TLSRouteRule has no <code>matches</code>, <code>filters</code>, <code>timeouts</code>, <code>retry</code>, or <code>sessionPersistence</code></strong> — TLS is L4 passthrough; the spec defines only <code>name</code> and <code>backendRefs</code>.</p>
+<blockquote>
+<p><strong>Schema strictness.</strong> Each rule entry is validated against a strict schema (<code>additionalProperties: false</code>) listing only <code>name</code>, <code>backendRefs</code>, <code>serviceName</code>, and <code>servicePort</code>. Unknown keys fail at <code>helm template</code> time.</p>
+</blockquote>
+<p>TLSRoute itself is in the Gateway API Experimental channel (<code>gateway.networking.k8s.io/v1alpha2</code>), so any use of TLSRoute already presupposes Experimental CRDs — <code>name</code> adds no further channel requirement beyond TLSRoute itself.</p>
+<h3 id="autoscaler-mutual-exclusion"><a class="header" href="#autoscaler-mutual-exclusion">Autoscaler mutual exclusion</a></h3>
+<ul>
+<li><code>hpa.enabled: true</code> and <code>keda.enabled: true</code> on the same workload is fail-fast. Both manage <code>spec.replicas</code>; both running is undefined behaviour.</li>
+<li><code>verticalPodAutoscaler</code> is orthogonal to both (touches <code>resources.requests</code>, not <code>replicas</code>).</li>
+<li>When any HPA-class scaler is on, <code>spec.replicas</code> is omitted from the rendered manifest so Helm doesn’t bounce the count on every apply.</li>
+</ul>
+<p>See <a href="../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a>.</p>
+<h3 id="scheduling-field-inheritance"><a class="header" href="#scheduling-field-inheritance">Scheduling field inheritance</a></h3>
+<p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
+<h3 id="init-containers-and-sidecars-share-one-container-shape"><a class="header" href="#init-containers-and-sidecars-share-one-container-shape">Init containers and sidecars share one container shape</a></h3>
+<p><code>deployments.&lt;name&gt;.initContainers</code> and <code>deployments.&lt;name&gt;.sidecars</code> (same under <code>statefulSets.&lt;name&gt;</code>) are maps keyed by container name. Both flow through the same renderer as the main container: <code>image</code>, <code>command</code>/<code>args</code>, <code>env</code>, <code>envSecrets</code>, <code>volumeMounts</code>, <code>resources</code>, <code>securityContext</code>, <code>lifecycle</code>. Both inherit the parent workload’s <code>inherit.env</code> / <code>inherit.configMaps</code> / <code>inherit.configMapMount</code> flags. Neither inherits root-level <code>volumeMounts.&lt;containerName&gt;</code> — declare local mounts inline. Render order is <code>sortAlpha</code>; for <code>initContainers</code> Kubernetes runs them sequentially in declared order, so prefix names with <code>01-</code>, <code>02-</code>, … when run order matters (same convention as <code>jobGroups[*].tasks</code>). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. <strong>Two exceptions for <code>initContainers</code>:</strong> <code>probesEnabled</code> / probe blocks (<code>readinessProbe</code>, <code>livenessProbe</code>, <code>startupProbe</code>) and <code>lifecycle</code> are rejected — Kubernetes does not allow these on standard init containers, so <code>helm template</code> fail-fasts if either is set on an init entry.</p>
+<h3 id="chart-owned-vs-external-name-resolution"><a class="header" href="#chart-owned-vs-external-name-resolution">Chart-owned vs external name resolution</a></h3>
+<p>When the same name appears in both a chart-owned map (<code>configMaps</code>, <code>integrations.eso.externalSecrets</code>) and an external reference list (<code>envConfigMaps</code>, <code>envSecrets</code>):</p>
+<ul>
+<li>chart-owned wins: the rendered reference points at <code>&lt;release-fullname&gt;-&lt;name&gt;</code>.</li>
+<li>external is silently shadowed.</li>
+<li>having both with the same name is a smell — pick distinct names.</li>
+</ul>
+<p>See <a href="../05-adr/015-eso-data-vs-datafrom.html">ADR 015</a>.</p>
+<h2 id="where-to-go-next"><a class="header" href="#where-to-go-next">Where to go next</a></h2>
+<ul>
+<li>Concrete configurations to copy → <a href="../02-examples/"><code>02-examples/</code></a>.</li>
+<li>Why a specific shape was chosen → <a href="../05-adr/"><code>05-adr/</code></a>.</li>
+<li>IDE-side schema validation → <a href="02-schema.html"><code>02-schema.md</code></a>.</li>
+<li>Cluster / CRD requirements → <a href="03-compatibility.html"><code>03-compatibility.md</code></a>.</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../03-reference/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../03-reference/02-schema.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../03-reference/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../03-reference/02-schema.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

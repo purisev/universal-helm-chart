@@ -1,0 +1,67 @@
+# 09-multi-env-overrides — prod overlay.
+# Apply on top of values-base.yaml: helm install -f values-base.yaml -f values-prod.yaml
+
+commonLabels:
+  environment: prod
+  cost-center: orders
+
+integrations:
+  monitoring:
+    defaults:
+      enabled: true
+  stakater:
+    reloader:
+      enabled: true                  # restart on Secret/CM change in prod
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    orders.example.com:
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: orders-prod-api
+          servicePort: 80
+  tls:
+    orders-tls:
+      hosts:
+        - orders.example.com
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+topologySpreadConstraints:
+  enabled: true
+  constraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: ScheduleAnyway
+
+deployments:
+  api:
+    image:
+      tag: v1.4.2
+    env:
+      LOG_LEVEL:
+        value: info
+    hpa:
+      enabled: true
+      minReplicas: 3
+      maxReplicas: 30
+      metrics:
+        - type: Resource
+          resource:
+            name: cpu
+            target:
+              type: Utilization
+              averageUtilization: 70
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi

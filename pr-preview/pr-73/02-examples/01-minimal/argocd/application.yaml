@@ -1,0 +1,48 @@
+# Argo CD Application — single source.
+# Chart and values both live inside this manifest (values inlined under spec.source.helm.values).
+#
+# Apply with:
+#   kubectl apply -f argocd/application.yaml -n argocd
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: minimal
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: minimal
+  source:
+    repoURL: ghcr.io/purisev
+    chart: universal-helm-chart
+    targetRevision: 3.0.1
+    helm:
+      releaseName: minimal
+      values: |
+        deployments:
+          web:
+            enabled: true
+            replicaCount: 1
+            image:
+              repository: nginx
+              tag: "1.27"
+              pullPolicy: IfNotPresent
+            service:
+              enabled: true
+              type: ClusterIP
+              port: 80
+              targetPort: 80
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 128Mi
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

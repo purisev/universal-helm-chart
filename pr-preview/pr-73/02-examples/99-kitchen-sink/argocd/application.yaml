@@ -1,0 +1,33 @@
+# Argo CD Application — single source.
+# This Application points at the chart on OCI and references the example's values.yaml via
+# a sibling source ($values). For an inline-values single-source variant, embed the values
+# under spec.source.helm.values directly (see 01-minimal/argocd/application.yaml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kitchen-sink
+  namespace: argocd
+spec:
+  project: default
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kitchen-sink
+  source:
+    repoURL: ghcr.io/purisev
+    chart: universal-helm-chart
+    targetRevision: 3.0.1
+    helm:
+      releaseName: kitchen-sink
+      # Inline values would be ~250 lines here; in the single-source variant, copy the
+      # contents of ../values.yaml under "values: |" (folded). For a real GitOps setup,
+      # prefer application-multisource.yaml.
+      values: |
+        null
+        ...
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
