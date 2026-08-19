@@ -632,3 +632,61 @@ tests:
             - name: gpu-claim
               source:
                 resourceClaimName: my-gpu-claim
+
+  - it: should pre-fill apiVersion/kind/volumeMode/status on volumeClaimTemplates (ADR 019)
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          volumeClaimTemplates:
+            - metadata:
+                name: data
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                storageClassName: standard
+                resources:
+                  requests:
+                    storage: 1Gi
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0]
+          value:
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              name: data
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              storageClassName: standard
+              resources:
+                requests:
+                  storage: 1Gi
+              volumeMode: Filesystem
+            status:
+              phase: Pending
+
+  - it: should not override an explicit volumeMode on volumeClaimTemplates
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets:
+        db:
+          enabled: true
+          volumeClaimTemplates:
+            - metadata:
+                name: data
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                volumeMode: Block
+                resources:
+                  requests:
+                    storage: 1Gi
+    asserts:
+      - equal:
+          path: spec.volumeClaimTemplates[0].spec.volumeMode
+          value: Block

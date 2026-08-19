@@ -40,7 +40,7 @@ metadata:
 spec:
   {{- if .Values.httpRoute.parentRefs }}
   parentRefs:
-    {{- toYaml .Values.httpRoute.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" .Values.httpRoute.parentRefs | nindent 4 }}
   {{- end }}
   {{- if .Values.httpRoute.hostnames }}
   hostnames:
@@ -114,7 +114,7 @@ metadata:
 spec:
   {{- if $route.parentRefs }}
   parentRefs:
-    {{- toYaml $route.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" $route.parentRefs | nindent 4 }}
   {{- end }}
   {{- if $route.hostnames }}
   hostnames:

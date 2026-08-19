@@ -49,6 +49,40 @@ Skipped when gateway.networking.k8s.io/v1 is absent (offline helm template run).
 {{- end }}
 
 {{/*
+Normalizes a Gateway API parentRefs list by filling group/kind with the values
+the API server itself defaults them to when omitted (group:
+gateway.networking.k8s.io, kind: Gateway). Existing fields always win.
+
+Without this, a sync using ServerSideApply=true perpetually reports parentRefs
+as OutOfSync: it's an atomic list (no merge key), so once ArgoCD's field
+manager owns the whole list, the API server filling in group/kind on an entry
+we already "fully" specified computes as a pending patch back to our
+(shorter) version — forever OutOfSync even though nothing meaningful differs.
+
+Input: a parentRefs list (list of dicts).
+*/}}
+{{- define "uhc.gatewayParentRefs" -}}
+{{- $out := list -}}
+{{- range $ref := . -}}
+{{- $out = append $out (merge (deepCopy $ref) (dict "group" "gateway.networking.k8s.io" "kind" "Gateway")) -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end }}
+
+{{/*
+Normalizes a Gateway API backendRefs list the same way uhc.gatewayParentRefs
+does for parentRefs (see that comment for why): group: "" (core API group),
+kind: Service, weight: 1 — the defaults the API server itself fills in.
+*/}}
+{{- define "uhc.gatewayBackendRefs" -}}
+{{- $out := list -}}
+{{- range $ref := . -}}
+{{- $out = append $out (merge (deepCopy $ref) (dict "group" "" "kind" "Service" "weight" 1)) -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end }}
+
+{{/*
 Renders a single HTTPRoute rule body (without the leading `-`). Centralises the
 field order — name, matches, filters, timeouts, retry, sessionPersistence,
 backendRefs — across the three render sites in httproute.yaml (root rules,
@@ -92,11 +126,8 @@ the dash (e.g. `- name: foo` rather than an orphan dash on its own line).
 {{- include "uhc.assertGatewayApiSupportsSessionPersistence" $ctx -}}
 {{- $blocks = append $blocks (printf "sessionPersistence:\n%s" (toYaml $rule.sessionPersistence | indent 2 | trimSuffix "\n")) -}}
 {{- end -}}
-{{- if $rule.backendRefs -}}
-{{- $blocks = append $blocks (printf "backendRefs:\n%s" (toYaml $rule.backendRefs | indent 2 | trimSuffix "\n")) -}}
-{{- else -}}
-{{- $blocks = append $blocks (printf "backendRefs:\n  - name: %s\n    port: %v" ($rule.serviceName | default $defaultBackend) ($rule.servicePort | default $defaultPort)) -}}
-{{- end -}}
+{{- $backendRefs := $rule.backendRefs | default (list (dict "name" ($rule.serviceName | default $defaultBackend) "port" ($rule.servicePort | default $defaultPort))) -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n%s" (include "uhc.gatewayBackendRefs" $backendRefs | indent 2 | trimSuffix "\n")) -}}
 {{- join "\n" $blocks -}}
 {{- end }}
 
@@ -127,7 +158,17 @@ newline. The caller wraps it under a list-item dash via the standard
 {{- $blocks = append $blocks (printf "name: %s" ($rule.name | quote)) -}}
 {{- end -}}
 {{- with $rule.matches -}}
-{{- $blocks = append $blocks (printf "matches:\n%s" (toYaml . | indent 2 | trimSuffix "\n")) -}}
+{{- /* GRPCRouteMatch.method.type defaults to "Exact" server-side when a
+method match is set without one — normalize it here for the same reason
+uhc.gatewayParentRefs normalizes group/kind (see that comment). */ -}}
+{{- $matches := list -}}
+{{- range $m := . -}}
+{{- if $m.method -}}
+{{- $m = merge (deepCopy $m) (dict "method" (merge (deepCopy $m.method) (dict "type" "Exact"))) -}}
+{{- end -}}
+{{- $matches = append $matches $m -}}
+{{- end -}}
+{{- $blocks = append $blocks (printf "matches:\n%s" (toYaml $matches | indent 2 | trimSuffix "\n")) -}}
 {{- end -}}
 {{- with $rule.filters -}}
 {{- $blocks = append $blocks (printf "filters:\n%s" (toYaml . | indent 2 | trimSuffix "\n")) -}}
@@ -136,11 +177,8 @@ newline. The caller wraps it under a list-item dash via the standard
 {{- include "uhc.assertGatewayApiSupportsSessionPersistence" $ctx -}}
 {{- $blocks = append $blocks (printf "sessionPersistence:\n%s" (toYaml $rule.sessionPersistence | indent 2 | trimSuffix "\n")) -}}
 {{- end -}}
-{{- if $rule.backendRefs -}}
-{{- $blocks = append $blocks (printf "backendRefs:\n%s" (toYaml $rule.backendRefs | indent 2 | trimSuffix "\n")) -}}
-{{- else -}}
-{{- $blocks = append $blocks (printf "backendRefs:\n  - name: %s\n    port: %v" ($rule.serviceName | default $defaultBackend) ($rule.servicePort | default $defaultPort)) -}}
-{{- end -}}
+{{- $backendRefs := $rule.backendRefs | default (list (dict "name" ($rule.serviceName | default $defaultBackend) "port" ($rule.servicePort | default $defaultPort))) -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n%s" (include "uhc.gatewayBackendRefs" $backendRefs | indent 2 | trimSuffix "\n")) -}}
 {{- join "\n" $blocks -}}
 {{- end }}
 
@@ -166,10 +204,7 @@ Input dict:
 {{- if $rule.name -}}
 {{- $blocks = append $blocks (printf "name: %s" ($rule.name | quote)) -}}
 {{- end -}}
-{{- if $rule.backendRefs -}}
-{{- $blocks = append $blocks (printf "backendRefs:\n%s" (toYaml $rule.backendRefs | indent 2 | trimSuffix "\n")) -}}
-{{- else -}}
-{{- $blocks = append $blocks (printf "backendRefs:\n  - name: %s\n    port: %v" ($rule.serviceName | default $defaultBackend) ($rule.servicePort | default $defaultPort)) -}}
-{{- end -}}
+{{- $backendRefs := $rule.backendRefs | default (list (dict "name" ($rule.serviceName | default $defaultBackend) "port" ($rule.servicePort | default $defaultPort))) -}}
+{{- $blocks = append $blocks (printf "backendRefs:\n%s" (include "uhc.gatewayBackendRefs" $backendRefs | indent 2 | trimSuffix "\n")) -}}
 {{- join "\n" $blocks -}}
 {{- end }}
