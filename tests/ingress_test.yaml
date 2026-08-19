@@ -247,3 +247,14 @@ tests:
       - equal:
           path: spec.rules[0].http.paths[1].path
           value: /a
+
+  - it: should evaluate a templated host and tls host through tpl
+    values:
+      - fixtures/ingress-templated-host.yaml
+    asserts:
+      - equal:
+          path: spec.rules[0].host
+          value: test-ns.example.com
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: test-ns.example.com

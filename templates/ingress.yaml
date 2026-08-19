@@ -37,7 +37,7 @@ spec:
     {{- range .Values.ingress.tls }}
     - hosts:
         {{- range .hosts }}
-        - {{ . | quote }}
+        - {{ tpl . $ctx | trim | quote }}
         {{- end }}
       {{- if .secretName }}
       secretName: {{ .secretName }}
@@ -48,7 +48,7 @@ spec:
   rules:
   {{- range $host := keys .Values.ingress.hosts | sortAlpha }}
   {{- $hostCfg := index $.Values.ingress.hosts $host }}
-    - host: {{ $host | quote }}
+    - host: {{ tpl $host $ctx | trim | quote }}
       http:
         paths:
         {{- range $hostCfg.paths }}
@@ -106,7 +106,7 @@ spec:
     {{- range $ing.tls }}
     - hosts:
         {{- range .hosts }}
-        - {{ . | quote }}
+        - {{ tpl . $ctx | trim | quote }}
         {{- end }}
       {{- if .secretName }}
       secretName: {{ .secretName }}
@@ -117,7 +117,7 @@ spec:
   rules:
   {{- range $host := keys $ing.hosts | sortAlpha }}
   {{- $hostCfg := index $ing.hosts $host }}
-    - host: {{ $host | quote }}
+    - host: {{ tpl $host $ctx | trim | quote }}
       http:
         paths:
         {{- range $hostCfg.paths }}

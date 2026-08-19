@@ -58,7 +58,7 @@ Templates **must not** call `fail` for things the schema can express. If you fin
 - **K8s-native shapes stay open.** `resources`, `affinity`, `securityContext`, `podSecurityContext`, `volumes.<name>`, `volumeMounts.<container>.<mount>`, `tolerations`, `topologySpreadConstraints` (the array of constraints), `livenessProbe` / `readinessProbe` / `startupProbe`, `lifecycle`, `nodeSelector`, `podAnnotations` — these mirror upstream Kubernetes types whose fields grow each minor release. Closing them would force-fail on values that pass `kubectl apply` on a newer cluster, which is worse than letting a typo through. Treat them as pass-through and rely on the API server to reject malformed shapes at admission time.
 - **Open maps use `additionalProperties: <object schema>` with patternProperties on keys.** Example: `deployments` (any DNS-1123 key, value must match the `deploymentEntry` schema in `$defs`).
 - **Per-feature toggles use `if/then`** to make required fields conditional: e.g. when `integrations.eso.externalSecrets.<name>.dataFrom` is set, `secretStore` becomes required.
-- **Keep regex sane.** Port names: `^[a-z]([-a-z0-9]*[a-z0-9])?$` and `length(name) <= 15`. Hostnames: standard DNS pattern. Anything more elaborate is suspect.
+- **Keep regex sane.** Port names: `^[a-z]([-a-z0-9]*[a-z0-9])?$` and `length(name) <= 15`. Hostnames: standard DNS pattern. Anything more elaborate is suspect. Exception: hosts/hostnames, `parentRefs.name`, and the templatable ReferenceGrant fields are exempt from a DNS-pattern constraint here. See [ADR 020](020-tpl-hostnames-and-parentrefs.md), which evaluates them through `tpl`; a pre-render pattern would reject legitimate `{{ }}` values.
 
 ## Alternatives considered
 

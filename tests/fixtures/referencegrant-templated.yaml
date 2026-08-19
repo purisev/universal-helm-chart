@@ -1,0 +1,10 @@
+referenceGrant:
+  enabled: true
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: "{{ .Release.Namespace }}-gateway"
+  to:
+    - group: ""
+      kind: Service
+      name: "{{ .Release.Name }}-svc"
