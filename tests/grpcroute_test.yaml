@@ -65,6 +65,17 @@ tests:
           path: spec.parentRefs[0].sectionName
           value: grpc
 
+  - it: should pre-fill parentRefs group/kind when unset (ADR 019)
+    values:
+      - fixtures/grpcroute-full.yaml
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].group
+          value: gateway.networking.k8s.io
+      - equal:
+          path: spec.parentRefs[0].kind
+          value: Gateway
+
   - it: should fail fast when grpcRoute is enabled without parentRefs
     set:
       grpcRoute.enabled: true
@@ -109,6 +120,15 @@ tests:
       - equal:
           path: spec.rules[0].backendRefs[0].port
           value: 50051
+      - equal:
+          path: spec.rules[0].backendRefs[0].group
+          value: ""
+      - equal:
+          path: spec.rules[0].backendRefs[0].kind
+          value: Service
+      - equal:
+          path: spec.rules[0].backendRefs[0].weight
+          value: 1
 
   # --- rules: shorthand serviceName/servicePort ---
 
@@ -122,6 +142,35 @@ tests:
       - equal:
           path: spec.rules[1].backendRefs[0].port
           value: 50051
+      - equal:
+          path: spec.rules[1].backendRefs[0].group
+          value: ""
+      - equal:
+          path: spec.rules[1].backendRefs[0].kind
+          value: Service
+      - equal:
+          path: spec.rules[1].backendRefs[0].weight
+          value: 1
+
+  # --- matches: method.type default ---
+
+  - it: should default matches[].method.type to Exact when unset (ADR 019)
+    set:
+      grpcRoute.enabled: true
+      grpcRoute.parentRefs:
+        - {name: my-gw, namespace: gateway-ns}
+      grpcRoute.rules:
+        - matches:
+            - method:
+                service: com.example.UserService
+          serviceName: my-svc
+    asserts:
+      - equal:
+          path: spec.rules[0].matches[0].method.type
+          value: Exact
+      - equal:
+          path: spec.rules[0].matches[0].method.service
+          value: com.example.UserService
 
   - it: should default serviceName to fullname when not specified
     set:

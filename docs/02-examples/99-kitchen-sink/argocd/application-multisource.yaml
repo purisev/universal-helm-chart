@@ -1,4 +1,4 @@
-# Argo CD Application — multi-source: chart from OCI, values from this chart's repo at v3.0.0.
+# Argo CD Application — multi-source: chart from OCI, values from this chart's repo at v3.0.1.
 # The chart's source references a values file inside the second source ($values). This is the
 # recommended GitOps shape: chart and values version independently; values changes go through
 # code review without touching the Application CR.
@@ -18,13 +18,13 @@ spec:
   sources:
     - repoURL: ghcr.io/purisev
       chart: universal-helm-chart
-      targetRevision: 3.0.0
+      targetRevision: 3.0.1
       helm:
         releaseName: kitchen-sink
         valueFiles:
           - $values/docs/02-examples/99-kitchen-sink/values.yaml
     - repoURL: https://github.com/purisev/universal-helm-chart.git
-      targetRevision: v3.0.0
+      targetRevision: v3.0.1
       ref: values
   syncPolicy:
     automated:

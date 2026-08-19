@@ -44,7 +44,7 @@ metadata:
 spec:
   {{- if .Values.tlsRoute.parentRefs }}
   parentRefs:
-    {{- toYaml .Values.tlsRoute.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" .Values.tlsRoute.parentRefs | nindent 4 }}
   {{- end }}
   hostnames:
     {{- range .Values.tlsRoute.hostnames }}
@@ -118,7 +118,7 @@ metadata:
 spec:
   {{- if $route.parentRefs }}
   parentRefs:
-    {{- toYaml $route.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" $route.parentRefs | nindent 4 }}
   {{- end }}
   hostnames:
     {{- range $route.hostnames }}
