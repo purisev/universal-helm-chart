@@ -27,6 +27,22 @@ tests:
           path: spec.template.spec.containers[0].image
           pattern: nginx:alpine
 
+  - it: renders every Deployment as its own document when two or more are defined
+    # Regression test for the same document-separator bug that once broke
+    # multi-entry statefulSets: a right-trimmed `{{- end -}}` right before
+    # the `---` separator glues two documents together, so only the
+    # alphabetically last one survives a real YAML parse.
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.aaa-first.enabled: true
+      deployments.aaa-first.replicaCount: 1
+      deployments.zzz-second.enabled: true
+      deployments.zzz-second.replicaCount: 1
+    asserts:
+      - hasDocuments:
+          count: 2
+
   - it: should fail when image.tag is latest and imagePullPolicy is IfNotPresent
     set:
       image.repository: nginx
