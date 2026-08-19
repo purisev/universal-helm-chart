@@ -7,7 +7,7 @@
 {{- $hsOptedOut := eq (index ($wl.headlessService | default dict) "enabled") false -}}
 {{- if and $hsOptedOut (not $wl.serviceName) -}}
 {{- fail (printf "statefulSets.%s: headlessService.enabled=false requires serviceName to point at an existing headless Service. Kubernetes rejects a StatefulSet whose spec.serviceName resolves to no Service. Set statefulSets.%s.serviceName to the name of the externally managed Service that provides stable per-pod DNS for these pods." $wlName $wlName) -}}
-{{- end -}}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet

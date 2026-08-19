@@ -840,6 +840,37 @@ statefulSets:
     inherit:
       configMapMount: false
 
+  # --- cache: minimal peer-to-peer StatefulSet ---
+  # Features: the "replicated database" shape mentioned above — headlessService
+  # carries its own port and is used directly for pod-to-pod discovery, so
+  # there's no separate client Service. Also keeps a second statefulSets entry
+  # in this file so the chart's own smoke render always exercises the
+  # multi-document StatefulSet loop, not just a single one.
+  cache:
+    image:
+      repository: redis
+      tag: "7.4"
+
+    replicaCount: 2
+
+    headlessService:
+      ports:
+        redis:
+          port: 6379
+
+    metrics:
+      enabled: false
+
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+    inherit:
+      configMapMount: false
+
 # ---------------------------------------------------------------------------
 # jobGroups
 # ---------------------------------------------------------------------------
