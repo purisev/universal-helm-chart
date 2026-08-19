@@ -39,7 +39,7 @@ metadata:
 spec:
   {{- if .Values.grpcRoute.parentRefs }}
   parentRefs:
-    {{- toYaml .Values.grpcRoute.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" .Values.grpcRoute.parentRefs | nindent 4 }}
   {{- end }}
   {{- if .Values.grpcRoute.hostnames }}
   hostnames:
@@ -112,7 +112,7 @@ metadata:
 spec:
   {{- if $route.parentRefs }}
   parentRefs:
-    {{- toYaml $route.parentRefs | nindent 4 }}
+    {{- include "uhc.gatewayParentRefs" $route.parentRefs | nindent 4 }}
   {{- end }}
   {{- if $route.hostnames }}
   hostnames:

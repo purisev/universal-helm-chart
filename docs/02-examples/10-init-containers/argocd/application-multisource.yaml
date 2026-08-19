@@ -24,14 +24,14 @@ spec:
     # The chart itself, from OCI.
     - repoURL: ghcr.io/purisev
       chart: universal-helm-chart
-      targetRevision: 3.0.0
+      targetRevision: 3.0.1
       helm:
         releaseName: init-containers
         valueFiles:
           - $values/docs/02-examples/10-init-containers/values.yaml
     # The values, from this chart's repository at the matching release tag.
     - repoURL: https://github.com/purisev/universal-helm-chart.git
-      targetRevision: v3.0.0
+      targetRevision: v3.0.1
       ref: values
   syncPolicy:
     automated:

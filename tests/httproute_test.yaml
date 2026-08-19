@@ -71,6 +71,33 @@ tests:
           path: spec.parentRefs[0].sectionName
           value: https
 
+  - it: should pre-fill parentRefs group/kind when unset (ADR 019)
+    values:
+      - fixtures/httproute-full.yaml
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].group
+          value: gateway.networking.k8s.io
+      - equal:
+          path: spec.parentRefs[0].kind
+          value: Gateway
+
+  - it: should not override an explicit parentRefs group/kind
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: my-gw
+          namespace: gateway-ns
+          group: custom.example.io
+          kind: CustomGateway
+    asserts:
+      - equal:
+          path: spec.parentRefs[0].group
+          value: custom.example.io
+      - equal:
+          path: spec.parentRefs[0].kind
+          value: CustomGateway
+
   - it: should fail fast when httpRoute is enabled without parentRefs
     set:
       httpRoute.enabled: true
@@ -115,6 +142,15 @@ tests:
       - equal:
           path: spec.rules[0].backendRefs[0].port
           value: 8080
+      - equal:
+          path: spec.rules[0].backendRefs[0].group
+          value: ""
+      - equal:
+          path: spec.rules[0].backendRefs[0].kind
+          value: Service
+      - equal:
+          path: spec.rules[0].backendRefs[0].weight
+          value: 1
 
   # --- rules: shorthand serviceName/servicePort ---
 
@@ -128,6 +164,15 @@ tests:
       - equal:
           path: spec.rules[1].backendRefs[0].port
           value: 80
+      - equal:
+          path: spec.rules[1].backendRefs[0].group
+          value: ""
+      - equal:
+          path: spec.rules[1].backendRefs[0].kind
+          value: Service
+      - equal:
+          path: spec.rules[1].backendRefs[0].weight
+          value: 1
 
   - it: should default serviceName to fullname when not specified
     set:

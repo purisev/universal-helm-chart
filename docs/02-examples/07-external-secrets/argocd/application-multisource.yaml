@@ -11,13 +11,13 @@ spec:
   sources:
     - repoURL: ghcr.io/purisev
       chart: universal-helm-chart
-      targetRevision: 3.0.0
+      targetRevision: 3.0.1
       helm:
         releaseName: secrets
         valueFiles:
           - $values/docs/02-examples/07-external-secrets/values.yaml
     - repoURL: https://github.com/purisev/universal-helm-chart.git
-      targetRevision: v3.0.0
+      targetRevision: v3.0.1
       ref: values
   syncPolicy:
     automated:

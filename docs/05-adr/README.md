@@ -34,6 +34,7 @@ Three-digit prefix; one decision per file.
 | 016 | [Metrics port auto-exposure on Service](016-metrics-port-auto-exposure.md) | Accepted |
 | 017 | [Reloader annotation injection](017-reloader-annotation-injection.md) | Accepted |
 | 018 | [Testing with `helm-unittest` and fixtures](018-testing-with-helm-unittest.md) | Accepted |
+| 019 | [Pre-fill API-server defaults on atomic list fields](019-explicit-atomic-list-defaults.md) | Accepted |
 
 ## Template
 

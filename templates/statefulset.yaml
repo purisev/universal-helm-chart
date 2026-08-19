@@ -119,7 +119,21 @@ spec:
       {{- end }}
   {{- with $wl.volumeClaimTemplates }}
   volumeClaimTemplates:
-    {{- toYaml . | nindent 4 }}
+    {{- /*
+    Each entry is a full embedded PersistentVolumeClaim, and the API server
+    fills in apiVersion/kind/spec.volumeMode/status on creation regardless of
+    what we send. volumeClaimTemplates is an atomic list (no merge key), so
+    under a sync using ServerSideApply=true, the API server adding those
+    fields to an entry we already "fully" own computes as a pending patch
+    back to our (shorter) version — forever OutOfSync even though nothing
+    meaningful differs. Pre-filling them here makes desired == live.
+    */}}
+    {{- $out := list }}
+    {{- range $pvc := . }}
+    {{- $defaults := dict "apiVersion" "v1" "kind" "PersistentVolumeClaim" "status" (dict "phase" "Pending") "spec" (dict "volumeMode" "Filesystem") }}
+    {{- $out = append $out (merge (deepCopy $pvc) $defaults) }}
+    {{- end }}
+    {{- toYaml $out | nindent 4 }}
   {{- end }}
 {{- end }}
 {{- end }}
