@@ -29,9 +29,9 @@ metadata:
   {{- end }}
 spec:
   from:
-    {{- toYaml .Values.referenceGrant.from | nindent 4 }}
+    {{- include "uhc.referenceGrantFrom" (dict "ctx" $ctx "refs" .Values.referenceGrant.from) | nindent 4 }}
   to:
-    {{- toYaml .Values.referenceGrant.to | nindent 4 }}
+    {{- include "uhc.referenceGrantTo" (dict "ctx" $ctx "refs" .Values.referenceGrant.to) | nindent 4 }}
 {{- end }}
 {{- /*
 Multi-ReferenceGrant map: each key becomes a separate ReferenceGrant named <fullname>-<key>.
@@ -64,8 +64,8 @@ metadata:
   {{- end }}
 spec:
   from:
-    {{- toYaml $grant.from | nindent 4 }}
+    {{- include "uhc.referenceGrantFrom" (dict "ctx" $ctx "refs" $grant.from) | nindent 4 }}
   to:
-    {{- toYaml $grant.to | nindent 4 }}
+    {{- include "uhc.referenceGrantTo" (dict "ctx" $ctx "refs" $grant.to) | nindent 4 }}
 {{- end }}
 {{- end }}

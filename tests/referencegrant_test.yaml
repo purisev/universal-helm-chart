@@ -148,3 +148,16 @@ tests:
       - equal:
           path: metadata.annotations["team"]
           value: platform
+
+  # --- tpl evaluation ---
+
+  - it: should evaluate templated from.namespace and to.name through tpl
+    values:
+      - fixtures/referencegrant-templated.yaml
+    asserts:
+      - equal:
+          path: spec.from[0].namespace
+          value: test-ns-gateway
+      - equal:
+          path: spec.to[0].name
+          value: test-release-svc

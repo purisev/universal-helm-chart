@@ -372,7 +372,10 @@ ingresses:
     enabled: true
     ingressClassName: nginx-internal
     hosts:
-      app.internal.example.com:
+      # Host keys (and tls[].hosts[]) are evaluated with `tpl` against the
+      # release context, so a per-namespace/per-environment hostname needs
+      # no separate values file per environment.
+      "{{ .Release.Namespace }}.internal.example.com":
         paths:
           - path: /
             pathType: Prefix
@@ -510,9 +513,12 @@ referenceGrants:
   from-grpc-gw:
     enabled: true
     from:
+      # from[].namespace (and to[].name) are evaluated with `tpl` against the
+      # release context, e.g. to scope the grant to this release's own
+      # namespace without hardcoding it per environment.
       - group: gateway.networking.k8s.io
         kind: GRPCRoute
-        namespace: gateway-system
+        namespace: "{{ .Release.Namespace }}-gateway"
     to:
       - group: ""
         kind: Service

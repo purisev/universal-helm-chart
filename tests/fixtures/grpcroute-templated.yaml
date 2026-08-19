@@ -1,0 +1,11 @@
+grpcRoute:
+  enabled: true
+  parentRefs:
+    - name: "{{ .Release.Name }}-gateway"
+      namespace: "{{ .Release.Namespace }}"
+  hostnames:
+    - "{{ .Release.Namespace }}.example.com"
+  rules:
+    - backendRefs:
+        - name: myapp
+          port: 50051

@@ -150,12 +150,18 @@ ingress:
   # working side by side.
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+  # hosts/tls[].hosts[] below are written as `{{ .Release.Name }}.local`
+  # instead of the literal `e2e.local` on purpose: this release's name is
+  # "e2e", so it renders to the exact same string every other fixture in
+  # this job (the cert-manager Certificate, ingress-tls-termination) still
+  # expects — while proving on a real cluster that tpl evaluation actually
+  # runs for these fields (see ADR 020), not just in helm-unittest.
   tls:
     - hosts:
-        - e2e.local
+        - "{{ .Release.Name }}.local"
       secretName: e2e-ingress-tls
   hosts:
-    e2e.local:
+    "{{ .Release.Name }}.local":
       paths:
         - path: /
           pathType: Prefix
@@ -167,19 +173,24 @@ ingress:
 # the Gateway itself).
 httpRoute:
   enabled: true
+  # parentRefs[].name and hostnames[] use tpl expressions that resolve to
+  # the exact same literals as before ("e2e-gateway", "httproute.e2e.local")
+  # since this release is named "e2e" — real proof tpl runs against the
+  # live Gateway/agentgateway stack, with no other fixture needing to
+  # change.
   parentRefs:
-    - name: e2e-gateway
+    - name: "{{ .Release.Name }}-gateway"
   hostnames:
-    - httproute.e2e.local
+    - "{{ printf \"httproute.%s.local\" .Release.Name }}"
 
 # Routed through the same agentgateway listener, to the real grpcbin
 # backend above.
 grpcRoute:
   enabled: true
   parentRefs:
-    - name: e2e-gateway
+    - name: "{{ .Release.Name }}-gateway"
   hostnames:
-    - grpcroute.e2e.local
+    - "{{ printf \"grpcroute.%s.local\" .Release.Name }}"
   rules:
     - matches:
         - method:
@@ -197,10 +208,10 @@ grpcRoute:
 tlsRoute:
   enabled: true
   parentRefs:
-    - name: e2e-gateway
+    - name: "{{ .Release.Name }}-gateway"
       sectionName: tls
   hostnames:
-    - tlsroute.e2e.local
+    - "{{ printf \"tlsroute.%s.local\" .Release.Name }}"
   rules:
     - backendRefs:
         - name: e2e-tls-backend
@@ -213,9 +224,9 @@ tlsRoute:
 httpRoutes:
   referencegrant-cross-ns:
     parentRefs:
-      - name: e2e-gateway
+      - name: "{{ .Release.Name }}-gateway"
     hostnames:
-      - referencegrant.e2e.local
+      - "{{ printf \"referencegrant.%s.local\" .Release.Name }}"
     rules:
       - backendRefs:
           - name: e2e-rg-backend-backend

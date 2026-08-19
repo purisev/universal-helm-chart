@@ -59,12 +59,36 @@ manager owns the whole list, the API server filling in group/kind on an entry
 we already "fully" specified computes as a pending patch back to our
 (shorter) version — forever OutOfSync even though nothing meaningful differs.
 
-Input: a parentRefs list (list of dicts).
+Also evaluates name/namespace/sectionName through tpl against the release
+context, so values.yaml can carry expressions like `{{ .Release.Namespace }}`
+instead of a literal string that would otherwise reach the API server as-is
+and fail Kubernetes' name/namespace validation. name is required by the
+Gateway API, so a template that evaluates to empty fails fast here rather
+than producing a confusing API server rejection.
+
+Input dict:
+  ctx  — root template context (passed to tpl)
+  refs — a parentRefs list (list of dicts)
 */}}
 {{- define "uhc.gatewayParentRefs" -}}
+{{- $ctx := .ctx -}}
 {{- $out := list -}}
-{{- range $ref := . -}}
-{{- $out = append $out (merge (deepCopy $ref) (dict "group" "gateway.networking.k8s.io" "kind" "Gateway")) -}}
+{{- range $ref := .refs -}}
+{{- $tpled := deepCopy $ref -}}
+{{- if $ref.name -}}
+{{- $name := tpl $ref.name $ctx | trim -}}
+{{- if not $name -}}
+{{- fail (printf "a parentRefs entry's name templated to an empty string (source: %q). parentRefs[].name is required by the Gateway API — set it to a non-empty Gateway name, or fix the template expression." $ref.name) -}}
+{{- end -}}
+{{- $tpled = set $tpled "name" $name -}}
+{{- end -}}
+{{- if $ref.namespace -}}
+{{- $tpled = set $tpled "namespace" (tpl $ref.namespace $ctx | trim) -}}
+{{- end -}}
+{{- if $ref.sectionName -}}
+{{- $tpled = set $tpled "sectionName" (tpl $ref.sectionName $ctx | trim) -}}
+{{- end -}}
+{{- $out = append $out (merge $tpled (dict "group" "gateway.networking.k8s.io" "kind" "Gateway")) -}}
 {{- end -}}
 {{- toYaml $out -}}
 {{- end }}
@@ -78,6 +102,51 @@ kind: Service, weight: 1 — the defaults the API server itself fills in.
 {{- $out := list -}}
 {{- range $ref := . -}}
 {{- $out = append $out (merge (deepCopy $ref) (dict "group" "" "kind" "Service" "weight" 1)) -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end }}
+
+{{/*
+Evaluates a ReferenceGrant `from[]` entry's namespace through tpl against the
+release context, so values.yaml can carry expressions like
+`{{ .Release.Namespace }}` for cross-namespace references. group/kind are
+left as-is — they're structural Gateway API constants, not per-release text.
+
+Input dict:
+  ctx  — root template context (passed to tpl)
+  refs — a referenceGrant `from` list (list of {group, kind, namespace})
+*/}}
+{{- define "uhc.referenceGrantFrom" -}}
+{{- $ctx := .ctx -}}
+{{- $out := list -}}
+{{- range $ref := .refs -}}
+{{- $tpled := deepCopy $ref -}}
+{{- if $ref.namespace -}}
+{{- $tpled = set $tpled "namespace" (tpl $ref.namespace $ctx | trim) -}}
+{{- end -}}
+{{- $out = append $out $tpled -}}
+{{- end -}}
+{{- toYaml $out -}}
+{{- end }}
+
+{{/*
+Evaluates a ReferenceGrant `to[]` entry's name through tpl against the
+release context, same rationale as uhc.referenceGrantFrom. `to[]` has no
+namespace field — only `name` is templatable here.
+
+Input dict:
+  ctx  — root template context (passed to tpl)
+  refs — a referenceGrant `to` list (list of {group, kind, name})
+*/}}
+{{- define "uhc.referenceGrantTo" -}}
+{{- $ctx := .ctx -}}
+{{- $out := list -}}
+{{- range $ref := .refs -}}
+{{- $tpled := deepCopy $ref -}}
+{{- if $ref.name -}}
+{{- $tpled = set $tpled "name" (tpl $ref.name $ctx | trim) -}}
+{{- end -}}
+{{- $out = append $out $tpled -}}
 {{- end -}}
 {{- toYaml $out -}}
 {{- end }}
