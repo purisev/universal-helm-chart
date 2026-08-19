@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5c9a7cbb.js";
+            window.path_to_searchindex_js = "searchindex-f949d0e2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-447daa91.js"></script>
@@ -316,7 +316,7 @@
 </code></pre>
 <p>There is no Helm “repo add” step — Helm 3.8+ pulls OCI charts directly:</p>
 <pre><code class="language-bash">helm install my-app oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.0.0 \
+  --version 3.0.1 \
   -f values.yaml
 </code></pre>
 <h2 id="optional-crds"><a class="header" href="#optional-crds">Optional CRDs</a></h2>
@@ -352,7 +352,7 @@
           port: 80
 </code></pre>
 <p>Install:</p>
-<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.0 -f values.yaml
+<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.0.1 -f values.yaml
 </code></pre>
 <p>A complete copy-and-deploy version of this scenario, including Argo CD and Flux manifests, lives at <a href="02-examples/01-minimal"><code>../02-examples/01-minimal/</code></a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -1271,7 +1271,7 @@ kubectl apply -f flux/
 <h2 id="ide-setup"><a class="header" href="#ide-setup">IDE setup</a></h2>
 <h3 id="yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><a class="header" href="#yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><code>yaml-language-server</code> / Red Hat YAML extension (VS Code, Neovim, others)</a></h3>
 <p>Add a directive at the top of any values file you author:</p>
-<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.0.0/values.schema.json
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.0.1/values.schema.json
 deployments:
   api:
     image:
@@ -1282,7 +1282,7 @@ deployments:
 <h3 id="jetbrains-ides-intellij-goland-pycharm-"><a class="header" href="#jetbrains-ides-intellij-goland-pycharm-">JetBrains IDEs (IntelliJ, GoLand, PyCharm, …)</a></h3>
 <p><code>Settings</code> → <code>Languages &amp; Frameworks</code> → <code>Schemas and DTDs</code> → <code>JSON Schema Mappings</code>:</p>
 <ul>
-<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.0.0/values.schema.json</code></li>
+<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.0.1/values.schema.json</code></li>
 <li><strong>Schema version:</strong> JSON Schema 2020-12 (the latest)</li>
 <li><strong>File path pattern:</strong> <code>*values*.yaml</code> (or per-project glob).</li>
 </ul>
@@ -1297,7 +1297,7 @@ deployments:
 </code></pre>
 <p>Use this when iterating on overlay values in a config repo where Helm isn’t installed.</p>
 <h2 id="pinning-the-schema-url"><a class="header" href="#pinning-the-schema-url">Pinning the schema URL</a></h2>
-<p>The <code>v3.0.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
+<p>The <code>v3.0.1</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="compatibility"><a class="header" href="#compatibility">Compatibility</a></h1>
 <p>Versions and APIs the chart targets. The intent here is to be honest about <strong>what the chart renders</strong> rather than to claim a tested SemVer matrix that rots on every operator release.</p>
@@ -1741,6 +1741,7 @@ git push origin v&lt;X.Y.Z&gt;
 <tr><td>016</td><td><a href="#016--metrics-port-auto-exposure-on-service">Metrics port auto-exposure on Service</a></td><td>Accepted</td></tr>
 <tr><td>017</td><td><a href="#017--reloader-annotation-injection">Reloader annotation injection</a></td><td>Accepted</td></tr>
 <tr><td>018</td><td><a href="#018--testing-with-helm-unittest-and-fixtures">Testing with <code>helm-unittest</code> and fixtures</a></td><td>Accepted</td></tr>
+<tr><td>019</td><td><a href="05-adr/019-explicit-atomic-list-defaults.html">Pre-fill API-server defaults on atomic list fields</a></td><td>Accepted</td></tr>
 </tbody>
 </table>
 </div>
