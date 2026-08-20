@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-f949d0e2.js";
+            window.path_to_searchindex_js = "../searchindex-36f9f0b4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-447daa91.js"></script>
@@ -233,7 +233,7 @@
 <li><strong>K8s-native shapes stay open.</strong> <code>resources</code>, <code>affinity</code>, <code>securityContext</code>, <code>podSecurityContext</code>, <code>volumes.&lt;name&gt;</code>, <code>volumeMounts.&lt;container&gt;.&lt;mount&gt;</code>, <code>tolerations</code>, <code>topologySpreadConstraints</code> (the array of constraints), <code>livenessProbe</code> / <code>readinessProbe</code> / <code>startupProbe</code>, <code>lifecycle</code>, <code>nodeSelector</code>, <code>podAnnotations</code> — these mirror upstream Kubernetes types whose fields grow each minor release. Closing them would force-fail on values that pass <code>kubectl apply</code> on a newer cluster, which is worse than letting a typo through. Treat them as pass-through and rely on the API server to reject malformed shapes at admission time.</li>
 <li><strong>Open maps use <code>additionalProperties: &lt;object schema&gt;</code> with patternProperties on keys.</strong> Example: <code>deployments</code> (any DNS-1123 key, value must match the <code>deploymentEntry</code> schema in <code>$defs</code>).</li>
 <li><strong>Per-feature toggles use <code>if/then</code></strong> to make required fields conditional: e.g. when <code>integrations.eso.externalSecrets.&lt;name&gt;.dataFrom</code> is set, <code>secretStore</code> becomes required.</li>
-<li><strong>Keep regex sane.</strong> Port names: <code>^[a-z]([-a-z0-9]*[a-z0-9])?$</code> and <code>length(name) &lt;= 15</code>. Hostnames: standard DNS pattern. Anything more elaborate is suspect.</li>
+<li><strong>Keep regex sane.</strong> Port names: <code>^[a-z]([-a-z0-9]*[a-z0-9])?$</code> and <code>length(name) &lt;= 15</code>. Hostnames: standard DNS pattern. Anything more elaborate is suspect. Exception: hosts/hostnames, <code>parentRefs.name</code>, and the templatable ReferenceGrant fields are exempt from a DNS-pattern constraint here. See <a href="020-tpl-hostnames-and-parentrefs.html">ADR 020</a>, which evaluates them through <code>tpl</code>; a pre-render pattern would reject legitimate <code>{{ }}</code> values.</li>
 </ul>
 <h2 id="alternatives-considered"><a class="header" href="#alternatives-considered">Alternatives considered</a></h2>
 <ul>

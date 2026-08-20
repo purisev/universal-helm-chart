@@ -15,7 +15,7 @@ spec:
   source:
     repoURL: ghcr.io/purisev
     chart: universal-helm-chart
-    targetRevision: 3.0.1
+    targetRevision: 3.1.0
     helm:
       releaseName: kitchen-sink
       # Inline values would be ~250 lines here; in the single-source variant, copy the
