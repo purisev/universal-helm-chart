@@ -71,33 +71,15 @@ jobs:
           echo "any=$ANY" >> "$GITHUB_OUTPUT"
 
   # A kind cluster per suite is the most expensive thing this repository runs,
-  # and a chart that does not lint cannot pass a single one of them. These two
-  # repeat what ci.yaml checks so that the answer arrives before the clusters
-  # come up rather than beside them; every suite below waits on both.
+  # and a chart that does not lint cannot pass a single one of them, so both
+  # checks go first and every suite below waits on them. They are the same two
+  # ci.yaml runs: the chart lint through the shared lint.yaml, the version pins
+  # through the same script.
   lint:
-    name: Lint and Test
+    # Shared with ci.yaml so both check the same things. See lint.yaml.
     needs: gate
     if: needs.gate.outputs.any == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Helm
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: latest
-
-      - name: Install helm-unittest plugin
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
-
-      - name: Lint
-        run: helm lint .
-
-      - name: Template (default values)
-        run: helm template my-app .
-
-      - name: Run unit tests
-        run: helm unittest .
+    uses: ./.github/workflows/lint.yaml
 
   version-pins:
     name: Check version pins

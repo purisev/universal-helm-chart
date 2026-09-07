@@ -20,27 +20,8 @@ concurrency:
 
 jobs:
   lint-test:
-    name: Lint and Test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Set up Helm
-        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
-        with:
-          version: latest
-
-      - name: Install helm-unittest plugin
-        run: helm plugin install https://github.com/helm-unittest/helm-unittest --verify=false
-
-      - name: Lint
-        run: helm lint .
-
-      - name: Template (default values)
-        run: helm template my-app .
-
-      - name: Run unit tests
-        run: helm unittest .
+    # Shared with e2e.yaml so both check the same things. See lint.yaml.
+    uses: ./.github/workflows/lint.yaml
 
   gate:
     name: Check label-gated jobs
