@@ -12,10 +12,9 @@
 {{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
 {{- end }}
 {{- /* Standalone metrics-only Service for deployments without main service */ -}}
-{{- if and (ne (index $wl "enabled") false) $injectMetricsPort (not (and $wl.service (ne (index $wl.service "enabled") false))) }}
+{{- $metricsSvcName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+{{- if and (ne (index $wl "enabled") false) $metricsSvcName }}
 {{- $expose := $exposeJson | fromJson }}
-{{- $metricsSvcName := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) }}
-{{- include "uhc.assertNameLength" (dict "name" $metricsSvcName "kind" (printf "standalone metrics Service for workload %q" $wlName)) }}
 ---
 apiVersion: v1
 kind: Service
