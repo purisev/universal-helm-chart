@@ -43,7 +43,7 @@ jobs:
         run: helm unittest .
 
   gate:
-    name: Check security-scan / publish-preview labels
+    name: Check label-gated jobs
     # Only PRs need gating — a push to main has already been reviewed, and
     # there's no PR label to read at that point anyway.
     if: github.event_name == 'pull_request'
@@ -51,21 +51,42 @@ jobs:
     outputs:
       security-scan: ${{ steps.check.outputs.security-scan }}
       publish-preview: ${{ steps.check.outputs.publish-preview }}
+      version-pins: ${{ steps.check.outputs.version-pins }}
     steps:
       # `pre-merge` (see e2e.yaml too) is the one-label "run all the things
-      # before I merge this" shortcut — it implies both of the labels below.
+      # before I merge this" shortcut — it implies every label below.
       - name: Decide which label-gated jobs should run
         id: check
         env:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          for label in security-scan publish-preview; do
+          for label in security-scan publish-preview version-pins; do
             if jq -e --arg l "$label" 'index($l) != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$label=true" >> "$GITHUB_OUTPUT"
             else
               echo "$label=false" >> "$GITHUB_OUTPUT"
             fi
           done
+
+  version-pins:
+    name: Check version pins
+    needs: [gate]
+    # Runs unconditionally on push (main); on a PR, behind its own label or via
+    # `pre-merge`. It is a grep over docs and costs seconds, so it does not wait
+    # on lint-test the way misconfig-scan does — a forgotten version bump is
+    # worth hearing about immediately.
+    if: always() && (github.event_name != 'pull_request' || needs.gate.outputs.version-pins == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check docs against Chart.yaml
+        # base_ref is the PR's target branch and is empty on push, where
+        # ref_name is the branch being pushed. Either way the script sees the
+        # release-X.Y.Z name when there is one.
+        env:
+          TARGET_REF: ${{ github.base_ref || github.ref_name }}
+        run: bash .github/scripts/check-version-pins.sh
 
   misconfig-scan:
     name: Trivy misconfiguration scan
