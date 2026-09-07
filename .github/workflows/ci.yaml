@@ -67,6 +67,23 @@ jobs:
           TARGET_REFS: ${{ github.base_ref }} ${{ github.head_ref }} ${{ github.ref_name }}
         run: bash .github/scripts/check-version-pins.sh
 
+  examples:
+    name: Check examples render
+    # Not label-gated, for the same reason as version-pins: it is a handful of
+    # helm template runs, and an example that no longer installs is worth
+    # hearing about on every run. yq comes with the runner image.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: latest
+
+      - name: Render every example
+        run: bash .github/scripts/check-examples.sh
+
   misconfig-scan:
     name: Trivy misconfiguration scan
     needs: [lint-test, gate, version-pins]
@@ -119,16 +136,17 @@ jobs:
 
   publish-branch:
     name: Publish branch build to GHCR
-    needs: [lint-test, gate, misconfig-scan, version-pins]
+    needs: [lint-test, gate, misconfig-scan, version-pins, examples]
     runs-on: ubuntu-latest
     # Fork PRs run with packages: write stripped by GitHub, so the publish
     # step can never push to GHCR. Skip the job entirely on forks to keep
     # those runs green; the lint-test job above is fork-safe and still runs.
     # Gated by its own label (publish-preview), and only proceeds once
-    # lint-test and version-pins have actually succeeded — publishing an
-    # artifact whose version the docs disagree about is the thing the pin
-    # check exists to stop. misconfig-scan may legitimately be *skipped*
-    # (its own label wasn't set), which is fine, but must not have *failed*.
+    # lint-test, version-pins and examples have actually succeeded —
+    # publishing an artifact whose version the docs disagree about, or whose
+    # examples no longer install, is the thing those two checks exist to stop.
+    # misconfig-scan may legitimately be *skipped* (its own label wasn't set),
+    # which is fine, but must not have *failed*.
     if: |
       always() &&
       github.event_name == 'pull_request' &&
@@ -137,6 +155,7 @@ jobs:
       needs.gate.outputs.publish-preview == 'true' &&
       needs.lint-test.result == 'success' &&
       needs.version-pins.result == 'success' &&
+      needs.examples.result == 'success' &&
       needs.misconfig-scan.result != 'failure'
     permissions:
       contents: read
