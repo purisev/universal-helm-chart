@@ -1,5 +1,4 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
@@ -9,12 +8,12 @@
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
 {{- if and (ne (index $wl "enabled") false) $wl.service (ne (index $wl.service "enabled") false) }}
-{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
+{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
 {{- end }}
 {{- /* Standalone metrics-only Service for deployments without main service */ -}}
 {{- if and (ne (index $wl "enabled") false) $injectMetricsPort (not (and $wl.service (ne (index $wl.service "enabled") false))) }}
 {{- $expose := $exposeJson | fromJson }}
-{{- $metricsSvcName := printf "%s-%s-metrics" $releaseName $wlName }}
+{{- $metricsSvcName := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) }}
 {{- include "uhc.assertNameLength" (dict "name" $metricsSvcName "kind" (printf "standalone metrics Service for workload %q" $wlName)) }}
 ---
 apiVersion: v1
@@ -58,9 +57,9 @@ spec:
      rendered Service for client traffic (same shape/name as the Deployment Service),
      never merged into headlessService's spec regardless of headlessService.enabled. */ -}}
 {{- if and (ne (index $wl "enabled") false) $hsEnabled }}
-{{- include "uhc.headlessService" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName "injectMetricsPort" (and $injectMetricsPort (not $svcEnabled)) "exposeJson" $exposeJson) }}
+{{- include "uhc.headlessService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" (and $injectMetricsPort (not $svcEnabled)) "exposeJson" $exposeJson) }}
 {{- end }}
 {{- if and (ne (index $wl "enabled") false) $svcEnabled }}
-{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
+{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
 {{- end }}
 {{- end }}

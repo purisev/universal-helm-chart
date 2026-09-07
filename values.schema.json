@@ -1163,6 +1163,13 @@
     "fullnameOverride": {
       "type": "string"
     },
+    "naming": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "omitWorkloadSuffix": {"type": "boolean"}
+      }
+    },
     "priorityClassName": {
       "type": "string"
     },

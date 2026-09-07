@@ -36,6 +36,7 @@ Three-digit prefix; one decision per file.
 | 018 | [Testing with `helm-unittest` and fixtures](018-testing-with-helm-unittest.md) | Accepted |
 | 019 | [Pre-fill API-server defaults on atomic list fields](019-explicit-atomic-list-defaults.md) | Accepted |
 | 020 | [`tpl`-evaluated hostnames and parentRefs](020-tpl-hostnames-and-parentrefs.md) | Accepted |
+| 021 | [Optional single-workload naming](021-optional-single-workload-naming.md) | Accepted |
 
 ## Template
 

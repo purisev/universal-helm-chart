@@ -1,0 +1,226 @@
+suite: test naming
+templates:
+  - deployment.yaml
+  - statefulset.yaml
+  - service.yaml
+  - hpa.yaml
+  - configmap.yaml
+  - servicemonitor.yaml
+release:
+  name: myrel
+  namespace: test-ns
+
+tests:
+  - it: should suffix resource names with the workload name by default
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.api.service.enabled: true
+      deployments.api.service.port: 80
+      deployments.api.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart-api
+        template: deployment.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: api
+        template: deployment.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart-api
+        template: deployment.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart-api
+        template: service.yaml
+
+  # --- naming.omitWorkloadSuffix ---
+
+  - it: should drop the workload suffix from resource names
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.api.service.enabled: true
+      deployments.api.service.port: 80
+      deployments.api.service.targetPort: 8080
+      deployments.api.createConfigmap: true
+      deployments.api.configData.app\.conf: key = value
+      deployments.api.hpa.enabled: true
+      deployments.api.hpa.maxReplicas: 5
+      integrations.monitoring.defaults.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart
+        template: deployment.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart
+        template: service.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart
+        template: hpa.yaml
+      - equal:
+          path: spec.scaleTargetRef.name
+          value: myrel-universal-helm-chart
+        template: hpa.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart-config
+        template: configmap.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart-metrics
+        template: servicemonitor.yaml
+
+  - it: should drop the workload name from labels and selectors
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.api.service.enabled: true
+      deployments.api.service.port: 80
+      deployments.api.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: universal-helm-chart
+        template: deployment.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart
+        template: deployment.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/name"]
+          value: universal-helm-chart
+        template: deployment.yaml
+      - equal:
+          path: spec.selector.matchLabels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart
+        template: deployment.yaml
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart
+        template: deployment.yaml
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart
+        template: service.yaml
+
+  - it: should keep the container name on the workload key
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].name
+          value: api
+        template: deployment.yaml
+
+  - it: should follow nameOverride on the chart name label
+    set:
+      naming.omitWorkloadSuffix: true
+      nameOverride: shop
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: myrel-shop
+        template: deployment.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: shop
+        template: deployment.yaml
+
+  - it: should drop the workload suffix from StatefulSet and headless Service names
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+    asserts:
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart
+        template: statefulset.yaml
+      - equal:
+          path: spec.serviceName
+          value: myrel-universal-helm-chart-headless
+        template: statefulset.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart-headless
+        template: service.yaml
+
+  - it: should let service.nameOverride win over the dropped suffix
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.api.service.enabled: true
+      deployments.api.service.port: 80
+      deployments.api.service.targetPort: 8080
+      deployments.api.service.nameOverride: shop-web
+    asserts:
+      - equal:
+          path: metadata.name
+          value: shop-web
+        template: service.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart
+        template: deployment.yaml
+
+  # --- more than one workload ---
+
+  - it: should fail fast with two deployments
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.worker.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "expects exactly one enabled workload, found 2 \\(deployments.api, deployments.worker\\)"
+        template: deployment.yaml
+
+  - it: should fail fast with a deployment and a statefulSet
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      statefulSets.db.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "expects exactly one enabled workload, found 2 \\(deployments.api, statefulSets.db\\)"
+        template: statefulset.yaml
+
+  - it: should ignore disabled workloads when counting
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.worker.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 1
+        template: deployment.yaml
+      - equal:
+          path: metadata.name
+          value: myrel-universal-helm-chart
+        template: deployment.yaml

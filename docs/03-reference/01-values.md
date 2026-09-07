@@ -8,7 +8,7 @@ For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). Fo
 
 | Topic | Top-level keys | Read more |
 |-------|----------------|-----------|
-| Identity & metadata | `commonLabels`, `commonAnnotations`, `labels.standard`, `nameOverride`, `fullnameOverride` | [ADR 011](../05-adr/011-standard-wins-labels-and-invariant-selectors.md) |
+| Identity & metadata | `commonLabels`, `commonAnnotations`, `labels.standard`, `nameOverride`, `fullnameOverride`, `naming.omitWorkloadSuffix` | [ADR 011](../05-adr/011-standard-wins-labels-and-invariant-selectors.md) · [ADR 021](../05-adr/021-optional-single-workload-naming.md) |
 | Environment & config | `global.env`, `env`, `envSecrets`, `envConfigMaps`, `configMaps`, `podAnnotations`, `jobPodAnnotations` | [ADR 003](../05-adr/003-layered-inheritance-and-override.md) · [ADR 015](../05-adr/015-eso-data-vs-datafrom.md) |
 | Image & pulls | `image`, `imagePullSecrets`, `jobCompletionImage` | [`02-examples/01-minimal/`](../02-examples/01-minimal/) |
 | Deployments / StatefulSets | `deployments`, `statefulSets`, `strategy`, `statefulSetUpdateStrategy`, `revisionHistoryLimit`, `progressDeadlineSeconds`, `minReadySeconds` | [ADR 002](../05-adr/002-multi-workload-keyed-maps.md) · [`02-examples/03-statefulset-pvc/`](../02-examples/03-statefulset-pvc/) |
@@ -73,6 +73,28 @@ service:
       targetPort: 9000
       appProtocol: kubernetes.io/h2c
 ```
+
+### Dropping the workload suffix from names
+
+Every per-workload resource is named `<fullname>-<workloadName>`, and the workload name also lands in `app.kubernetes.io/name` while `app.kubernetes.io/instance` carries the full construction. A release that runs one workload can drop that suffix:
+
+```yaml
+naming:
+  omitWorkloadSuffix: true   # default: false
+```
+
+With it on, a release named `myrel` renders `myrel-universal-helm-chart` for the Deployment, the Service, the HPA, the PDB, the VPA, the ScaledObject and the NetworkPolicy, and keeps the usual trailing parts elsewhere: `-headless`, `-metrics`, `-config`. Labels and selectors follow: `app.kubernetes.io/name` becomes the chart name (`nameOverride` when set) and `app.kubernetes.io/instance` becomes `<fullname>`, which is the same pair the chart already puts on its singleton resources.
+
+Two things stay where they are. Container names keep the workload key, so `kubectl logs -c api` still works and KEDA's `envSourceContainerName` still resolves. `jobGroups` names are built from the group and job keys, not from a workload, so they are unaffected.
+
+The flag expects exactly one enabled entry across `deployments` and `statefulSets`. With more than one, `helm template` fails and names the offenders rather than collapsing them onto the same resource names:
+
+```
+naming.omitWorkloadSuffix expects exactly one enabled workload, found 2
+(deployments.api, deployments.worker).
+```
+
+Turning the flag on or off for a release that already exists renames its workload and changes an immutable selector, so the Deployment or StatefulSet is replaced rather than updated. Decide before the first install. See [ADR 021](../05-adr/021-optional-single-workload-naming.md).
 
 ### Service naming
 

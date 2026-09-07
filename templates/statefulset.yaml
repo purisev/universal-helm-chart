@@ -9,11 +9,12 @@
 {{- if and $hsOptedOut (not $hsNamed) -}}
 {{- fail (printf "statefulSets.%s: headlessService.enabled=false requires headlessService.nameOverride to point at an existing headless Service. Kubernetes rejects a StatefulSet whose spec.serviceName resolves to no Service. Set statefulSets.%s.headlessService.nameOverride to the name of the externally managed Service that provides stable per-pod DNS for these pods." $wlName $wlName) -}}
 {{- end }}
+{{- $resName := include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ $resName }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "statefulSet" "includeReloader" true "extra" ($wl.metadataAnnotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
@@ -21,7 +22,7 @@ metadata:
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 spec:
-  serviceName: {{ include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) }}
+  serviceName: {{ include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
   {{- with $wl.podManagementPolicy }}
   podManagementPolicy: {{ . }}
   {{- end }}

@@ -1,5 +1,4 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
@@ -10,7 +9,7 @@
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "vpa") }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
@@ -21,7 +20,7 @@ spec:
   targetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ $releaseName }}-{{ $wlName }}
+    name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   updatePolicy:
     updateMode: {{ $vpaSpec.updateMode | default "Initial" | quote }}
   {{- if $vpaSpec.resourcePolicy }}
@@ -41,7 +40,7 @@ spec:
 apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "vpa") }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
@@ -52,7 +51,7 @@ spec:
   targetRef:
     apiVersion: apps/v1
     kind: StatefulSet
-    name: {{ $releaseName }}-{{ $wlName }}
+    name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   updatePolicy:
     updateMode: {{ $vpaSpec.updateMode | default "Initial" | quote }}
   {{- if $vpaSpec.resourcePolicy }}

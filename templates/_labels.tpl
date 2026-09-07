@@ -26,6 +26,50 @@ If the release name already contains the chart name it is used as the full name.
 {{- end }}
 
 {{/*
+Whether constructed names drop the -<workloadName> suffix, from
+naming.omitWorkloadSuffix. A release running a single workload can carry the
+release name alone on every resource; the suffix only exists to keep several
+workloads in one release apart, so more than one enabled workload is rejected
+instead of silently collapsing them onto the same names.
+Returns "true" when the suffix is dropped, empty string otherwise.
+Params: $ctx (the dot)
+*/}}
+{{- define "uhc.omitWorkloadSuffix" -}}
+{{- if (.Values.naming | default dict).omitWorkloadSuffix -}}
+{{- $workloads := list -}}
+{{- range $name, $spec := (.Values.deployments | default dict) -}}
+  {{- if ne (index $spec "enabled") false -}}
+    {{- $workloads = append $workloads (printf "deployments.%s" $name) -}}
+  {{- end -}}
+{{- end -}}
+{{- range $name, $spec := (.Values.statefulSets | default dict) -}}
+  {{- if ne (index $spec "enabled") false -}}
+    {{- $workloads = append $workloads (printf "statefulSets.%s" $name) -}}
+  {{- end -}}
+{{- end -}}
+{{- if gt (len $workloads) 1 -}}
+{{- fail (printf "naming.omitWorkloadSuffix expects exactly one enabled workload, found %d (%s). Without the -<workloadName> suffix every one of them renders under the same resource names. Set naming.omitWorkloadSuffix: false, or keep a single deployments / statefulSets entry enabled." (len $workloads) (join ", " (sortAlpha $workloads))) -}}
+{{- end -}}
+true
+{{- end -}}
+{{- end }}
+
+{{/*
+Name of the resources belonging to one workload: <fullname>-<workloadName>, or
+<fullname> alone under naming.omitWorkloadSuffix. Every per-workload resource name
+is built from this, including the -headless / -metrics / -config variants.
+Params: dict "ctx" $ctx "wlName" $wlName
+*/}}
+{{- define "uhc.workloadResourceName" -}}
+{{- $fullName := include "uhc.fullname" .ctx -}}
+{{- if eq (include "uhc.omitWorkloadSuffix" .ctx) "true" -}}
+{{- $fullName -}}
+{{- else -}}
+{{- printf "%s-%s" $fullName .wlName -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Common labels for chart-level singleton resources (ServiceAccount, Ingress, RBAC, etc.).
 Honors labels.standard.{enabled,partOf,name,instance,version,managedBy} toggles and merges
 .Values.commonLabels with standard-wins precedence (chart-managed app.kubernetes.io/* labels
@@ -63,11 +107,15 @@ Params: dict "ctx" $ctx "workloadName" $wlName
 {{- $ctx := .ctx -}}
 {{- $wlName := .workloadName -}}
 {{- $fullName := include "uhc.fullname" $ctx -}}
-{{- $instance := printf "%s-%s" $fullName $wlName -}}
+{{- $instance := include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) -}}
+{{- $nameLabel := $wlName -}}
+{{- if eq (include "uhc.omitWorkloadSuffix" $ctx) "true" -}}
+{{- $nameLabel = include "uhc.name" $ctx -}}
+{{- end -}}
 {{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "label app.kubernetes.io/instance for workload %q" $wlName)) -}}
 {{- $std := $ctx.Values.labels.standard | default dict -}}
 {{- $stdLabels := dict -}}
-{{- $_ := set $stdLabels "app.kubernetes.io/name" $wlName -}}
+{{- $_ := set $stdLabels "app.kubernetes.io/name" $nameLabel -}}
 {{- $_ := set $stdLabels "app.kubernetes.io/instance" $instance -}}
 {{- if $std.enabled -}}
   {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" $fullName -}}{{- end -}}
@@ -86,10 +134,13 @@ workload resources, so they must NEVER be affected by user toggles or commonLabe
 Params: dict "ctx" $ctx "workloadName" $wlName
 */}}
 {{- define "uhc.workloadSelectorLabels" -}}
-{{- $fullName := include "uhc.fullname" .ctx -}}
-{{- $instance := printf "%s-%s" $fullName .workloadName -}}
+{{- $instance := include "uhc.workloadResourceName" (dict "ctx" .ctx "wlName" .workloadName) -}}
+{{- $nameLabel := .workloadName -}}
+{{- if eq (include "uhc.omitWorkloadSuffix" .ctx) "true" -}}
+{{- $nameLabel = include "uhc.name" .ctx -}}
+{{- end -}}
 {{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "selector label app.kubernetes.io/instance for workload %q" .workloadName)) -}}
-app.kubernetes.io/name: {{ .workloadName }}
+app.kubernetes.io/name: {{ $nameLabel }}
 app.kubernetes.io/instance: {{ $instance }}
 {{- end }}
 
