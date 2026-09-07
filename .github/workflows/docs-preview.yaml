@@ -4,6 +4,11 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, closed]
 
+# Default for every job in this workflow. A job that needs more declares its
+# own permissions block, which replaces this one rather than adding to it.
+permissions:
+  contents: read
+
 concurrency:
   group: docs-preview-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -40,7 +45,7 @@ jobs:
       contents: write # to push the preview to gh-pages
       pull-requests: write # for the sticky preview-link comment
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Install mdbook
         if: github.event.action != 'closed'

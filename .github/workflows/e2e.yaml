@@ -7,6 +7,11 @@ on:
     types: [labeled, synchronize]
   workflow_dispatch: {}
 
+# Default for every job in this workflow. A job that needs more declares its
+# own permissions block, which replaces this one rather than adding to it.
+permissions:
+  contents: read
+
 # Every label add (and every push once at least one e2e label is already
 # present) triggers a fresh run; without this, rapid successive label
 # additions pile up concurrent, resource-heavy kind-cluster runs instead of
@@ -65,21 +70,21 @@ jobs:
     env:
       NAMESPACE: e2e-core-workloads
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-core-workloads
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -127,21 +132,21 @@ jobs:
     env:
       NAMESPACE: e2e-jobs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-jobs
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -194,21 +199,21 @@ jobs:
     env:
       NAMESPACE: e2e-autoscaling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-autoscaling
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -291,21 +296,21 @@ jobs:
     env:
       NAMESPACE: e2e-gateway-ingress
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-gateway-ingress
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -430,21 +435,21 @@ jobs:
     env:
       NAMESPACE: e2e-secrets-config
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-secrets-config
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -571,21 +576,21 @@ jobs:
     env:
       NAMESPACE: e2e-observability
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-observability
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -688,21 +693,21 @@ jobs:
     env:
       NAMESPACE: e2e-network-policy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster (no default CNI)
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/network-policy.yaml
           cluster_name: e2e-network-policy
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 
@@ -756,23 +761,23 @@ jobs:
     env:
       NAMESPACE: e2e-argocd
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4.3.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # v1.14.0
         with:
           config: test/e2e/kind/argocd.yaml
           cluster_name: e2e-argocd
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@6ab03ccb2c8309b5f494fcbc78ec3a2d80cfabee # v0.1.0
         with:
           release: v0.2.15
 

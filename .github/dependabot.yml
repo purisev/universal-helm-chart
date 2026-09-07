@@ -1,0 +1,23 @@
+version: 2
+
+updates:
+  # Workflow actions are pinned by commit SHA, which is what stops a moved tag
+  # from running unreviewed code in CI. The cost of pinning is that nothing
+  # updates on its own, so Dependabot proposes the bumps instead and keeps the
+  # trailing "# vX.Y.Z" comment in step with the SHA.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # One PR a week for all of them; twelve separate bump PRs is noise on a
+    # repository this size.
+    groups:
+      actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: chore
+      include: scope
+    labels:
+      - dependencies
