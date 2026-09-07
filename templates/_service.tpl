@@ -89,8 +89,12 @@ Emits the leading "---" document separator itself.
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($svc.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
-{{- if and (not $svc.ports) (not $svc.port) (not $svc.targetPort) (not .injectMetricsPort) }}
-{{- fail (printf "Service for workload %q declares no port. Set service.ports.<name>.port for the map form, or service.port / service.targetPort for the single-port form. Unlike headlessService, a client-facing Service has no port to fall back on." $wlName) }}
+{{- $hasPorts := or $svc.ports $svc.port $svc.targetPort .injectMetricsPort }}
+{{- /* ExternalName resolves to a DNS name and carries no virtual IP, so Kubernetes
+     treats its ports as optional and ignores them. Every other type needs at least one:
+     unlike headlessService, a client-facing Service has no port to fall back on. */ -}}
+{{- if and (not $hasPorts) (ne ($svc.type | default "ClusterIP") "ExternalName") }}
+{{- fail (printf "Service for workload %q declares no port. Set service.ports.<name>.port for the map form, or service.port / service.targetPort for the single-port form." $wlName) }}
 {{- end }}
 ---
 apiVersion: v1
@@ -161,6 +165,7 @@ spec:
   {{- if hasKey $svc "publishNotReadyAddresses" }}
   publishNotReadyAddresses: {{ $svc.publishNotReadyAddresses }}
   {{- end }}
+  {{- if $hasPorts }}
   ports:
     {{- if $svc.ports }}
     {{- range $pName := include "uhc.orderedPortNames" $svc.ports | fromJsonArray }}
@@ -189,6 +194,7 @@ spec:
       targetPort: {{ $expose.targetPort }}
       protocol: TCP
     {{- end }}
+  {{- end }}
   selector:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 {{- end }}

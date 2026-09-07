@@ -1,6 +1,21 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
+Fail fast when a Service targetPort that becomes a containerPort is a port name rather
+than a number. Service.targetPort accepts either, but ContainerPort.containerPort is an
+int32, so a name renders a container the API server rejects. The workload's own `ports`
+map replaces the Service-derived container ports entirely, which is where a named
+targetPort belongs.
+Params: dict "value" $v "containerName" $n "source" "<values path>" "portName" $pName
+*/}}
+{{- define "uhc.assertNumericContainerPort" -}}
+{{- $value := .value -}}
+{{- if not (regexMatch "^[0-9]+$" (toString $value)) -}}
+{{- fail (printf "container %q: %s is %q, a port name rather than a number, and containerPort has to be numeric. Declare the port on the workload itself (ports.%s.containerPort: <number>) — that replaces the Service-derived container ports and leaves the Service free to keep referring to it by name." .containerName .source (toString $value) .portName) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Reusable container spec: image, command/args, env, envFrom, ports, probes, resources,
 securityContext, volumeMounts.
 Params:
@@ -88,6 +103,11 @@ Output at zero indent; caller controls nindent.
   {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
   {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
   {{- $hasMetricsPortAlready := or (and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics")) (hasKey ($wl.ports | default dict) "metrics") -}}
+  {{- /* Container ports derived from the Service. Each targetPort falls back to its own
+     port the same way uhc.plainService resolves it, so the container spec names the port
+     the Service actually sends traffic to. A Service carrying no port at all (ExternalName,
+     or a workload whose only port is the injected metrics one) contributes nothing here. */ -}}
+  {{- $svcDerived := and $wl.service $wl.service.enabled (or $wl.service.ports $wl.service.targetPort $wl.service.port) -}}
   {{- if and .renderDirectPorts $wl.ports }}
   ports:
     {{- range $pName := include "uhc.orderedPortNames" $wl.ports | fromJsonArray }}
@@ -101,19 +121,23 @@ Output at zero indent; caller controls nindent.
       containerPort: {{ $expose.targetPort }}
       protocol: TCP
     {{- end }}
-  {{- else if or (and $wl.service $wl.service.enabled) $addMetricsPort }}
+  {{- else if or $svcDerived (and $addMetricsPort (not $hasMetricsPortAlready)) }}
   ports:
-    {{- if and $wl.service $wl.service.enabled }}
+    {{- if $svcDerived }}
     {{- if $wl.service.ports }}
     {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
     {{- $p := index $wl.service.ports $pName }}
+    {{- $target := $p.targetPort | default $p.port }}
+    {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" (printf "service.ports.%s.targetPort" $pName) "portName" $pName) }}
     - name: {{ $pName }}
-      containerPort: {{ $p.targetPort }}
+      containerPort: {{ $target }}
       protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
-    {{- else if or $wl.service.targetPort $wl.service.port }}
+    {{- else }}
+    {{- $target := $wl.service.targetPort | default $wl.service.port }}
+    {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" "service.targetPort" "portName" "http") }}
     - name: http
-      containerPort: {{ $wl.service.targetPort | default $wl.service.port }}
+      containerPort: {{ $target }}
       protocol: TCP
     {{- end }}
     {{- end }}
