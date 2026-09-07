@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-cc061e0b.js";
+            window.path_to_searchindex_js = "../searchindex-adf42f9a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -190,6 +190,10 @@
 <li>the workflow is triggered manually (<code>workflow_dispatch</code>) — runs every job.</li>
 </ul>
 <p>A <code>gate</code> job reads the PR’s labels and sets one boolean output per job; every <code>e2e-*</code> job is <code>if: needs.gate.outputs.&lt;job&gt; == 'true'</code>. Label a PR with the narrowest <code>e2e:&lt;job&gt;</code> that covers what you changed — not the blanket <code>e2e</code> label — so CI time stays proportional to the change.</p>
+<h2 id="linting-runs-first"><a class="header" href="#linting-runs-first">Linting runs first</a></h2>
+<p>Once the gate decides at least one suite should run, two preflight jobs go ahead of it: <code>Lint and Test</code> (<code>helm lint</code>, <code>helm template</code>, <code>helm unittest</code>) and <code>Check version pins</code>. Every <code>e2e-*</code> job waits on both, so a chart that does not lint, or a version the docs disagree about, never reaches a kind cluster — fix the lint first, then the suites run on something that can plausibly pass.</p>
+<p>Both are the same checks <code>ci.yaml</code> runs, not copies of them. The chart lint lives in <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/lint.yaml"><code>lint.yaml</code></a>, a <code>workflow_call</code> workflow both files invoke, and the version check is <code>.github/scripts/check-version-pins.sh</code> in both. Add a check to <code>lint.yaml</code> and it guards the e2e suites too.</p>
+<p>They are skipped along with everything else when the gate enables no suite, so a PR that never asked for e2e pays nothing.</p>
 <h2 id="the-jobs"><a class="header" href="#the-jobs">The jobs</a></h2>
 <div class="table-wrapper">
 <table>
