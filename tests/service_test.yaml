@@ -932,6 +932,21 @@ tests:
           path: metadata.name
           value: shared-svc
 
+  - it: should fail fast when an override collides with a metrics-only Service name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      deployments.a.enabled: true
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: test-release-universal-helm-chart-a-metrics
+    asserts:
+      - failedTemplate:
+          errorPattern: "is claimed by both deployments.a.metrics.exposeService and deployments.b.service"
+
   # --- a Service needs a port ---
 
   - it: should fail fast when an enabled service declares no port

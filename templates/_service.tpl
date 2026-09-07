@@ -30,16 +30,39 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
 {{- end }}
 
 {{/*
+Resolves the name of the metrics-only Service the chart renders for a workload that
+exposes a metrics port but has no Service of its own. Returns "" when no such Service
+is rendered — the workload already has a Service to carry the port, or nothing exposes
+one. Both the renderer and uhc.assertUniqueServiceNames resolve the name through here,
+so the two cannot disagree about which workloads claim it.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
+*/}}
+{{- define "uhc.metricsOnlyServiceName" -}}
+{{- $ctx := .ctx -}}
+{{- $wl := .wl -}}
+{{- $wlName := .wlName -}}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
+{{- $svcEnabled := and $wl.service (ne (index $wl.service "enabled") false) -}}
+{{- if and $exposeJson (ne $metricsType "pod") (not $svcEnabled) -}}
+{{- $name := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) -}}
+{{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "standalone metrics Service for workload %q" $wlName)) -}}
+{{- $name -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Fail fast when two workloads resolve to the same Service name. Defaults never collide,
 so a duplicate always comes from service.nameOverride or headlessService.nameOverride
 (or the older serviceName spelling) — and it renders two Service documents under one
 name, which Kubernetes rejects on apply and a server-side-apply controller turns into
 two owners fighting over one object's selector.
 
-Covers the names a values file can set: each workload's own Service and, for
-StatefulSets, the governing headless Service while the chart renders it. A headless
-name under headlessService.enabled: false points at a Service the chart does not
-render, so it is left out.
+Covers every Service name the chart puts on the cluster: each workload's own Service,
+the metrics-only Service a Deployment gets when it exposes metrics without a Service of
+its own, and, for StatefulSets, the governing headless Service while the chart renders
+it. A headless name under headlessService.enabled: false points at a Service the chart
+does not render, so it is left out.
 Params: $ctx (the dot)
 */}}
 {{- define "uhc.assertUniqueServiceNames" -}}
@@ -53,6 +76,12 @@ Params: $ctx (the dot)
       {{- $claims := dict -}}
       {{- if and $wl.service (ne (index $wl.service "enabled") false) -}}
         {{- $_ := set $claims (include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName)) (printf "%s.%s.service" $kind $wlName) -}}
+      {{- end -}}
+      {{- if eq $kind "deployments" -}}
+        {{- $metricsName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) -}}
+        {{- if $metricsName -}}
+          {{- $_ := set $claims $metricsName (printf "%s.%s.metrics.exposeService" $kind $wlName) -}}
+        {{- end -}}
       {{- end -}}
       {{- if and (eq $kind "statefulSets") (ne (index ($wl.headlessService | default dict) "enabled") false) -}}
         {{- $hsName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) -}}

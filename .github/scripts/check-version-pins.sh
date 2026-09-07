@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 #
 # Every place the docs pin this chart's version has to name the version in
-# Chart.yaml. The pins live in Argo CD Applications (targetRevision), Flux
-# OCIRepositories (tag), helm install scripts (--version), schema URLs and a
-# few sentences of prose, so this matches on the version itself rather than on
-# the key in front of it: any X.Y.Z sharing a major with Chart.yaml, with or
-# without a leading v.
+# Chart.yaml. Two passes find those places, and their results are merged:
+#
+#   1. By context, at any major: Argo CD `targetRevision`, `helm ... --version`,
+#      a version segment in a universal-helm-chart URL, and `tag` in a Flux
+#      OCIRepository (the only file where `tag` names the chart rather than a
+#      container image). These stay visible across a major bump, when nothing
+#      left in the docs shares Chart.yaml's major any more.
+#   2. By version, at Chart.yaml's own major: any X.Y.Z, with or without a
+#      leading v. This catches prose naming the version with no key in front of
+#      it — and only within the major, so a major bump is the one release where
+#      the prose is worth a manual look.
 #
 # Historical records are excluded, because naming an older version is their job:
 # the migration guide and the ADRs.
@@ -51,13 +57,32 @@ done
 
 # --- the docs against Chart.yaml -------------------------------------------
 
-matches=$(grep -rnoE "v?${major}\.[0-9]+\.[0-9]+" README.md docs \
+semver='v?[0-9]+\.[0-9]+\.[0-9]+'
+
+by_context=$(grep -rnoE "(targetRevision:|--version)[[:space:]=]+\"?${semver}|universal-helm-chart/${semver}" README.md docs \
   --exclude-dir=05-adr \
   --exclude=04-migration.md || true)
 
-stale=$(printf '%s' "${matches}" | awk -F: -v want="${chart_version}" '
+by_context_flux=$(grep -rnoE "tag:[[:space:]]*\"?${semver}" README.md docs \
+  --include=ocirepository.yaml \
+  --exclude-dir=05-adr || true)
+
+by_major=$(grep -rnoE "v?${major}\.[0-9]+\.[0-9]+" README.md docs \
+  --exclude-dir=05-adr \
+  --exclude=04-migration.md || true)
+
+# Every match ends with the version it found, so the tail of the match is the
+# version and the head of the line is file:line. A line found by more than one
+# pass is reported once, under the match that names the key it sits behind.
+stale=$(printf '%s\n%s\n%s\n' "${by_context}" "${by_context_flux}" "${by_major}" | awk -v want="${chart_version}" '
   NF == 0 { next }
-  { found = $NF; sub(/^v/, "", found); if (found != want) print }')
+  {
+    if (!match($0, /[0-9]+\.[0-9]+\.[0-9]+$/)) next
+    found = substr($0, RSTART, RLENGTH)
+    split($0, loc, ":")
+    if (found == want || seen[loc[1] ":" loc[2] ":" found]++) next
+    print
+  }')
 
 if [[ -n "${stale}" ]]; then
   count=$(printf '%s\n' "${stale}" | wc -l | tr -d ' ')
@@ -66,8 +91,9 @@ if [[ -n "${stale}" ]]; then
   printf '%s\n' "${stale}" | sed 's/^/  /'
   echo
   echo "Update them to ${chart_version}. A version that belongs to something else"
-  echo "(a dependency, an image tag) should not share this chart's major, and a"
-  echo "historical mention belongs in the migration guide or an ADR, both skipped."
+  echo "(a dependency, an image tag) should sit outside a chart pin and should not"
+  echo "share this chart's major, and a historical mention belongs in the migration"
+  echo "guide or an ADR, both skipped."
   status=1
 fi
 
