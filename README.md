@@ -18,7 +18,7 @@ Published as an OCI artifact at `oci://ghcr.io/purisev/universal-helm-chart`.
 ```bash
 helm upgrade --install my-app \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.1.0 \
+  --version 3.2.0 \
   -f values.yaml
 ```
 
