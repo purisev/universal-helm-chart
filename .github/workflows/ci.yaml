@@ -67,11 +67,12 @@ jobs:
 
   misconfig-scan:
     name: Trivy misconfiguration scan
-    needs: [lint-test, gate]
+    needs: [lint-test, gate, version-pins]
     # Runs unconditionally on push (main); on a PR, only with the
     # security-scan label — trivy-action's own container-image download is
-    # slow enough that it's not worth paying on every PR.
-    if: always() && needs.lint-test.result == 'success' && (github.event_name != 'pull_request' || needs.gate.outputs.security-scan == 'true')
+    # slow enough that it's not worth paying on every PR, and it is not worth
+    # paying at all on a chart the linters have already rejected.
+    if: always() && needs.lint-test.result == 'success' && needs.version-pins.result == 'success' && (github.event_name != 'pull_request' || needs.gate.outputs.security-scan == 'true')
     runs-on: ubuntu-latest
     permissions:
       contents: read
