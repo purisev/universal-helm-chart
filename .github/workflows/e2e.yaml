@@ -34,6 +34,7 @@ jobs:
       observability: ${{ steps.check.outputs.observability }}
       network-policy: ${{ steps.check.outputs.network-policy }}
       argocd: ${{ steps.check.outputs.argocd }}
+      any: ${{ steps.check.outputs.any }}
     steps:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
       # `pre-merge` (see ci.yaml) also runs everything — it's the
@@ -54,17 +55,48 @@ jobs:
             FULL=true
           fi
 
+          ANY=false
           for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy argocd; do
             if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$job=true" >> "$GITHUB_OUTPUT"
+              ANY=true
             else
               echo "$job=false" >> "$GITHUB_OUTPUT"
             fi
           done
 
+          # Whether anything below this gate will run at all. The workflow fires
+          # on every `synchronize`, so most runs enable no job and should not
+          # pay for the preflight either.
+          echo "any=$ANY" >> "$GITHUB_OUTPUT"
+
+  # A kind cluster per suite is the most expensive thing this repository runs,
+  # and a chart that does not lint cannot pass a single one of them, so both
+  # checks go first and every suite below waits on them. They are the same two
+  # ci.yaml runs: the chart lint through the shared lint.yaml, the version pins
+  # through the same script.
+  lint:
+    # Shared with ci.yaml so both check the same things. See lint.yaml.
+    needs: gate
+    if: needs.gate.outputs.any == 'true'
+    uses: ./.github/workflows/lint.yaml
+
+  version-pins:
+    name: Check version pins
+    needs: gate
+    if: needs.gate.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check docs against Chart.yaml
+        env:
+          TARGET_REF: ${{ github.base_ref || github.ref_name }}
+        run: bash .github/scripts/check-version-pins.sh
+
   e2e-core-workloads:
     name: E2E / core workloads
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.core-workloads == 'true'
     runs-on: ubuntu-latest
     env:
@@ -126,7 +158,7 @@ jobs:
 
   e2e-jobs:
     name: E2E / jobs
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.jobs == 'true'
     runs-on: ubuntu-latest
     env:
@@ -193,7 +225,7 @@ jobs:
 
   e2e-autoscaling:
     name: E2E / autoscaling
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.autoscaling == 'true'
     runs-on: ubuntu-latest
     env:
@@ -290,7 +322,7 @@ jobs:
 
   e2e-gateway-ingress:
     name: E2E / gateway ingress
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.gateway-ingress == 'true'
     runs-on: ubuntu-latest
     env:
@@ -429,7 +461,7 @@ jobs:
 
   e2e-secrets-config:
     name: E2E / secrets config
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.secrets-config == 'true'
     runs-on: ubuntu-latest
     env:
@@ -566,7 +598,7 @@ jobs:
 
   e2e-observability:
     name: E2E / observability (${{ matrix.provider }})
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.observability == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -687,7 +719,7 @@ jobs:
 
   e2e-network-policy:
     name: E2E / network policy
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.network-policy == 'true'
     runs-on: ubuntu-latest
     env:
@@ -755,7 +787,7 @@ jobs:
 
   e2e-argocd:
     name: E2E / argocd
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.argocd == 'true'
     runs-on: ubuntu-latest
     env:

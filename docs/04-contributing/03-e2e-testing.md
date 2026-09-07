@@ -12,6 +12,14 @@ Standing up a dozen controllers per push would be slow and wasteful. `.github/wo
 
 A `gate` job reads the PR's labels and sets one boolean output per job; every `e2e-*` job is `if: needs.gate.outputs.<job> == 'true'`. Label a PR with the narrowest `e2e:<job>` that covers what you changed — not the blanket `e2e` label — so CI time stays proportional to the change.
 
+## Linting runs first
+
+Once the gate decides at least one suite should run, two preflight jobs go ahead of it: `Lint and Test` (`helm lint`, `helm template`, `helm unittest`) and `Check version pins`. Every `e2e-*` job waits on both, so a chart that does not lint, or a version the docs disagree about, never reaches a kind cluster — fix the lint first, then the suites run on something that can plausibly pass.
+
+Both are the same checks `ci.yaml` runs, not copies of them. The chart lint lives in [`lint.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/lint.yaml), a `workflow_call` workflow both files invoke, and the version check is `.github/scripts/check-version-pins.sh` in both. Add a check to `lint.yaml` and it guards the e2e suites too.
+
+They are skipped along with everything else when the gate enables no suite, so a PR that never asked for e2e pays nothing.
+
 ## The jobs
 
 | Job | Label | Covers |
