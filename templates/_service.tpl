@@ -89,6 +89,9 @@ Emits the leading "---" document separator itself.
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($svc.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+{{- if and (not $svc.ports) (not $svc.port) (not $svc.targetPort) (not .injectMetricsPort) }}
+{{- fail (printf "Service for workload %q declares no port. Set service.ports.<name>.port for the map form, or service.port / service.targetPort for the single-port form. Unlike headlessService, a client-facing Service has no port to fall back on." $wlName) }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -170,7 +173,7 @@ spec:
       appProtocol: {{ . }}
       {{- end }}
     {{- end }}
-    {{- else }}
+    {{- else if or $svc.port $svc.targetPort }}
     - port: {{ $svc.port | default $svc.targetPort }}
       targetPort: {{ $svc.targetPort | default $svc.port }}
       protocol: TCP

@@ -772,3 +772,15 @@ tests:
     asserts:
       - hasDocuments:
           count: 2
+
+  - it: should fall back to service.port for containerPort when targetPort is absent
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 6379

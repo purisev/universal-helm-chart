@@ -111,9 +111,9 @@ Output at zero indent; caller controls nindent.
       containerPort: {{ $p.targetPort }}
       protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
-    {{- else }}
+    {{- else if or $wl.service.targetPort $wl.service.port }}
     - name: http
-      containerPort: {{ $wl.service.targetPort }}
+      containerPort: {{ $wl.service.targetPort | default $wl.service.port }}
       protocol: TCP
     {{- end }}
     {{- end }}
