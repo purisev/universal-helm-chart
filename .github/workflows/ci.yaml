@@ -20,8 +20,13 @@ concurrency:
 
 jobs:
   lint-test:
-    # Shared with e2e.yaml so both check the same things. See lint.yaml.
-    uses: ./.github/workflows/lint.yaml
+    name: Lint and Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Shared with e2e.yaml so both check the same things.
+      - uses: ./.github/actions/lint-chart
 
   gate:
     name: Check label-gated jobs

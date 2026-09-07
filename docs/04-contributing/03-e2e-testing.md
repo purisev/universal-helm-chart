@@ -16,7 +16,7 @@ A `gate` job reads the PR's labels and sets one boolean output per job; every `e
 
 Once the gate decides at least one suite should run, two preflight jobs go ahead of it: `Lint and Test` (`helm lint`, `helm template`, `helm unittest`) and `Check version pins`. Every `e2e-*` job waits on both, so a chart that does not lint, or a version the docs disagree about, never reaches a kind cluster — fix the lint first, then the suites run on something that can plausibly pass.
 
-Both are the same checks `ci.yaml` runs, not copies of them. The chart lint lives in [`lint.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/lint.yaml), a `workflow_call` workflow both files invoke, and the version check is `.github/scripts/check-version-pins.sh` in both. Add a check to `lint.yaml` and it guards the e2e suites too.
+Both are the same checks `ci.yaml` runs, not copies of them. The chart lint lives in [`.github/actions/lint-chart`](https://github.com/purisev/universal-helm-chart/blob/main/.github/actions/lint-chart/action.yml), a composite action both files invoke, and the version check is `.github/scripts/check-version-pins.sh` in both. Add a step to the action and it guards the e2e suites too. Running the steps inside the calling job rather than through a reusable workflow keeps the status check named `Lint and Test`, which is the name branch protection requires.
 
 They are skipped along with everything else when the gate enables no suite, so a PR that never asked for e2e pays nothing.
 

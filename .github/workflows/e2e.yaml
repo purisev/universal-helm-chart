@@ -73,13 +73,18 @@ jobs:
   # A kind cluster per suite is the most expensive thing this repository runs,
   # and a chart that does not lint cannot pass a single one of them, so both
   # checks go first and every suite below waits on them. They are the same two
-  # ci.yaml runs: the chart lint through the shared lint.yaml, the version pins
-  # through the same script.
+  # ci.yaml runs: the chart lint through the shared composite action, the
+  # version pins through the same script.
   lint:
-    # Shared with ci.yaml so both check the same things. See lint.yaml.
+    name: Lint and Test
     needs: gate
     if: needs.gate.outputs.any == 'true'
-    uses: ./.github/workflows/lint.yaml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Shared with ci.yaml so both check the same things.
+      - uses: ./.github/actions/lint-chart
 
   version-pins:
     name: Check version pins
