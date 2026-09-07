@@ -38,6 +38,14 @@ jobs:
       - name: Run unit tests
         run: helm unittest .
 
+      - name: Check version pins
+        # The tag is the version this artifact will be published under, so
+        # Chart.yaml has to agree with it, and the docs have to agree with
+        # Chart.yaml. Cheaper to stop here than to unpublish from GHCR.
+        env:
+          TARGET_REF: ${{ github.ref_name }}
+        run: bash .github/scripts/check-version-pins.sh
+
       - name: Log in to GHCR
         env:
           GHCR_ACTOR: ${{ github.actor }}

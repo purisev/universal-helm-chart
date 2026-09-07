@@ -6,13 +6,13 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 
 1. **Check `Chart.yaml`.** The `version` field is pinned to the in-flight release line and must already match the version you want to publish — don't bump per-PR.
 
-   The `version-pins` CI job checks this for you, and checks that the version in `Chart.yaml` is also the one every Argo CD `targetRevision`, Flux `tag`, `helm install --version` and schema URL under `docs/` names. On a `release-X.Y.Z` branch it additionally holds `Chart.yaml` to the version the branch name promises. Run it locally with:
+   The `version-pins` CI job checks this for you, and checks that the version in `Chart.yaml` is also the one every Argo CD `targetRevision`, Flux `tag`, `helm install --version` and schema URL under `docs/` names. Given a ref that names a version — a `release-X.Y.Z` branch or a `vX.Y.Z` tag — it additionally holds `Chart.yaml` to that version. Run it locally with:
 
    ```bash
    TARGET_REF=release-<X.Y.Z> bash .github/scripts/check-version-pins.sh
    ```
 
-   It is label-gated on PRs (`version-pins`, or `pre-merge`) and runs on every push to `main`. The migration guide and the ADRs are skipped, since naming older versions is what they are for.
+   It runs on every CI run, and the branch preview build in `ci.yaml` will not publish while it is red. `release.yaml` runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.
 
 2. **Tag and push** from the matching release branch:
 
@@ -22,7 +22,7 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
    git push origin v<X.Y.Z>
    ```
 
-3. **CI takes over.** [`release.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, packages the chart, pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`), and signs it keylessly via [Sigstore/cosign](https://docs.sigstore.dev/) — no key management, the signature is tied to this repo's GitHub Actions OIDC identity.
+3. **CI takes over.** [`release.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, checks the tag against `Chart.yaml` and the docs, packages the chart, pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`), and signs it keylessly via [Sigstore/cosign](https://docs.sigstore.dev/) — no key management, the signature is tied to this repo's GitHub Actions OIDC identity.
 4. **Verify the artifact:**
 
    ```bash

@@ -32,7 +32,6 @@ jobs:
     outputs:
       security-scan: ${{ steps.check.outputs.security-scan }}
       publish-preview: ${{ steps.check.outputs.publish-preview }}
-      version-pins: ${{ steps.check.outputs.version-pins }}
     steps:
       # `pre-merge` (see e2e.yaml too) is the one-label "run all the things
       # before I merge this" shortcut — it implies every label below.
@@ -41,7 +40,7 @@ jobs:
         env:
           LABELS_JSON: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          for label in security-scan publish-preview version-pins; do
+          for label in security-scan publish-preview; do
             if jq -e --arg l "$label" 'index($l) != null or index("pre-merge") != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$label=true" >> "$GITHUB_OUTPUT"
             else
@@ -51,12 +50,9 @@ jobs:
 
   version-pins:
     name: Check version pins
-    needs: [gate]
-    # Runs unconditionally on push (main); on a PR, behind its own label or via
-    # `pre-merge`. It is a grep over docs and costs seconds, so it does not wait
-    # on lint-test the way misconfig-scan does — a forgotten version bump is
-    # worth hearing about immediately.
-    if: always() && (github.event_name != 'pull_request' || needs.gate.outputs.version-pins == 'true')
+    # Not label-gated and waiting on nothing: it is a grep over docs, and a
+    # forgotten version bump is worth hearing about on every run rather than
+    # only on the runs someone remembered to label.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -120,15 +116,16 @@ jobs:
 
   publish-branch:
     name: Publish branch build to GHCR
-    needs: [lint-test, gate, misconfig-scan]
+    needs: [lint-test, gate, misconfig-scan, version-pins]
     runs-on: ubuntu-latest
     # Fork PRs run with packages: write stripped by GitHub, so the publish
     # step can never push to GHCR. Skip the job entirely on forks to keep
     # those runs green; the lint-test job above is fork-safe and still runs.
     # Gated by its own label (publish-preview), and only proceeds once
-    # lint-test has actually succeeded — misconfig-scan may legitimately
-    # be *skipped* (its own label wasn't set), which is fine, but must not
-    # have *failed*.
+    # lint-test and version-pins have actually succeeded — publishing an
+    # artifact whose version the docs disagree about is the thing the pin
+    # check exists to stop. misconfig-scan may legitimately be *skipped*
+    # (its own label wasn't set), which is fine, but must not have *failed*.
     if: |
       always() &&
       github.event_name == 'pull_request' &&
@@ -136,6 +133,7 @@ jobs:
       !github.event.pull_request.head.repo.fork &&
       needs.gate.outputs.publish-preview == 'true' &&
       needs.lint-test.result == 'success' &&
+      needs.version-pins.result == 'success' &&
       needs.misconfig-scan.result != 'failure'
     permissions:
       contents: read

@@ -10,12 +10,15 @@
 # Historical records are excluded, because naming an older version is their job:
 # the migration guide and the ADRs.
 #
-# On a release-X.Y.Z branch it also holds Chart.yaml to the version the branch
-# name promises, which is the bump that is easy to forget until after the tag.
+# It also holds Chart.yaml to the version its ref names, on a release-X.Y.Z
+# branch and on a vX.Y.Z tag. The branch catches the forgotten bump before the
+# tag; the tag catches it before the artifact reaches GHCR under a version that
+# is not the one inside it.
 #
 # Run it the same way CI does:
 #   bash .github/scripts/check-version-pins.sh
 #   TARGET_REF=release-3.2.0 bash .github/scripts/check-version-pins.sh
+#   TARGET_REF=v3.2.0 bash .github/scripts/check-version-pins.sh
 
 set -euo pipefail
 
@@ -30,14 +33,14 @@ major=${chart_version%%.*}
 
 status=0
 
-# --- the branch name against Chart.yaml ------------------------------------
+# --- the ref name against Chart.yaml ---------------------------------------
 
 target_ref=${TARGET_REF:-}
-if [[ "${target_ref}" =~ ^release-([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-  branch_version=${BASH_REMATCH[1]}
-  if [[ "${chart_version}" != "${branch_version}" ]]; then
-    echo "Chart.yaml is on ${chart_version}, but the release branch is ${target_ref}."
-    echo "Set 'version: ${branch_version}' in Chart.yaml before tagging."
+if [[ "${target_ref}" =~ ^(release-|v)([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+  ref_version=${BASH_REMATCH[2]}
+  if [[ "${chart_version}" != "${ref_version}" ]]; then
+    echo "Chart.yaml is on ${chart_version}, but ${target_ref} calls for ${ref_version}."
+    echo "Set 'version: ${ref_version}' in Chart.yaml."
     echo
     status=1
   fi
