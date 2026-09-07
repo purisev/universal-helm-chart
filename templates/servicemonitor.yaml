@@ -1,5 +1,4 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
 {{- $defaults := $ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $allWorkloads := include "uhc.serviceWorkloads" $ctx | fromJson -}}
 {{- range $wlName := keys $allWorkloads | sortAlpha }}
@@ -12,7 +11,7 @@
 {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
 {{- $hasService := or (and $wl.service $wl.service.enabled) (ne $exposeJson "") -}}
 {{- if and $hasService $metricsEnabled (ne $metricsType "pod") (ne $discovery "annotations") }}
-{{- $smName := printf "%s-%s-metrics" $releaseName $wlName }}
+{{- $smName := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) }}
 {{- include "uhc.assertSubdomainLength" (dict "name" $smName "kind" (printf "ServiceMonitor for workload %q" $wlName)) }}
 ---
 {{- if eq $provider "victoriametrics" }}

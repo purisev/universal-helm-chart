@@ -5,7 +5,7 @@
 {{- $wl := index $ctx.Values.deployments $wlName -}}
 {{- if and (ne (index $wl "enabled") false) $wl.createConfigmap }}
 ---
-{{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
+{{- $cmFullName := printf "%s-config" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) }}
 {{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap
@@ -33,7 +33,7 @@ data:
 {{- $wl := index $ctx.Values.statefulSets $wlName -}}
 {{- if and (ne (index $wl "enabled") false) $wl.createConfigmap }}
 ---
-{{- $cmFullName := printf "%s-%s-config" $releaseName $wlName }}
+{{- $cmFullName := printf "%s-config" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) }}
 {{- include "uhc.assertSubdomainLength" (dict "name" $cmFullName "kind" (printf "ConfigMap (workload %q)" $wlName)) }}
 apiVersion: v1
 kind: ConfigMap

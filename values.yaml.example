@@ -28,6 +28,13 @@ commonAnnotations:
   owner: platform-team@example.com
   repo: https://github.com/example/myapp
 
+# Resource naming. omitWorkloadSuffix names every workload resource after the
+# release alone (<fullname> instead of <fullname>-<workloadName>) and drops the
+# workload name from labels and selectors. It needs exactly one enabled entry
+# across deployments + statefulSets, so this file, which has four, leaves it off.
+naming:
+  omitWorkloadSuffix: false
+
 # Standard label toggles (all on by default; shown explicitly for reference)
 labels:
   standard:
