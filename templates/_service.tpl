@@ -1,6 +1,34 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
+Resolves the name of a workload's client-facing Service: service.nameOverride when set,
+otherwise <fullname>-<workloadName>. Every reference to that Service goes through this
+helper — the Service object itself and the Gateway API backendRefs that default to it —
+so an override stays consistent across the release.
+Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName
+*/}}
+{{- define "uhc.serviceName" -}}
+{{- $svc := .wl.service | default dict -}}
+{{- $name := $svc.nameOverride | default (printf "%s-%s" .releaseName .wlName) -}}
+{{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "Service for workload %q" .wlName)) -}}
+{{- $name -}}
+{{- end }}
+
+{{/*
+Resolves the name of a StatefulSet's governing headless Service:
+headlessService.nameOverride, then the older serviceName spelling, otherwise
+<fullname>-<workloadName>-headless. With headlessService.enabled=false the resolved
+value names an externally managed Service that spec.serviceName points at.
+Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName
+*/}}
+{{- define "uhc.headlessServiceName" -}}
+{{- $hs := .wl.headlessService | default dict -}}
+{{- $name := $hs.nameOverride | default .wl.serviceName | default (printf "%s-%s-headless" .releaseName .wlName) -}}
+{{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "headless Service for StatefulSet workload %q" .wlName)) -}}
+{{- $name -}}
+{{- end }}
+
+{{/*
 Renders one complete, independent Service document from a workload's $wl.service
 block. Used by Deployment and StatefulSet — for StatefulSet this is always a
 second, separate object alongside the headless Service (never merged into it);
@@ -17,11 +45,12 @@ Emits the leading "---" document separator itself.
 {{- $svc := $wl.service }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($svc.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
+{{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ $svcName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" $extra) }}
@@ -138,10 +167,7 @@ Emits the leading "---" document separator itself.
 {{- $hs := $wl.headlessService | default dict }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($hs.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
-{{- $headlessName := $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
-{{- if not $wl.serviceName }}
-{{- include "uhc.assertNameLength" (dict "name" $headlessName "kind" (printf "headless Service for StatefulSet workload %q" $wlName)) }}
-{{- end }}
+{{- $headlessName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) }}
 ---
 apiVersion: v1
 kind: Service

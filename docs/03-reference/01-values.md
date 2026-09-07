@@ -74,6 +74,24 @@ service:
       appProtocol: kubernetes.io/h2c
 ```
 
+### Service naming
+
+A workload's Service is named `<fullname>-<workloadName>`. `service.nameOverride` replaces that name:
+
+```yaml
+deployments:
+  frontend:
+    service:
+      enabled: true
+      nameOverride: frontend-web
+```
+
+The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API `backendRefs` in `httpRoute` / `grpcRoute` / `tlsRoute` rules that carry no explicit `serviceName`. Labels and selectors are untouched: `app.kubernetes.io/name` and `app.kubernetes.io/instance` keep the workload's own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload with `service.enabled: false` keeps its `<fullname>-<workloadName>-metrics` name.
+
+On a StatefulSet the governing headless Service has its own key, `headlessService.nameOverride`, and `spec.serviceName` follows it. With `headlessService.enabled: false` that key is required and names the externally managed Service providing stable per-pod DNS. `statefulSets.<name>.serviceName` is the older spelling of the same value and still works; `headlessService.nameOverride` wins when both are set.
+
+Either override is checked against the 63-character ceiling the chart applies to every constructed name.
+
 ### `jobGroups` group → job merge
 
 For each per-job field:

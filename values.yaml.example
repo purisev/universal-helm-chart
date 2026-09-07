@@ -802,7 +802,8 @@ deployments:
           resourceClaimTemplateName: worker-gpu-template
 
   # --- frontend: shows annotations-based metrics discovery ---
-  # Features: single port, prometheus.io/* annotations (no ServiceMonitor CRD), paused
+  # Features: single port, prometheus.io/* annotations (no ServiceMonitor CRD), paused,
+  #           service.nameOverride
   frontend:
     image:
       repository: ghcr.io/example/frontend
@@ -813,6 +814,11 @@ deployments:
       type: ClusterIP
       port: 80
       targetPort: 3000
+      # Names the Service explicitly instead of <fullname>-frontend — for a
+      # DNS name other workloads already hardcode. Gateway API backendRefs
+      # that default to this workload's Service follow the override; labels
+      # and selectors keep the workload's own names.
+      nameOverride: frontend-web
 
     metrics:
       enabled: true
@@ -943,6 +949,11 @@ statefulSets:
     replicaCount: 2
 
     headlessService:
+      # Names the governing Service explicitly instead of
+      # <fullname>-cache-headless; spec.serviceName follows it. With
+      # headlessService.enabled: false the same key points the StatefulSet at
+      # an externally managed headless Service.
+      nameOverride: cache-peers
       ports:
         redis:
           port: 6379

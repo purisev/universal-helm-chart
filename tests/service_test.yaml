@@ -754,3 +754,97 @@ tests:
       - equal:
           path: spec.ipFamilyPolicy
           value: RequireDualStack
+
+  # --- service.nameOverride ---
+
+  - it: should name the deployment Service from service.nameOverride
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.nameOverride: legacy-web-svc
+    asserts:
+      - equal:
+          path: metadata.name
+          value: legacy-web-svc
+
+  - it: should keep workload labels and selector on the default names when service.nameOverride is set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.nameOverride: legacy-web-svc
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: web
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
+
+  - it: should name the StatefulSet client Service from service.nameOverride
+    documentIndex: 1
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: db-clients
+    asserts:
+      - equal:
+          path: metadata.name
+          value: db-clients
+
+  - it: should name the headless Service from headlessService.nameOverride
+    documentIndex: 0
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.nameOverride: db-peers
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+      - equal:
+          path: metadata.name
+          value: db-peers
+
+  - it: should keep the metrics-only Service on the default name when service is disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: false
+      deployments.web.service.nameOverride: legacy-web-svc
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 9090
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-web-metrics
+
+  - it: should fail fast when service.nameOverride exceeds 63 characters
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.nameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: "exceeds 63 characters"

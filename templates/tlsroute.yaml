@@ -83,7 +83,7 @@ spec:
     {{- else }}
       {{- $wl = index $ctx.Values.statefulSets $wlName }}
     {{- end }}
-    {{- $svcName := printf "%s-%s" $releaseName $wlName }}
+    {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName) }}
     {{- $svcPort := int (($wl.service | default dict).port | default 443) }}
     {{- range $wl.tlsRoute.rules }}
     - {{ include "uhc.tlsRouteRuleSpec" (dict "rule" . "defaultBackend" $svcName "defaultPort" $svcPort) | nindent 6 | trimPrefix "\n      " }}
