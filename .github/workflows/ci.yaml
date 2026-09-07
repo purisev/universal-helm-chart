@@ -58,11 +58,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Check docs against Chart.yaml
-        # base_ref is the PR's target branch and is empty on push, where
-        # ref_name is the branch being pushed. Either way the script sees the
-        # release-X.Y.Z name when there is one.
+        # A run can name the version being prepared in the branch a PR targets,
+        # the branch it comes from, or a tag; refs that name no version are
+        # ignored. They go through the environment rather than into the script
+        # body — a branch name is attacker-controlled on a fork PR, and the
+        # script only ever matches these against a regex.
         env:
-          TARGET_REF: ${{ github.base_ref || github.ref_name }}
+          TARGET_REFS: ${{ github.base_ref }} ${{ github.head_ref }} ${{ github.ref_name }}
         run: bash .github/scripts/check-version-pins.sh
 
   misconfig-scan:
