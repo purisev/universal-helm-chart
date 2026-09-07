@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-adf42f9a.js";
+            window.path_to_searchindex_js = "../searchindex-09fc4b95.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -186,10 +186,10 @@
 <ol>
 <li>
 <p><strong>Check <code>Chart.yaml</code>.</strong> The <code>version</code> field is pinned to the in-flight release line and must already match the version you want to publish — don’t bump per-PR.</p>
-<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. On a <code>release-X.Y.Z</code> branch it additionally holds <code>Chart.yaml</code> to the version the branch name promises. Run it locally with:</p>
+<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. Given a ref that names a version — a <code>release-X.Y.Z</code> branch or a <code>vX.Y.Z</code> tag — it additionally holds <code>Chart.yaml</code> to that version. Run it locally with:</p>
 <pre><code class="language-bash">TARGET_REF=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
 </code></pre>
-<p>It is label-gated on PRs (<code>version-pins</code>, or <code>pre-merge</code>) and runs on every push to <code>main</code>. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
+<p>It runs on every CI run, and the branch preview build in <code>ci.yaml</code> will not publish while it is red. <code>release.yaml</code> runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
 </li>
 <li>
 <p><strong>Tag and push</strong> from the matching release branch:</p>
@@ -199,7 +199,7 @@ git push origin v&lt;X.Y.Z&gt;
 </code></pre>
 </li>
 <li>
-<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity.</p>
+<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, checks the tag against <code>Chart.yaml</code> and the docs, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity.</p>
 </li>
 <li>
 <p><strong>Verify the artifact:</strong></p>
