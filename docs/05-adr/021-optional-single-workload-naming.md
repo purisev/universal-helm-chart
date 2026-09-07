@@ -28,16 +28,22 @@ Service, HPA, ScaledObject, VPA, PDB, NetworkPolicy, ServiceMonitor,
 PodMonitor and the workload ConfigMap, including the `-headless`, `-metrics`
 and `-config` variants. Labels and selectors follow through
 `uhc.workloadLabels` / `uhc.workloadSelectorLabels`: `app.kubernetes.io/name`
-becomes the chart name and `app.kubernetes.io/instance` becomes `<fullname>`,
-the pair the chart already emits on its singleton resources.
+becomes the chart name and `app.kubernetes.io/instance` becomes `<fullname>`.
+Singleton resources are a separate pair and do not move: `uhc.labels` keeps
+emitting `app.kubernetes.io/instance: <release name>` there.
 
 With more than one enabled entry across `deployments` and `statefulSets`,
 `helm template` fails and names the offenders. Silently keeping the suffix
 would make the flag mean different things in different releases, and honoring
 it would render several workloads under one set of names.
 
-Container names keep the workload key, and `jobGroups` names are untouched:
-both are addressed by key rather than by release identity.
+Container names keep the workload key. `jobGroups` and the ESO entries keep
+both their names and their labels, and say so at the call site with
+`keepSuffix`: a release holds at most one workload under this flag but any
+number of job groups and secrets beside it, so those are addressed by their
+own key rather than by release identity. Without that, every Job pod would
+carry the workload's selector labels and land in its Service endpoints,
+NetworkPolicy and PDB.
 
 ## Consequences
 

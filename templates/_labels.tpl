@@ -101,15 +101,24 @@ labels.standard.{name,instance,enabled} flags do NOT affect this helper (changin
 would silently break Deployment/StatefulSet/Job by orphaning the selector). Toggles for
 partOf, version, managedBy still apply, and commonLabels are merged with standard-wins
 precedence.
-Params: dict "ctx" $ctx "workloadName" $wlName
+Params: dict "ctx" $ctx "workloadName" $wlName ["keepSuffix" true]
+keepSuffix holds the {name, instance} pair on <workloadName> / <fullname>-<workloadName>
+whatever naming.omitWorkloadSuffix says. jobGroups pass it: the flag speaks about the one
+long-running workload in a release, and any number of job groups can sit beside it, so
+collapsing their labels too would file their pods under the workload's own selector.
 */}}
 {{- define "uhc.workloadLabels" -}}
 {{- $ctx := .ctx -}}
 {{- $wlName := .workloadName -}}
 {{- $fullName := include "uhc.fullname" $ctx -}}
-{{- $instance := include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) -}}
+{{- $omit := false -}}
+{{- if not .keepSuffix -}}
+{{- $omit = eq (include "uhc.omitWorkloadSuffix" $ctx) "true" -}}
+{{- end -}}
+{{- $instance := printf "%s-%s" $fullName $wlName -}}
 {{- $nameLabel := $wlName -}}
-{{- if eq (include "uhc.omitWorkloadSuffix" $ctx) "true" -}}
+{{- if $omit -}}
+{{- $instance = $fullName -}}
 {{- $nameLabel = include "uhc.name" $ctx -}}
 {{- end -}}
 {{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "label app.kubernetes.io/instance for workload %q" $wlName)) -}}
@@ -131,15 +140,23 @@ Selector labels for a named workload (matchLabels — Service/PDB/ServiceMonitor
 selectors and Deployment/StatefulSet spec.selector.matchLabels). Always emits the minimal
 {name, instance} pair regardless of labels.standard.* toggles — selectors are immutable on
 workload resources, so they must NEVER be affected by user toggles or commonLabels.
-Params: dict "ctx" $ctx "workloadName" $wlName
+Params: dict "ctx" $ctx "workloadName" $wlName ["keepSuffix" true]
+keepSuffix has the same meaning as in uhc.workloadLabels and is passed by jobGroups.
 */}}
 {{- define "uhc.workloadSelectorLabels" -}}
-{{- $instance := include "uhc.workloadResourceName" (dict "ctx" .ctx "wlName" .workloadName) -}}
-{{- $nameLabel := .workloadName -}}
-{{- if eq (include "uhc.omitWorkloadSuffix" .ctx) "true" -}}
-{{- $nameLabel = include "uhc.name" .ctx -}}
+{{- $ctx := .ctx -}}
+{{- $wlName := .workloadName -}}
+{{- $omit := false -}}
+{{- if not .keepSuffix -}}
+{{- $omit = eq (include "uhc.omitWorkloadSuffix" $ctx) "true" -}}
 {{- end -}}
-{{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "selector label app.kubernetes.io/instance for workload %q" .workloadName)) -}}
+{{- $instance := printf "%s-%s" (include "uhc.fullname" $ctx) $wlName -}}
+{{- $nameLabel := $wlName -}}
+{{- if $omit -}}
+{{- $instance = include "uhc.fullname" $ctx -}}
+{{- $nameLabel = include "uhc.name" $ctx -}}
+{{- end -}}
+{{- include "uhc.assertNameLength" (dict "name" $instance "kind" (printf "selector label app.kubernetes.io/instance for workload %q" $wlName)) -}}
 app.kubernetes.io/name: {{ $nameLabel }}
 app.kubernetes.io/instance: {{ $instance }}
 {{- end }}
