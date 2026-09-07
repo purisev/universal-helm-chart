@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-26e1de28.js";
+            window.path_to_searchindex_js = "searchindex-4cb78a3a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -1765,8 +1765,8 @@ chainsaw test test/e2e/chainsaw/&lt;job&gt; --config test/e2e/chainsaw/&lt;job&g
 <ol>
 <li>
 <p><strong>Check <code>Chart.yaml</code>.</strong> The <code>version</code> field is pinned to the in-flight release line and must already match the version you want to publish — don’t bump per-PR.</p>
-<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. Given a ref that names a version — a <code>release-X.Y.Z</code> branch or a <code>vX.Y.Z</code> tag — it additionally holds <code>Chart.yaml</code> to that version. Run it locally with:</p>
-<pre><code class="language-bash">TARGET_REF=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
+<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. Given a ref that names a version — a <code>release-X.Y.Z</code> branch or a <code>vX.Y.Z</code> tag — it additionally holds <code>Chart.yaml</code> to that version. CI hands it the branch a PR targets, the branch it comes from and the tag, so the release PR asserts the version too rather than only the PRs into the release branch. Run it locally with:</p>
+<pre><code class="language-bash">TARGET_REFS=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
 </code></pre>
 <p>It runs on every CI run, and the branch preview build in <code>ci.yaml</code> will not publish while it is red. <code>release.yaml</code> runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
 </li>
