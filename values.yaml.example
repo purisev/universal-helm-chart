@@ -781,6 +781,25 @@ deployments:
             consumerGroup: myapp-worker
             topic: events
             lagThreshold: "100"
+      # Passed to the ScaledObject verbatim; the chart validates it as an
+      # object and nothing more, so KEDA fields it doesn't name still render.
+      advanced:
+        restoreToOriginalReplicaCount: true
+        horizontalPodAutoscalerConfig:
+          behavior:
+            # One pod a minute up. The HPA default doubles every 15s.
+            scaleUp:
+              stabilizationWindowSeconds: 60
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 60
+            scaleDown:
+              stabilizationWindowSeconds: 900
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 300
 
     resources:
       requests:

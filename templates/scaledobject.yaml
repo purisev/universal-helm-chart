@@ -39,6 +39,14 @@ spec:
   {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
   {{- end }}
+  {{- /* Passed through verbatim: restoreToOriginalReplicaCount,
+     horizontalPodAutoscalerConfig (name, behavior) and scalingModifiers are
+     KEDA's own shapes and track its releases, so the chart does not restate
+     them field by field. */ -}}
+  {{- with $wl.keda.advanced }}
+  advanced:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
@@ -80,6 +88,14 @@ spec:
   {{- end }}
   {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
+  {{- end }}
+  {{- /* Passed through verbatim: restoreToOriginalReplicaCount,
+     horizontalPodAutoscalerConfig (name, behavior) and scalingModifiers are
+     KEDA's own shapes and track its releases, so the chart does not restate
+     them field by field. */ -}}
+  {{- with $wl.keda.advanced }}
+  advanced:
+    {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
 {{- end }}

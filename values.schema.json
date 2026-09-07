@@ -216,6 +216,7 @@
         "pollingInterval": {"type": "integer", "minimum": 1},
         "cooldownPeriod": {"type": "integer", "minimum": 0},
         "idleReplicaCount": {"type": "integer", "minimum": 0},
+        "advanced": {"type": "object"},
         "triggers": {"type": "array"}
       }
     },

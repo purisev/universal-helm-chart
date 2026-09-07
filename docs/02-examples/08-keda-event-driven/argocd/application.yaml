@@ -51,6 +51,22 @@ spec:
                     topic: orders
                     lagThreshold: "100"
                     offsetResetPolicy: earliest
+              advanced:
+                restoreToOriginalReplicaCount: true
+                horizontalPodAutoscalerConfig:
+                  behavior:
+                    scaleUp:
+                      stabilizationWindowSeconds: 60
+                      policies:
+                        - type: Pods
+                          value: 1
+                          periodSeconds: 60
+                    scaleDown:
+                      stabilizationWindowSeconds: 900
+                      policies:
+                        - type: Pods
+                          value: 1
+                          periodSeconds: 300
             verticalPodAutoscaler:
               enabled: true
               updateMode: Initial
