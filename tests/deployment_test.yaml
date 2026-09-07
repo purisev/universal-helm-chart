@@ -1300,6 +1300,29 @@ tests:
           path: spec.template.spec.containers[0].ports
           count: 1
 
+  - it: should keep the injected metrics port off sidecars and init containers
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.sidecars.log-shipper.image.repository: fluent/fluent-bit
+      deployments.web.sidecars.log-shipper.image.tag: "3.1"
+      deployments.web.initContainers.wait-db.image.repository: busybox
+      deployments.web.initContainers.wait-db.image.tag: "1.36"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].name
+          value: metrics
+      - notExists:
+          path: spec.template.spec.containers[1].ports
+      - notExists:
+          path: spec.template.spec.initContainers[0].ports
+
   - it: should render imagePullSecrets as name entries
     set:
       image.repository: nginx

@@ -252,6 +252,19 @@ tests:
           path: spec.template.spec.initContainers
           count: 2
 
+  - it: should keep the injected metrics port off job containers
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      jobGroups.db.enabled: true
+      jobGroups.db.jobs.migrate.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].ports
+
   # ---------- image fallback chain ----------
   - it: should fall back to root image when group/job have none
     set:

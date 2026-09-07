@@ -19,7 +19,7 @@ Params: dict "value" $v "containerName" $n "source" "<values path>" "portName" $
 Reusable container spec: image, command/args, env, envFrom, ports, probes, resources,
 securityContext, volumeMounts.
 Params:
-- dict "ctx" $ctx "wl" $wl "containerName" $wlName — for main workload container
+- dict "ctx" $ctx "wl" $wl "containerName" $wlName "renderMetricsPort" true — for main workload container
 - dict "ctx" $ctx "wl" $sidecarSpec "containerName" $sidecarSpec.name "renderDirectPorts" true "useRootVolumeMounts" false — for sidecars
 Output at zero indent; caller controls nindent.
 */}}
@@ -101,7 +101,12 @@ Output at zero indent; caller controls nindent.
   {{- end }}
   {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
   {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
-  {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
+  {{- /* The exposed metrics port belongs to the container the workload's Service and
+     ServiceMonitor point at, and ContainerPort.name has to be unique within a Pod, so
+     only the caller that renders the main container asks for it. Sidecars, init
+     containers and job containers resolve the same workload-level metrics settings and
+     would otherwise each declare a port they do not serve. */ -}}
+  {{- $addMetricsPort := and .renderMetricsPort $exposeJson (ne $metricsType "pod") -}}
   {{- $hasMetricsPortAlready := or (and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics")) (hasKey ($wl.ports | default dict) "metrics") -}}
   {{- /* Container ports derived from the Service. Each targetPort falls back to its own
      port the same way uhc.plainService resolves it, so the container spec names the port
@@ -234,7 +239,9 @@ Output at zero indent; caller controls nindent.
 {{- end }}
 
 {{/*
-Full spec for the main workload container.
+Full spec for the main workload container. Deployments and StatefulSets add
+"renderMetricsPort" true so the container carries the exposed metrics port; job
+containers are never scraped and leave it off.
 Params: dict "ctx" $ctx "wl" $wl "containerName" $wlName
 Output at zero indent; caller controls nindent.
 */}}
