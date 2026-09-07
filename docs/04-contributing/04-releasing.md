@@ -6,10 +6,10 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 
 1. **Check `Chart.yaml`.** The `version` field is pinned to the in-flight release line and must already match the version you want to publish — don't bump per-PR.
 
-   The `version-pins` CI job checks this for you, and checks that the version in `Chart.yaml` is also the one every Argo CD `targetRevision`, Flux `tag`, `helm install --version` and schema URL under `docs/` names. Given a ref that names a version — a `release-X.Y.Z` branch or a `vX.Y.Z` tag — it additionally holds `Chart.yaml` to that version. Run it locally with:
+   The `version-pins` CI job checks this for you, and checks that the version in `Chart.yaml` is also the one every Argo CD `targetRevision`, Flux `tag`, `helm install --version` and schema URL under `docs/` names. Given a ref that names a version — a `release-X.Y.Z` branch or a `vX.Y.Z` tag — it additionally holds `Chart.yaml` to that version. CI hands it the branch a PR targets, the branch it comes from and the tag, so the release PR asserts the version too rather than only the PRs into the release branch. Run it locally with:
 
    ```bash
-   TARGET_REF=release-<X.Y.Z> bash .github/scripts/check-version-pins.sh
+   TARGET_REFS=release-<X.Y.Z> bash .github/scripts/check-version-pins.sh
    ```
 
    It runs on every CI run, and the branch preview build in `ci.yaml` will not publish while it is red. `release.yaml` runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.

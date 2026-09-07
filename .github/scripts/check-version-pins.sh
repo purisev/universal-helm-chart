@@ -10,15 +10,18 @@
 # Historical records are excluded, because naming an older version is their job:
 # the migration guide and the ADRs.
 #
-# It also holds Chart.yaml to the version its ref names, on a release-X.Y.Z
-# branch and on a vX.Y.Z tag. The branch catches the forgotten bump before the
-# tag; the tag catches it before the artifact reaches GHCR under a version that
-# is not the one inside it.
+# It also holds Chart.yaml to the version its refs name. TARGET_REFS is a
+# space-separated list because a run can name the version being prepared in
+# more than one place: the branch a pull request targets (a feature PR into
+# release-X.Y.Z), the branch it comes from (the release PR itself, which
+# targets main and would otherwise assert nothing), or a vX.Y.Z tag. Refs that
+# name no version are ignored, so passing all of them is safe.
 #
 # Run it the same way CI does:
 #   bash .github/scripts/check-version-pins.sh
-#   TARGET_REF=release-3.2.0 bash .github/scripts/check-version-pins.sh
-#   TARGET_REF=v3.2.0 bash .github/scripts/check-version-pins.sh
+#   TARGET_REFS=release-3.2.0 bash .github/scripts/check-version-pins.sh
+#   TARGET_REFS="main release-3.2.0" bash .github/scripts/check-version-pins.sh
+#   TARGET_REFS=v3.2.0 bash .github/scripts/check-version-pins.sh
 
 set -euo pipefail
 
@@ -33,18 +36,18 @@ major=${chart_version%%.*}
 
 status=0
 
-# --- the ref name against Chart.yaml ---------------------------------------
+# --- the ref names against Chart.yaml --------------------------------------
 
-target_ref=${TARGET_REF:-}
-if [[ "${target_ref}" =~ ^(release-|v)([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+for ref in ${TARGET_REFS:-}; do
+  [[ "${ref}" =~ ^(release-|v)([0-9]+\.[0-9]+\.[0-9]+)$ ]] || continue
   ref_version=${BASH_REMATCH[2]}
   if [[ "${chart_version}" != "${ref_version}" ]]; then
-    echo "Chart.yaml is on ${chart_version}, but ${target_ref} calls for ${ref_version}."
+    echo "Chart.yaml is on ${chart_version}, but ${ref} calls for ${ref_version}."
     echo "Set 'version: ${ref_version}' in Chart.yaml."
     echo
     status=1
   fi
-fi
+done
 
 # --- the docs against Chart.yaml -------------------------------------------
 

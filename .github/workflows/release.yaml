@@ -43,7 +43,7 @@ jobs:
         # Chart.yaml has to agree with it, and the docs have to agree with
         # Chart.yaml. Cheaper to stop here than to unpublish from GHCR.
         env:
-          TARGET_REF: ${{ github.ref_name }}
+          TARGET_REFS: ${{ github.ref_name }}
         run: bash .github/scripts/check-version-pins.sh
 
       - name: Log in to GHCR
