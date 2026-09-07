@@ -28,18 +28,19 @@ statefulSets:
       - db-credentials               # external Secret carrying POSTGRES_USER + POSTGRES_PASSWORD
 
     volumeClaimTemplates:
-      data:
-        accessModes:
-          - ReadWriteOnce
-        # storageClassName: standard # uncomment to pin; otherwise the cluster default is used
-        resources:
-          requests:
-            storage: 10Gi
+      - metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          # storageClassName: standard # uncomment to pin; otherwise the cluster default is used
+          resources:
+            requests:
+              storage: 10Gi
 
     volumeMounts:
-      db:                            # outer key = workload name (statefulSets entry)
-        data:                        # mount name = volumeClaimTemplates key
-          mountPath: /var/lib/postgresql/data
+      data:                          # mount name = the volumeClaimTemplates entry's metadata.name
+        mountPath: /var/lib/postgresql/data
 
     resources:
       requests:

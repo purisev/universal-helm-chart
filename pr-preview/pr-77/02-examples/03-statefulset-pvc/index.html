@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-a6cc7134.js";
+            window.path_to_searchindex_js = "../../searchindex-d678dc0e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-9fa66af8.js"></script>
@@ -185,11 +185,11 @@
 <h2 id="what-this-shows"><a class="header" href="#what-this-shows">What this shows</a></h2>
 <ul>
 <li>A <code>statefulSets.db</code> workload — replaces <code>deployments.&lt;n&gt;</code> for ordered, stateful pods.</li>
-<li><code>volumeClaimTemplates.data</code> — every pod gets its own PVC, retained across restarts and scale-up.</li>
+<li><code>volumeClaimTemplates</code> — a list of embedded PVCs, one entry named <code>data</code>, so every pod gets its own PVC, retained across restarts and scale-up.</li>
 <li><code>service.clusterIP: None</code> — headless Service required by StatefulSet for stable per-pod DNS.</li>
 <li><code>replicaCount: 3</code> with <code>podManagementPolicy: OrderedReady</code> (chart default).</li>
 <li><code>envSecrets</code> referencing an externally-managed Secret for <code>POSTGRES_PASSWORD</code> (no ESO here — see <code>07-external-secrets/</code> for that).</li>
-<li>Per-pod <code>volumeMounts</code> map keyed by mount name, referencing the <code>volumeClaimTemplates</code> entry by name.</li>
+<li>Per-pod <code>volumeMounts</code> map keyed by mount name, referencing the <code>volumeClaimTemplates</code> entry by its <code>metadata.name</code>.</li>
 </ul>
 <h2 id="delta-from-02-web-app-ingress"><a class="header" href="#delta-from-02-web-app-ingress">Delta from <code>02-web-app-ingress</code></a></h2>
 <div class="table-wrapper">
@@ -238,7 +238,7 @@ kubectl apply -f flux/
 </code></pre>
 <h2 id="prerequisites"><a class="header" href="#prerequisites">Prerequisites</a></h2>
 <ul>
-<li>A default StorageClass in the cluster, or override <code>volumeClaimTemplates.data.storageClassName</code> for your provisioner.</li>
+<li>A default StorageClass in the cluster, or set <code>storageClassName</code> in the <code>data</code> entry’s <code>spec</code> for your provisioner.</li>
 <li>The <code>db-credentials</code> Secret pre-existing in the target namespace.</li>
 </ul>
 
