@@ -355,18 +355,19 @@ statefulSets:
       enabled: false               # postgres-exporter not in this example
 
     volumeClaimTemplates:
-      data:
-        accessModes:
-          - ReadWriteOnce
-        storageClassName: standard
-        resources:
-          requests:
-            storage: 10Gi
+      - metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 10Gi
 
     volumeMounts:
-      db:
-        data:
-          mountPath: /var/lib/postgresql/data
+      data:
+        mountPath: /var/lib/postgresql/data
 
     env:
       POSTGRES_DB:

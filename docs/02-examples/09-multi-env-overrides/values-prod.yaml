@@ -26,20 +26,18 @@ ingress:
           serviceName: orders-prod-api
           servicePort: 80
   tls:
-    orders-tls:
-      hosts:
+    - hosts:
         - orders.example.com
+      secretName: orders-tls
 
 podDisruptionBudget:
   enabled: true
   minAvailable: 2
 
 topologySpreadConstraints:
-  enabled: true
-  constraints:
-    - maxSkew: 1
-      topologyKey: topology.kubernetes.io/zone
-      whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
 
 deployments:
   api:
