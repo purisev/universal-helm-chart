@@ -307,6 +307,17 @@ Because nothing here is validated field by field, a typo inside `advanced` reach
 
 `deployments.<name>.initContainers` and `deployments.<name>.sidecars` (same under `statefulSets.<name>`) are maps keyed by container name. Both flow through the same renderer as the main container: `image`, `command`/`args`, `env`, `envSecrets`, `volumeMounts`, `resources`, `securityContext`, `lifecycle`. Both inherit the parent workload's `inherit.env` / `inherit.configMaps` / `inherit.configMapMount` flags. Neither inherits root-level `volumeMounts.<containerName>` — declare local mounts inline. Render order is `sortAlpha`; for `initContainers` Kubernetes runs them sequentially in declared order, so prefix names with `01-`, `02-`, … when run order matters (same convention as `jobGroups[*].tasks`). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. **Two exceptions for `initContainers`:** `probesEnabled` / probe blocks (`readinessProbe`, `livenessProbe`, `startupProbe`) and `lifecycle` are rejected — Kubernetes does not allow these on standard init containers, so `helm template` fail-fasts if either is set on an init entry.
 
+### ConfigMap names
+
+A workload with `createConfigmap: true` gets `<fullname>-<workloadName>-config`, and an entry in `configMaps` gets `<fullname>-<key>`. The two shapes meet whenever a key spells out the other's suffix, so `configMaps.web-config` beside a workload named `web` lands both on one name, and under `naming.omitWorkloadSuffix` a key of just `config` is enough. That fails the render rather than producing two documents Kubernetes will refuse:
+
+```
+ConfigMap name "myrel-universal-helm-chart-web-config" is claimed by both
+deployments.web.createConfigmap and configMaps.web-config.
+```
+
+The same check covers a `deployments.<name>` and a `statefulSets.<name>` sharing a key while both set `createConfigmap`. Disabled workloads and `configMaps` entries are ignored, since neither renders.
+
 ### Chart-owned vs external name resolution
 
 When the same name appears in both a chart-owned map (`configMaps`, `integrations.eso.externalSecrets`) and an external reference list (`envConfigMaps`, `envSecrets`):
