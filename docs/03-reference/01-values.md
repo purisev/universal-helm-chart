@@ -59,6 +59,52 @@ http (if present)  →  others alphabetically  →  metrics (if present)
 
 Auto-injected metrics port (from `integrations.monitoring.defaults.exposeService`) lands last. See [ADR 014](../05-adr/014-deterministic-ordering.md) and [ADR 016](../05-adr/016-metrics-port-auto-exposure.md).
 
+### The single-port service form
+
+A workload's Service takes ports either as the `service.ports.<name>` map or as the shorthand pair `service.port` / `service.targetPort`. In the shorthand, each side falls back to the other, in the Service and in the container spec alike:
+
+```yaml
+service:
+  enabled: true
+  port: 80          # container listens on 80 as well
+```
+
+```yaml
+service:
+  enabled: true
+  port: 80
+  targetPort: 8080  # container listens on 8080
+```
+
+The map form falls back the same way: `service.ports.<name>.port` alone is enough, and the container port follows it.
+
+An enabled Service with neither form, and no metrics port injected by `integrations.monitoring.defaults.exposeService`, fails the render. A client-facing Service has nothing sensible to default to, unlike `headlessService`, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is `type: ExternalName`, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a `ports` block, and any ports it does declare are still passed through.
+
+### Named `targetPort` and the workload `ports` map
+
+A Service `targetPort` may name a port instead of numbering it, but `containerPort` is an integer, so the chart cannot derive a container port from a name. Setting one fails the render:
+
+```
+container "web": service.ports.grpc.targetPort is "grpc", a port name rather than
+a number, and containerPort has to be numeric.
+```
+
+Declare the port on the workload instead. A workload's own `ports` map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:
+
+```yaml
+deployments:
+  web:
+    ports:
+      grpc:
+        containerPort: 9000
+    service:
+      enabled: true
+      ports:
+        grpc:
+          port: 9000
+          targetPort: grpc
+```
+
 ### Service port `appProtocol`
 
 Both Service port shapes accept an optional `appProtocol` — the single-port `service.port`/`service.targetPort` form and the `service.ports.<name>` map form (and their `headlessService` equivalents on StatefulSets). It passes straight through to `spec.ports[].appProtocol`, the native Kubernetes Service field.

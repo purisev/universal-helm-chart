@@ -1681,3 +1681,98 @@ tests:
           path: spec.template.spec.containers[0].resources.claims
           value:
             - name: gpu-claim
+
+  # --- container port from the single-port service form ---
+
+  - it: should take containerPort from service.targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  - it: should fall back to service.port when targetPort is absent
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 80
+
+  - it: should fall back to the map form's port when its targetPort is absent
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.port: 80
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 80
+
+  - it: should reject a named targetPort in the single-port form
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: http
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.targetPort is "http", a port name rather than a number'
+
+  - it: should reject a named targetPort in the map form
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.port: 9000
+      deployments.web.service.ports.grpc.targetPort: grpc
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports.grpc.targetPort is "grpc", a port name rather than a number'
+
+  - it: should let the workload ports map carry a named targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.port: 9000
+      deployments.web.service.ports.grpc.targetPort: grpc
+      deployments.web.ports.grpc.containerPort: 9000
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: grpc
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 9000
+
+  - it: should omit container ports for a portless ExternalName service
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: db.example.com
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].ports

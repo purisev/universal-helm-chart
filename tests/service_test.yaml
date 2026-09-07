@@ -931,3 +931,72 @@ tests:
       - equal:
           path: metadata.name
           value: shared-svc
+
+  # --- a Service needs a port ---
+
+  - it: should fail fast when an enabled service declares no port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: 'Service for workload "web" declares no port'
+
+  - it: should render a portless service that only carries the injected metrics port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 9090
+      integrations.monitoring.defaults.exposeService.targetPort: 9090
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].name
+          value: metrics
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+
+  - it: should render a portless ExternalName service without a ports block
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: db.example.com
+    asserts:
+      - equal:
+          path: spec.type
+          value: ExternalName
+      - equal:
+          path: spec.externalName
+          value: db.example.com
+      - isNull:
+          path: spec.ports
+
+  - it: should keep rendering the ports an ExternalName service does declare
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: db.example.com
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 80
