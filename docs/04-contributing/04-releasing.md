@@ -5,6 +5,15 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 ## Cutting a release (tagged build)
 
 1. **Check `Chart.yaml`.** The `version` field is pinned to the in-flight release line and must already match the version you want to publish — don't bump per-PR.
+
+   The `version-pins` CI job checks this for you, and checks that the version in `Chart.yaml` is also the one every Argo CD `targetRevision`, Flux `tag`, `helm install --version` and schema URL under `docs/` names. On a `release-X.Y.Z` branch it additionally holds `Chart.yaml` to the version the branch name promises. Run it locally with:
+
+   ```bash
+   TARGET_REF=release-<X.Y.Z> bash .github/scripts/check-version-pins.sh
+   ```
+
+   It is label-gated on PRs (`version-pins`, or `pre-merge`) and runs on every push to `main`. The migration guide and the ADRs are skipped, since naming older versions is what they are for.
+
 2. **Tag and push** from the matching release branch:
 
    ```bash
