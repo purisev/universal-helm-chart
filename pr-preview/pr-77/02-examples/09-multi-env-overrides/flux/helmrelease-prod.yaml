@@ -1,0 +1,92 @@
+# Flux HelmRelease for prod.
+#
+# Two ways to compose values, both shown:
+#  1. valuesFrom — pull a ConfigMap or Secret as values (great for ops-managed config).
+#  2. inline values — for the per-env overlay declared next to the HelmRelease.
+#
+# Apply order: Flux merges valuesFrom entries first (in declared order), then inline values.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: orders-prod
+  namespace: orders-prod
+spec:
+  interval: 5m
+  releaseName: orders-prod
+  chartRef:
+    kind: OCIRepository
+    name: universal-helm-chart
+    namespace: flux-system
+  install:
+    createNamespace: true
+
+  # Pull base values from a ConfigMap that the platform team manages out-of-band.
+  # Create the ConfigMap with: kubectl create configmap orders-base \
+  #   --from-file=values.yaml=values-base.yaml -n orders-prod
+  valuesFrom:
+    - kind: ConfigMap
+      name: orders-base
+      valuesKey: values.yaml
+      optional: false
+
+  # Inline overlay — equivalent to values-prod.yaml in this example.
+  values:
+    commonLabels:
+      environment: prod
+      cost-center: orders
+    integrations:
+      monitoring:
+        defaults:
+          enabled: true
+      stakater:
+        reloader:
+          enabled: true
+    ingress:
+      enabled: true
+      ingressClassName: nginx
+      annotations:
+        cert-manager.io/cluster-issuer: letsencrypt-prod
+      hosts:
+        orders.example.com:
+          paths:
+            - path: /
+              pathType: Prefix
+              serviceName: orders-prod-api
+              servicePort: 80
+      tls:
+        orders-tls:
+          hosts:
+            - orders.example.com
+    podDisruptionBudget:
+      enabled: true
+      minAvailable: 2
+    topologySpreadConstraints:
+      enabled: true
+      constraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+    deployments:
+      api:
+        image:
+          tag: v1.4.2
+        env:
+          LOG_LEVEL:
+            value: info
+        hpa:
+          enabled: true
+          minReplicas: 3
+          maxReplicas: 30
+          metrics:
+            - type: Resource
+              resource:
+                name: cpu
+                target:
+                  type: Utilization
+                  averageUtilization: 70
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            memory: 1Gi

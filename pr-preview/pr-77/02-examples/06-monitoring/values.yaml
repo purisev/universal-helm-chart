@@ -1,0 +1,115 @@
+# 06-monitoring — exercise the provider × discovery × target matrix on four workloads.
+
+integrations:
+  monitoring:
+    defaults:
+      enabled: true                   # opt-in monitoring for every workload by default
+      provider: prometheus            # ServiceMonitor / PodMonitor
+      discovery: crd
+      type: service
+      port: metrics                   # name of the port in service.ports / pod ports
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      exposeService:
+        enabled: true                 # auto-add `metrics` port when not explicitly declared
+        port: 9090
+        targetPort: 9090
+
+deployments:
+
+  # 1. API — accepts all defaults: ServiceMonitor + service target.
+  #    No metrics port declared in service.ports, so the chart auto-injects one.
+  api:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: ghcr.io/example/api
+      tag: v1.4.2
+    service:
+      enabled: true
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+        # No metrics port here — chart auto-appends per integrations.monitoring.defaults.exposeService
+    metrics:
+      enabled: true                   # uses defaults: prometheus + crd + service
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+  # 2. Worker — no main Service, scrape via PodMonitor.
+  #    Chart still emits a metrics-only Service (<release>-worker-metrics) for port-name resolution.
+  worker:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: ghcr.io/example/worker
+      tag: v0.9.0
+    service:
+      enabled: false                  # no main service
+    metrics:
+      enabled: true
+      type: pod                       # PodMonitor instead of ServiceMonitor
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+  # 3. Legacy — clusters without Prometheus Operator CRDs. Annotations-mode discovery.
+  #    Annotation-mode requires a NUMERIC port (kubernetes_sd convention).
+  legacy:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: ghcr.io/example/legacy
+      tag: v2.1.0
+    service:
+      enabled: true
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+        metrics:                                    # explicit — disables auto-expose for this workload
+          port: 9091
+          targetPort: 9091
+    metrics:
+      enabled: true
+      discovery: annotations          # injects prometheus.io/* on Service
+      port: 9091                      # numeric — required by prometheus.io/port contract
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
+
+  # 4. VictoriaMetrics-flavoured — same shape, different operator.
+  #    Renders VMServiceScrape (operator.victoriametrics.com/v1beta1) instead of ServiceMonitor.
+  vm-flavoured:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: ghcr.io/example/vm-app
+      tag: v1.0.0
+    service:
+      enabled: true
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+    metrics:
+      enabled: true
+      provider: victoriametrics       # per-workload override
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 256Mi

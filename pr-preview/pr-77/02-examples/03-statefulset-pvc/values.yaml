@@ -1,0 +1,70 @@
+# 03-statefulset-pvc — 3-replica PostgreSQL StatefulSet with per-pod PVC and headless Service.
+
+statefulSets:
+  db:
+    enabled: true
+    replicaCount: 3
+
+    image:
+      repository: postgres
+      tag: "16.3"
+      pullPolicy: IfNotPresent
+
+    service:
+      enabled: true
+      clusterIP: None                # headless — required for stable per-pod DNS
+      ports:
+        postgres:
+          port: 5432
+          targetPort: 5432
+
+    env:
+      POSTGRES_DB:
+        value: app
+      PGDATA:
+        value: /var/lib/postgresql/data/pgdata
+
+    envSecrets:
+      - db-credentials               # external Secret carrying POSTGRES_USER + POSTGRES_PASSWORD
+
+    volumeClaimTemplates:
+      data:
+        accessModes:
+          - ReadWriteOnce
+        # storageClassName: standard # uncomment to pin; otherwise the cluster default is used
+        resources:
+          requests:
+            storage: 10Gi
+
+    volumeMounts:
+      db:                            # outer key = workload name (statefulSets entry)
+        data:                        # mount name = volumeClaimTemplates key
+          mountPath: /var/lib/postgresql/data
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 1Gi
+
+    # PostgreSQL writes to /var/lib/postgresql/data; the chart's default
+    # readOnlyRootFilesystem: true would block startup. Override here.
+    securityContext:
+      readOnlyRootFilesystem: false
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 999                 # postgres image runs as uid 999
+      runAsGroup: 999
+      fsGroup: 999
+      seccompProfile:
+        type: RuntimeDefault
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2                    # tolerate one pod down at a time
