@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-079d51d0.js";
+            window.path_to_searchindex_js = "../searchindex-cc061e0b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -186,6 +186,10 @@
 <ol>
 <li>
 <p><strong>Check <code>Chart.yaml</code>.</strong> The <code>version</code> field is pinned to the in-flight release line and must already match the version you want to publish — don’t bump per-PR.</p>
+<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. On a <code>release-X.Y.Z</code> branch it additionally holds <code>Chart.yaml</code> to the version the branch name promises. Run it locally with:</p>
+<pre><code class="language-bash">TARGET_REF=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
+</code></pre>
+<p>It is label-gated on PRs (<code>version-pins</code>, or <code>pre-merge</code>) and runs on every push to <code>main</code>. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
 </li>
 <li>
 <p><strong>Tag and push</strong> from the matching release branch:</p>

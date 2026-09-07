@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-079d51d0.js";
+            window.path_to_searchindex_js = "searchindex-cc061e0b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -1609,6 +1609,7 @@ helm unittest .
 <tr><td><code>helm template my-app .</code></td><td>After any template or values change — fastest visual check of the rendered manifests.</td></tr>
 <tr><td><code>helm lint .</code></td><td>Before pushing — catches schema mismatches and shape problems CI will also reject.</td></tr>
 <tr><td><code>helm unittest .</code></td><td>Before pushing — catches behavioural regressions. Add a new test case in the matching <code>tests/&lt;template&gt;_test.yaml</code> whenever you add a feature.</td></tr>
+<tr><td><code>bash .github/scripts/check-version-pins.sh</code></td><td>After touching <code>Chart.yaml</code> or any install snippet in <code>docs/</code> — holds every documented version to the one in <code>Chart.yaml</code>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1619,6 +1620,7 @@ helm unittest .
 <ul>
 <li><strong>Changed the values shape?</strong> Update <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json"><code>values.schema.json</code></a> in the same commit. Schema and <code>values.yaml</code> drift is the most common reviewer comment.</li>
 <li><strong>Added a field?</strong> Add at least one assertion in <code>tests/&lt;template&gt;_test.yaml</code>. Coverage prevents silent regressions on future refactors.</li>
+<li><strong>Bumped the chart version?</strong> Every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names it too. <code>check-version-pins.sh</code> lists the ones you missed; CI runs it behind the <code>version-pins</code> label and under <code>pre-merge</code>.</li>
 <li><strong>Writing fixtures or example values?</strong> Use <strong>block-style</strong> YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -1759,6 +1761,10 @@ chainsaw test test/e2e/chainsaw/&lt;job&gt; --config test/e2e/chainsaw/&lt;job&g
 <ol>
 <li>
 <p><strong>Check <code>Chart.yaml</code>.</strong> The <code>version</code> field is pinned to the in-flight release line and must already match the version you want to publish — don’t bump per-PR.</p>
+<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. On a <code>release-X.Y.Z</code> branch it additionally holds <code>Chart.yaml</code> to the version the branch name promises. Run it locally with:</p>
+<pre><code class="language-bash">TARGET_REF=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
+</code></pre>
+<p>It is label-gated on PRs (<code>version-pins</code>, or <code>pre-merge</code>) and runs on every push to <code>main</code>. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
 </li>
 <li>
 <p><strong>Tag and push</strong> from the matching release branch:</p>
