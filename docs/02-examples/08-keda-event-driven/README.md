@@ -7,6 +7,7 @@ A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus
 - `keda.enabled: true` on the worker, with a `kafka` trigger keyed on consumer-group lag.
 - `minReplicas: 1`, not `0` — this worker should never have a gap in consumption. Set `minReplicas: 0` instead when the workload can tolerate sitting idle (e.g. a `cron` trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.
 - `hpa.enabled: false` (default) — KEDA itself manages an internal HPA; mixing both would be rejected by the chart's mutual-exclusion guard.
+- `keda.advanced` — passed into the ScaledObject verbatim. `horizontalPodAutoscalerConfig.behavior` shapes the HPA that KEDA creates: one pod a minute up instead of the HPA default of doubling every 15 seconds, and 15 minutes of quiet before a replica is given back. Kafka lag is spiky, and the default behaviour overshoots a queue that drains fast. `restoreToOriginalReplicaCount: true` puts the Deployment back on its pre-KEDA replica count if the ScaledObject is ever deleted. The chart validates the block as an object and nothing else, so any field in the [ScaledObject spec](https://keda.sh/docs/latest/reference/scaledobject-spec/) works here.
 - `verticalPodAutoscaler.enabled: true` with `updateMode: Initial` — VPA sets the resource request the first time each pod is created. Works alongside KEDA because VPA touches `requests`, KEDA touches `replicas`. ([ADR 007](../../05-adr/007-autoscaler-mutual-exclusion.md))
 - `service.enabled: false` — pure consumer, no inbound traffic.
 - `metrics.type: pod` + `integrations.monitoring.defaults.exposeService.enabled: true` → a metrics-only Service `<release>-worker-metrics` is auto-emitted, and a `PodMonitor` scrapes the worker pods directly.
@@ -17,6 +18,7 @@ A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus
 | Changed | What |
 |---------|------|
 | HPA → KEDA | Event-driven scaling; HPA off, KEDA on. |
+| Scaling behaviour | `keda.advanced.horizontalPodAutoscalerConfig.behavior` caps the ramp at one pod a minute. |
 | Added VPA | Orthogonal, recommends/sets memory requests on initial pod create. |
 | Service off | Worker has no listener; metrics-only Service auto-emitted instead. |
 | `metrics.type: pod` | PodMonitor instead of ServiceMonitor. |

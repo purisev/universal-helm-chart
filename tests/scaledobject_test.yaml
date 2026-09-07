@@ -197,3 +197,79 @@ tests:
       - equal:
           path: spec.cooldownPeriod
           value: 0
+
+  # --- keda.advanced ---
+
+  - it: should render the advanced block verbatim
+    values:
+      - fixtures/keda-advanced.yaml
+    asserts:
+      - equal:
+          path: spec.advanced.restoreToOriginalReplicaCount
+          value: true
+      - equal:
+          path: spec.advanced.horizontalPodAutoscalerConfig.name
+          value: worker-hpa
+      - equal:
+          path: spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleUp.stabilizationWindowSeconds
+          value: 60
+      - equal:
+          path: spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleUp.policies[0]
+          value:
+            type: Pods
+            value: 1
+            periodSeconds: 60
+      - equal:
+          path: spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.stabilizationWindowSeconds
+          value: 900
+      - equal:
+          path: spec.advanced.horizontalPodAutoscalerConfig.behavior.scaleDown.policies[0].periodSeconds
+          value: 300
+
+  - it: should omit the advanced block when unset
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - isNull:
+          path: spec.advanced
+
+  - it: should render the advanced block on a StatefulSet ScaledObject
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.cache.enabled: true
+      statefulSets.cache.keda.enabled: true
+      statefulSets.cache.keda.maxReplicas: 6
+      statefulSets.cache.keda.triggers[0].type: cron
+      statefulSets.cache.keda.triggers[0].metadata.timezone: UTC
+      statefulSets.cache.keda.triggers[0].metadata.start: 0 8 * * *
+      statefulSets.cache.keda.triggers[0].metadata.end: 0 20 * * *
+      statefulSets.cache.keda.triggers[0].metadata.desiredReplicas: "4"
+      statefulSets.cache.keda.advanced.restoreToOriginalReplicaCount: true
+      statefulSets.cache.keda.advanced.scalingModifiers.formula: cron_trigger
+      statefulSets.cache.keda.advanced.scalingModifiers.target: "2"
+    asserts:
+      - equal:
+          path: spec.advanced.restoreToOriginalReplicaCount
+          value: true
+      - equal:
+          path: spec.advanced.scalingModifiers.formula
+          value: cron_trigger
+      - equal:
+          path: spec.advanced.scalingModifiers.target
+          value: "2"
+
+  - it: should accept advanced fields the chart does not name
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.worker.enabled: true
+      deployments.worker.keda.enabled: true
+      deployments.worker.keda.maxReplicas: 5
+      deployments.worker.keda.triggers[0].type: cpu
+      deployments.worker.keda.triggers[0].metadata.value: "70"
+      deployments.worker.keda.advanced.someFutureKedaField: enabled
+    asserts:
+      - equal:
+          path: spec.advanced.someFutureKedaField
+          value: enabled

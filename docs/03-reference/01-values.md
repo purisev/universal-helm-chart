@@ -169,6 +169,35 @@ TLSRoute itself is in the Gateway API Experimental channel (`gateway.networking.
 
 See [ADR 007](../05-adr/007-autoscaler-mutual-exclusion.md).
 
+### KEDA `advanced` pass-through
+
+`keda.advanced` goes into the ScaledObject's `spec.advanced` verbatim. The chart checks that it is an object and stops there, so `restoreToOriginalReplicaCount`, `horizontalPodAutoscalerConfig` (`name`, `behavior`) and `scalingModifiers` all work, and so does anything KEDA adds later without a chart release in between.
+
+```yaml
+deployments:
+  worker:
+    keda:
+      enabled: true
+      maxReplicas: 20
+      triggers:
+        - type: kafka
+          metadata: {...}
+      advanced:
+        restoreToOriginalReplicaCount: true
+        horizontalPodAutoscalerConfig:
+          behavior:
+            scaleUp:
+              stabilizationWindowSeconds: 60
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 60
+```
+
+`behavior` is the Kubernetes HPA scaling-behavior shape, applied to the HPA that KEDA creates. It is worth setting on a lag-driven trigger: the HPA default doubles the replica count every 15 seconds, which overshoots on a queue that drains quickly. The example above adds one pod a minute instead.
+
+Because nothing here is validated field by field, a typo inside `advanced` reaches the cluster and is rejected by the KEDA CRD rather than by `helm template`. Check the field names against the [ScaledObject spec](https://keda.sh/docs/latest/reference/scaledobject-spec/) for the KEDA version you run.
+
 ### Scheduling field inheritance
 
 `tolerations`, `affinity`, `nodeSelector` and `topologySpreadConstraints` all follow the same rule: if the workload defines the field, it **replaces** the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (`tolerations: []`, `affinity: {}`, `topologySpreadConstraints: []`).
