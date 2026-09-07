@@ -83,9 +83,17 @@ naming:
   omitWorkloadSuffix: true   # default: false
 ```
 
-With it on, a release named `myrel` renders `myrel-universal-helm-chart` for the Deployment, the Service, the HPA, the PDB, the VPA, the ScaledObject and the NetworkPolicy, and keeps the usual trailing parts elsewhere: `-headless`, `-metrics`, `-config`. Labels and selectors follow: `app.kubernetes.io/name` becomes the chart name (`nameOverride` when set) and `app.kubernetes.io/instance` becomes `<fullname>`, which is the same pair the chart already puts on its singleton resources.
+With it on, a release named `myrel` renders `myrel-universal-helm-chart` for the Deployment, the Service, the HPA, the PDB, the VPA, the ScaledObject and the NetworkPolicy, and keeps the usual trailing parts elsewhere: `-headless`, `-metrics`, `-config`. Labels and selectors follow: `app.kubernetes.io/name` becomes the chart name (`nameOverride` when set) and `app.kubernetes.io/instance` becomes `<fullname>`.
 
-Two things stay where they are. Container names keep the workload key, so `kubectl logs -c api` still works and KEDA's `envSourceContainerName` still resolves. `jobGroups` names are built from the group and job keys, not from a workload, so they are unaffected.
+Note that `<fullname>` is not what singleton resources carry. `uhc.labels` puts `app.kubernetes.io/instance: <release name>` on the ServiceAccount, Ingress and Routes, and that stays as it is. So a release `myrel` gives the Deployment `instance: myrel-universal-helm-chart` and the ServiceAccount `instance: myrel`. A `kubectl -l` selector, or an external ServiceMonitor, has to pick the one it means.
+
+Three things stay where they are.
+
+Container names keep the workload key, so `kubectl logs -c api` still works and KEDA's `envSourceContainerName` still resolves.
+
+`jobGroups` keep both their names and their labels. The names are built from the group and job keys and never carried a workload suffix; the labels stay on `<groupName>-<jobName>` / `<fullname>-<groupName>-<jobName>` because a release can hold any number of job groups next to its one workload. Collapsing them would file every Job pod under the workload's own selector, and the workload's Service, NetworkPolicy and PDB would then pick up job pods.
+
+ESO `SecretStore` and `ExternalSecret` entries keep their own keys in labels for the same reason.
 
 The flag expects exactly one enabled entry across `deployments` and `statefulSets`. With more than one, `helm template` fails and names the offenders rather than collapsing them onto the same resource names:
 
@@ -112,7 +120,14 @@ The override covers the Service object and every chart-rendered reference that d
 
 On a StatefulSet the governing headless Service has its own key, `headlessService.nameOverride`, and `spec.serviceName` follows it. With `headlessService.enabled: false` that key is required and names the externally managed Service providing stable per-pod DNS. `statefulSets.<name>.serviceName` is the older spelling of the same value and still works; `headlessService.nameOverride` wins when both are set.
 
-Either override is checked against the 63-character ceiling the chart applies to every constructed name.
+Either override is checked against the 63-character ceiling the chart applies to every constructed name, and against the other Services in the release. Two workloads resolving to one Service name, or a StatefulSet whose client and headless Services land on the same name, fail the render:
+
+```
+Service name "shared-svc" is claimed by both deployments.a.service
+and deployments.b.service.
+```
+
+The one case that is allowed to look like a collision is `headlessService.enabled: false`, where the name points at a Service the chart does not render.
 
 ### `jobGroups` group → job merge
 

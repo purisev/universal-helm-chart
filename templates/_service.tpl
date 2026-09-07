@@ -30,6 +30,49 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
 {{- end }}
 
 {{/*
+Fail fast when two workloads resolve to the same Service name. Defaults never collide,
+so a duplicate always comes from service.nameOverride or headlessService.nameOverride
+(or the older serviceName spelling) — and it renders two Service documents under one
+name, which Kubernetes rejects on apply and a server-side-apply controller turns into
+two owners fighting over one object's selector.
+
+Covers the names a values file can set: each workload's own Service and, for
+StatefulSets, the governing headless Service while the chart renders it. A headless
+name under headlessService.enabled: false points at a Service the chart does not
+render, so it is left out.
+Params: $ctx (the dot)
+*/}}
+{{- define "uhc.assertUniqueServiceNames" -}}
+{{- $ctx := . -}}
+{{- $seen := dict -}}
+{{- range $kind := (list "deployments" "statefulSets") -}}
+  {{- $specs := index $ctx.Values $kind | default dict -}}
+  {{- range $wlName := keys $specs | sortAlpha -}}
+    {{- $wl := index $specs $wlName -}}
+    {{- if ne (index $wl "enabled") false -}}
+      {{- $claims := dict -}}
+      {{- if and $wl.service (ne (index $wl.service "enabled") false) -}}
+        {{- $_ := set $claims (include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName)) (printf "%s.%s.service" $kind $wlName) -}}
+      {{- end -}}
+      {{- if and (eq $kind "statefulSets") (ne (index ($wl.headlessService | default dict) "enabled") false) -}}
+        {{- $hsName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) -}}
+        {{- if hasKey $claims $hsName -}}
+          {{- fail (printf "Service name %q is claimed by both statefulSets.%s.service and statefulSets.%s.headlessService. A StatefulSet's client Service and its governing headless Service are two separate objects and cannot share a name." $hsName $wlName $wlName) -}}
+        {{- end -}}
+        {{- $_ := set $claims $hsName (printf "%s.%s.headlessService" $kind $wlName) -}}
+      {{- end -}}
+      {{- range $name, $origin := $claims -}}
+        {{- if hasKey $seen $name -}}
+          {{- fail (printf "Service name %q is claimed by both %s and %s. Two Services cannot share a name in one namespace; give one of them a different service.nameOverride / headlessService.nameOverride." $name (index $seen $name) $origin) -}}
+        {{- end -}}
+        {{- $_ := set $seen $name $origin -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Renders one complete, independent Service document from a workload's $wl.service
 block. Used by Deployment and StatefulSet — for StatefulSet this is always a
 second, separate object alongside the headless Service (never merged into it);

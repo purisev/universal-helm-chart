@@ -6,6 +6,9 @@ templates:
   - hpa.yaml
   - configmap.yaml
   - servicemonitor.yaml
+  - job-groups.yaml
+  - cronjob-groups.yaml
+  - externalsecret.yaml
 release:
   name: myrel
   namespace: test-ns
@@ -224,3 +227,82 @@ tests:
           path: metadata.name
           value: myrel-universal-helm-chart
         template: deployment.yaml
+
+  # --- jobGroups keep their own labels ---
+
+  - it: should keep the group name in Job labels and pod template
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      jobGroups.migrate.kind: Job
+      jobGroups.migrate.jobs.schema.command[0]: /bin/true
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: migrate-schema
+        template: job-groups.yaml
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart-migrate-schema
+        template: job-groups.yaml
+      - equal:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart-migrate-schema
+        template: job-groups.yaml
+
+  - it: should keep Job pod labels out of the workload selector
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      deployments.api.service.enabled: true
+      deployments.api.service.port: 80
+      deployments.api.service.targetPort: 8080
+      jobGroups.migrate.kind: Job
+      jobGroups.migrate.jobs.schema.command[0]: /bin/true
+    asserts:
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart
+        template: service.yaml
+      - notEqual:
+          path: spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart
+        template: job-groups.yaml
+
+  - it: should keep the group name in CronJob labels and pod template
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      jobGroups.cleanup.kind: CronJob
+      jobGroups.cleanup.jobs.nightly.schedule: 0 2 * * *
+      jobGroups.cleanup.jobs.nightly.command[0]: /bin/true
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: cleanup-nightly
+        template: cronjob-groups.yaml
+      - equal:
+          path: spec.jobTemplate.spec.template.metadata.labels["app.kubernetes.io/instance"]
+          value: myrel-universal-helm-chart-cleanup-nightly
+        template: cronjob-groups.yaml
+
+  - it: should keep the entry name in ExternalSecret labels
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.enabled: true
+      integrations.eso.externalSecrets.app-secrets.enabled: true
+      integrations.eso.externalSecrets.app-secrets.secretStore: vault
+      integrations.eso.externalSecrets.app-secrets.dataFrom[0].remoteKey: app
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: app-secrets
+        template: externalsecret.yaml

@@ -1,4 +1,5 @@
 {{- $ctx := . }}
+{{- include "uhc.assertUniqueServiceNames" $ctx }}
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}

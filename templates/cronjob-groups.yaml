@@ -22,7 +22,7 @@ metadata:
     {{- toYaml $cAnnots | nindent 4 }}
   {{- end }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "keepSuffix" true) | nindent 4 }}
 spec:
   schedule: {{ $merged.schedule | quote }}
   {{- with $merged.timeZone }}
@@ -91,7 +91,7 @@ spec:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           labels:
-            {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 12 }}
+            {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName "keepSuffix" true) | nindent 12 }}
         spec:
           {{- include "uhc.podSpec" (dict "ctx" $ctx "wl" $merged) | trim | nindent 10 }}
           restartPolicy: {{ default "Never" $merged.restartPolicy }}
@@ -142,7 +142,7 @@ spec:
             {{- include "uhc.configMapAutoVolumesFiltered" (dict "ctx" $ctx "granularDisable" $cmm.granular) | trim | nindent 12 }}
             {{- end }}
           {{- end }}
-          {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName) | trim }}
+          {{- $sched := include "uhc.scheduling" (dict "ctx" $ctx "wl" $merged "releaseName" $releaseName "wlName" $wlName "keepSuffix" true) | trim }}
           {{- if $sched }}
           {{- $sched | nindent 10 }}
           {{- end }}

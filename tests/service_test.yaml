@@ -848,3 +848,86 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "exceeds 63 characters"
+
+  # --- Service name collisions ---
+
+  - it: should fail fast when two workloads claim the same Service name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.a.service.enabled: true
+      deployments.a.service.port: 80
+      deployments.a.service.targetPort: 8080
+      deployments.a.service.nameOverride: shared-svc
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: shared-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: 'Service name "shared-svc" is claimed by both deployments.a.service and deployments.b.service'
+
+  - it: should fail fast when an override collides with another workload's default name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.a.service.enabled: true
+      deployments.a.service.port: 80
+      deployments.a.service.targetPort: 8080
+      deployments.a.service.nameOverride: test-release-universal-helm-chart-b
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: "is claimed by both deployments.a.service and deployments.b.service"
+
+  - it: should fail fast when a StatefulSet's client and headless Services share a name
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: db-peers
+      statefulSets.db.headlessService.nameOverride: db-peers
+    asserts:
+      - failedTemplate:
+          errorPattern: "statefulSets.db.service and statefulSets.db.headlessService"
+
+  - it: should allow an external headless Service to share a name with the client Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: shared
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: shared
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: shared
+
+  - it: should ignore disabled workloads when checking for collisions
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.a.service.enabled: true
+      deployments.a.service.port: 80
+      deployments.a.service.targetPort: 8080
+      deployments.a.service.nameOverride: shared-svc
+      deployments.b.enabled: false
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: shared-svc
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: shared-svc

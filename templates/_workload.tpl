@@ -311,10 +311,13 @@ resourceClaims:
 
 {{/*
 Scheduling: affinity (with inheritance), tolerations (merge root + local), topologySpreadConstraints.
-Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName
+Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName ["keepSuffix" true]
+keepSuffix is forwarded to uhc.workloadSelectorLabels for the default
+topologySpreadConstraints selector; jobGroups pass it.
 Output at zero indent; caller controls nindent.
 */}}
 {{- define "uhc.scheduling" -}}
+{{- $keepSuffix := .keepSuffix }}
 {{- $ctx := .ctx }}
 {{- $wl := .wl }}
 {{- $releaseName := .releaseName }}
@@ -352,7 +355,7 @@ topologySpreadConstraints:
       {{- toYaml .labelSelector | nindent 6 }}
       {{- else }}
       matchLabels:
-        {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
+        {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName "keepSuffix" $keepSuffix) | nindent 8 }}
       {{- end }}
     {{- if .matchLabelKeys }}
     matchLabelKeys:
