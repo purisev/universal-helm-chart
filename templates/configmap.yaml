@@ -1,4 +1,5 @@
 {{- $ctx := . }}
+{{- include "uhc.assertUniqueConfigMapNames" $ctx }}
 {{- $releaseName := include "uhc.fullname" . -}}
 
 {{- range $wlName := keys ($ctx.Values.deployments | default dict) | sortAlpha }}
