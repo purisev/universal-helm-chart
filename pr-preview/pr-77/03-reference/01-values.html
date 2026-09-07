@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4cb78a3a.js";
+            window.path_to_searchindex_js = "../searchindex-ce75ca25.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -437,6 +437,12 @@ and deployments.b.service.
 <p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
 <h3 id="init-containers-and-sidecars-share-one-container-shape"><a class="header" href="#init-containers-and-sidecars-share-one-container-shape">Init containers and sidecars share one container shape</a></h3>
 <p><code>deployments.&lt;name&gt;.initContainers</code> and <code>deployments.&lt;name&gt;.sidecars</code> (same under <code>statefulSets.&lt;name&gt;</code>) are maps keyed by container name. Both flow through the same renderer as the main container: <code>image</code>, <code>command</code>/<code>args</code>, <code>env</code>, <code>envSecrets</code>, <code>volumeMounts</code>, <code>resources</code>, <code>securityContext</code>, <code>lifecycle</code>. Both inherit the parent workload’s <code>inherit.env</code> / <code>inherit.configMaps</code> / <code>inherit.configMapMount</code> flags. Neither inherits root-level <code>volumeMounts.&lt;containerName&gt;</code> — declare local mounts inline. Render order is <code>sortAlpha</code>; for <code>initContainers</code> Kubernetes runs them sequentially in declared order, so prefix names with <code>01-</code>, <code>02-</code>, … when run order matters (same convention as <code>jobGroups[*].tasks</code>). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. <strong>Two exceptions for <code>initContainers</code>:</strong> <code>probesEnabled</code> / probe blocks (<code>readinessProbe</code>, <code>livenessProbe</code>, <code>startupProbe</code>) and <code>lifecycle</code> are rejected — Kubernetes does not allow these on standard init containers, so <code>helm template</code> fail-fasts if either is set on an init entry.</p>
+<h3 id="configmap-names"><a class="header" href="#configmap-names">ConfigMap names</a></h3>
+<p>A workload with <code>createConfigmap: true</code> gets <code>&lt;fullname&gt;-&lt;workloadName&gt;-config</code>, and an entry in <code>configMaps</code> gets <code>&lt;fullname&gt;-&lt;key&gt;</code>. The two shapes meet whenever a key spells out the other’s suffix, so <code>configMaps.web-config</code> beside a workload named <code>web</code> lands both on one name, and under <code>naming.omitWorkloadSuffix</code> a key of just <code>config</code> is enough. That fails the render rather than producing two documents Kubernetes will refuse:</p>
+<pre><code>ConfigMap name "myrel-universal-helm-chart-web-config" is claimed by both
+deployments.web.createConfigmap and configMaps.web-config.
+</code></pre>
+<p>The same check covers a <code>deployments.&lt;name&gt;</code> and a <code>statefulSets.&lt;name&gt;</code> sharing a key while both set <code>createConfigmap</code>. Disabled workloads and <code>configMaps</code> entries are ignored, since neither renders.</p>
 <h3 id="chart-owned-vs-external-name-resolution"><a class="header" href="#chart-owned-vs-external-name-resolution">Chart-owned vs external name resolution</a></h3>
 <p>When the same name appears in both a chart-owned map (<code>configMaps</code>, <code>integrations.eso.externalSecrets</code>) and an external reference list (<code>envConfigMaps</code>, <code>envSecrets</code>):</p>
 <ul>
