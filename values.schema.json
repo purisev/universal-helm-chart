@@ -98,6 +98,7 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "nameOverride": {"type": "string"},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "targetPort": {"type": ["integer", "string"]},
         "appProtocol": {"type": "string"},
@@ -143,6 +144,7 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "nameOverride": {"type": "string"},
         "type": {"type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "targetPort": {"type": ["integer", "string"]},

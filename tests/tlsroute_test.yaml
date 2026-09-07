@@ -340,3 +340,16 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "tlsRoute.hostnames entry templated to an empty string"
+
+  - it: should follow service.nameOverride in per-workload backendRefs
+    set:
+      tlsRoute.parentRefs[0].name: my-gateway
+      tlsRoute.hostnames[0]: tls.example.com
+      deployments.api.service.port: 443
+      deployments.api.service.nameOverride: legacy-api-svc
+      deployments.api.tlsRoute.enabled: true
+      deployments.api.tlsRoute.rules[0].name: api
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: legacy-api-svc
