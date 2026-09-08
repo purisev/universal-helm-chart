@@ -201,7 +201,7 @@ Service name "shared-svc" is claimed by both deployments.a.service
 and deployments.b.service.
 ```
 
-`headlessService.enabled: false` is the one case allowed to look like a collision, because the name belongs to a Service outside the release. It still has to stay outside it: a name the chart renders itself is either not headless or selects another workload's pods, so `spec.serviceName` would resolve to a Service that never provides per-pod DNS, and the render fails:
+`headlessService.enabled: false` is the one case allowed to look like a collision, because the name usually belongs to a Service outside the release. The one name inside it that also works is the workload's own client Service with `clusterIP: None`, which is headless and already selects these pods. Anything else the chart renders leaves `spec.serviceName` on a Service that never provides per-pod DNS, and the render fails:
 
 ```
 statefulSets.db.headlessService is disabled, so spec.serviceName points at
