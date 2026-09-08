@@ -80,7 +80,15 @@ The map form falls back the same way: `service.ports.<name>.port` alone is enoug
 
 ```
 service.ports for workload "web": port "http" declares neither port nor
-targetPort. Set one of them — the other falls back to it.
+targetPort. Set port, or a numeric targetPort for it to fall back to.
+```
+
+The fallback runs one way only. `spec.ports[].port` is a number, so an entry that names its `targetPort` has to declare `port` itself:
+
+```
+service.ports for workload "web": port "grpc" names its targetPort "grpc"
+and declares no port. A Service port is a number and cannot fall back to a
+name, so set port explicitly.
 ```
 
 An enabled Service with neither form, and no metrics port injected by `integrations.monitoring.defaults.exposeService`, fails the render. A client-facing Service has nothing sensible to default to, unlike `headlessService`, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is `type: ExternalName`, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a `ports` block, and any ports it does declare are still passed through.
