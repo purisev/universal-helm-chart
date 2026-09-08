@@ -82,14 +82,14 @@ An enabled Service with neither form, and no metrics port injected by `integrati
 
 ### Named `targetPort` and the workload `ports` map
 
-A Service `targetPort` may name a port instead of numbering it, but `containerPort` is an integer, so the chart cannot derive a container port from a name. Setting one fails the render:
+A Service `targetPort` may name a port instead of numbering it, but `containerPort` is an integer, so the chart cannot derive a container port from a name on its own. It resolves the name against the containers in the Pod, and fails the render when none of them declares it:
 
 ```
-container "web": service.ports.grpc.targetPort is "grpc", a port name rather than
-a number, and containerPort has to be numeric.
+container "web": service.ports.grpc.targetPort is "grpc", a port name no container
+in this Pod declares, and containerPort has to be numeric.
 ```
 
-Declare the port on the workload instead. A workload's own `ports` map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:
+Declare the port on the container that serves it. A workload's own `ports` map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:
 
 ```yaml
 deployments:
@@ -103,6 +103,29 @@ deployments:
         grpc:
           port: 9000
           targetPort: grpc
+```
+
+A sidecar counts too. A Service port whose `targetPort` names a port one of the workload's `sidecars` declares belongs to that sidecar's container — the main container leaves it out rather than claiming a port it does not listen on:
+
+```yaml
+deployments:
+  web:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080       # containerPort on the web container
+        proxy:
+          port: 9000
+          targetPort: envoy-admin
+    sidecars:
+      envoy:
+        image:
+          repository: envoyproxy/envoy
+          tag: v1.31-latest
+        ports:
+          envoy-admin:
+            containerPort: 9901  # the port the Service name resolves to
 ```
 
 ### Service port `appProtocol`

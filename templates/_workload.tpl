@@ -1,18 +1,35 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
-Fail fast when a Service targetPort that becomes a containerPort is a port name rather
-than a number. Service.targetPort accepts either, but ContainerPort.containerPort is an
-int32, so a name renders a container the API server rejects. The workload's own `ports`
-map replaces the Service-derived container ports entirely, which is where a named
-targetPort belongs.
-Params: dict "value" $v "containerName" $n "source" "<values path>" "portName" $pName
+Fail fast when a Service targetPort that becomes a containerPort is a port name no
+container in the Pod declares. Service.targetPort accepts a name or a number, but
+ContainerPort.containerPort is an int32, so a name the chart cannot resolve renders a
+container the API server rejects. A name a sidecar declares is resolved by that
+sidecar's own port and never reaches here.
+Params: dict "value" $v "containerName" $n "source" "<values path>"
 */}}
 {{- define "uhc.assertNumericContainerPort" -}}
 {{- $value := .value -}}
 {{- if not (regexMatch "^[0-9]+$" (toString $value)) -}}
-{{- fail (printf "container %q: %s is %q, a port name rather than a number, and containerPort has to be numeric. Declare the port on the workload itself (ports.%s.containerPort: <number>) — that replaces the Service-derived container ports and leaves the Service free to keep referring to it by name." .containerName .source (toString $value) .portName) -}}
+{{- fail (printf "container %q: %s is %q, a port name no container in this Pod declares, and containerPort has to be numeric. Declare it on the container that serves it — ports.%s.containerPort: <number> on the workload itself, or sidecars.<name>.ports.%s.containerPort on the sidecar — and the Service can keep referring to it by name." .containerName .source (toString $value) (toString $value) (toString $value)) -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+Port names declared by a workload's sidecars. A Service targetPort naming one of these
+is served by that sidecar's container, so the main container leaves it out instead of
+failing on a name it cannot turn into a number.
+Params: dict "sidecars" $wl.sidecars
+Returns a JSON array of names.
+*/}}
+{{- define "uhc.sidecarPortNames" -}}
+{{- $names := list -}}
+{{- range $sidecar := (.sidecars | default dict) -}}
+{{- range $pName := keys ($sidecar.ports | default dict) -}}
+{{- $names = append $names $pName -}}
+{{- end -}}
+{{- end -}}
+{{- toJson (uniq $names) -}}
 {{- end }}
 
 {{/*
@@ -111,9 +128,39 @@ Output at zero indent; caller controls nindent.
   {{- /* Container ports derived from the Service. Each targetPort falls back to its own
      port the same way uhc.plainService resolves it, so the container spec names the port
      the Service actually sends traffic to. A Service carrying no port at all (ExternalName,
-     or a workload whose only port is the injected metrics one) contributes nothing here. */ -}}
-  {{- $svcDerived := and $wl.service $wl.service.enabled (or $wl.service.ports $wl.service.targetPort $wl.service.port) -}}
-  {{- if and .renderDirectPorts $wl.ports }}
+     or a workload whose only port is the injected metrics one) contributes nothing here.
+     `service:` without an explicit enabled key counts as enabled, like everywhere else
+     in the chart. */ -}}
+  {{- $svcDerived := and $wl.service (ne (index $wl.service "enabled") false) (or $wl.service.ports $wl.service.targetPort $wl.service.port) -}}
+  {{- /* A named targetPort a sidecar declares is served by that sidecar's container, so
+     it is dropped here rather than failing on a name that cannot become an int32. */ -}}
+  {{- $sidecarPortNames := include "uhc.sidecarPortNames" (dict "sidecars" $wl.sidecars) | fromJsonArray -}}
+  {{- $directPorts := and .renderDirectPorts $wl.ports -}}
+  {{- $derivedNames := list -}}
+  {{- if and (not $directPorts) $svcDerived -}}
+    {{- if $wl.service.ports -}}
+      {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray -}}
+        {{- $p := index $wl.service.ports $pName -}}
+        {{- $target := toString ($p.targetPort | default $p.port) -}}
+        {{- if regexMatch "^[0-9]+$" $target -}}
+          {{- $derivedNames = append $derivedNames $pName -}}
+        {{- else if not (has $target $sidecarPortNames) -}}
+          {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" (printf "service.ports.%s.targetPort" $pName)) -}}
+        {{- end -}}
+      {{- end -}}
+    {{- else -}}
+      {{- $target := toString ($wl.service.targetPort | default $wl.service.port) -}}
+      {{- if regexMatch "^[0-9]+$" $target -}}
+        {{- $derivedNames = append $derivedNames "http" -}}
+      {{- else if not (has $target $sidecarPortNames) -}}
+        {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" "service.targetPort") -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not $derivedNames -}}
+      {{- $svcDerived = false -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $directPorts }}
   ports:
     {{- range $pName := include "uhc.orderedPortNames" $wl.ports | fromJsonArray }}
     {{- $p := index $wl.ports $pName }}
@@ -130,19 +177,15 @@ Output at zero indent; caller controls nindent.
   ports:
     {{- if $svcDerived }}
     {{- if $wl.service.ports }}
-    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
+    {{- range $pName := $derivedNames }}
     {{- $p := index $wl.service.ports $pName }}
-    {{- $target := $p.targetPort | default $p.port }}
-    {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" (printf "service.ports.%s.targetPort" $pName) "portName" $pName) }}
     - name: {{ $pName }}
-      containerPort: {{ $target }}
+      containerPort: {{ $p.targetPort | default $p.port }}
       protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
     {{- else }}
-    {{- $target := $wl.service.targetPort | default $wl.service.port }}
-    {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" "service.targetPort" "portName" "http") }}
     - name: http
-      containerPort: {{ $target }}
+      containerPort: {{ $wl.service.targetPort | default $wl.service.port }}
       protocol: TCP
     {{- end }}
     {{- end }}

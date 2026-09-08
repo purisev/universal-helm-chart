@@ -8,12 +8,15 @@
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
-{{- if and (ne (index $wl "enabled") false) $wl.service (ne (index $wl.service "enabled") false) }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.service (ne (index $wl.service "enabled") false) }}
 {{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
 {{- end }}
-{{- /* Standalone metrics-only Service for deployments without main service */ -}}
+{{- /* Standalone metrics-only Service for deployments without main service.
+     uhc.metricsOnlyServiceName asserts the name it builds, so a disabled workload
+     never reaches it — its names go on no cluster and must not fail the render. */ -}}
 {{- $metricsSvcName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
-{{- if and (ne (index $wl "enabled") false) $metricsSvcName }}
+{{- if $metricsSvcName }}
 {{- $expose := $exposeJson | fromJson }}
 ---
 apiVersion: v1
@@ -36,6 +39,7 @@ spec:
       protocol: TCP
   selector:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
