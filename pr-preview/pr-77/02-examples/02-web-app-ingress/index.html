@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-d678dc0e.js";
+            window.path_to_searchindex_js = "../../searchindex-4926e140.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-9fa66af8.js"></script>
@@ -199,7 +199,8 @@
 <tbody>
 <tr><td><code>service.ports</code> (map)</td><td>Replaces single-port <code>service.port</code> shorthand to expose two ports.</td></tr>
 <tr><td><code>metrics.enabled: true</code></td><td>Opt-in to monitoring (defaults are off).</td></tr>
-<tr><td><code>ingress</code></td><td>Routes <code>web.example.com</code> to the Service.</td></tr>
+<tr><td><code>ingress</code></td><td>Routes <code>web.example.com</code> to the Service. Its <code>serviceName</code> is a plain string, so it has to name what the chart renders.</td></tr>
+<tr><td><code>fullnameOverride</code></td><td>Pins the prefix on every resource name to <code>webapp</code>, making the Service <code>webapp-web</code> instead of <code>webapp-universal-helm-chart-web</code> — that is the name the Ingress backend spells out.</td></tr>
 <tr><td><code>hpa</code></td><td>Auto-scales on CPU; <code>replicaCount</code> is omitted from the rendered Deployment because HPA is on (see <a href="../../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a>).</td></tr>
 <tr><td><code>integrations.monitoring.defaults.enabled: true</code></td><td>Turns the default scrape on for every workload (per-workload <code>metrics.enabled</code> still acts as opt-out).</td></tr>
 </tbody>

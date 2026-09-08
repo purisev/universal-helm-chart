@@ -16,6 +16,7 @@ spec:
     helm:
       releaseName: webapp
       values: |
+        fullnameOverride: webapp
         integrations:
           monitoring:
             defaults:

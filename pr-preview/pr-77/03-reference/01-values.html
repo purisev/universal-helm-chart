@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d678dc0e.js";
+            window.path_to_searchindex_js = "../searchindex-4926e140.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -243,11 +243,11 @@
 <p>The map form falls back the same way: <code>service.ports.&lt;name&gt;.port</code> alone is enough, and the container port follows it.</p>
 <p>An enabled Service with neither form, and no metrics port injected by <code>integrations.monitoring.defaults.exposeService</code>, fails the render. A client-facing Service has nothing sensible to default to, unlike <code>headlessService</code>, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is <code>type: ExternalName</code>, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a <code>ports</code> block, and any ports it does declare are still passed through.</p>
 <h3 id="named-targetport-and-the-workload-ports-map"><a class="header" href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a></h3>
-<p>A Service <code>targetPort</code> may name a port instead of numbering it, but <code>containerPort</code> is an integer, so the chart cannot derive a container port from a name. Setting one fails the render:</p>
-<pre><code>container "web": service.ports.grpc.targetPort is "grpc", a port name rather than
-a number, and containerPort has to be numeric.
+<p>A Service <code>targetPort</code> may name a port instead of numbering it, but <code>containerPort</code> is an integer, so the chart cannot derive a container port from a name on its own. It resolves the name against the containers in the Pod, and fails the render when none of them declares it:</p>
+<pre><code>container "web": service.ports.grpc.targetPort is "grpc", a port name no container
+in this Pod declares, and containerPort has to be numeric.
 </code></pre>
-<p>Declare the port on the workload instead. A workload’s own <code>ports</code> map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:</p>
+<p>Declare the port on the container that serves it. A workload’s own <code>ports</code> map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:</p>
 <pre><code class="language-yaml">deployments:
   web:
     ports:
@@ -259,6 +259,26 @@ a number, and containerPort has to be numeric.
         grpc:
           port: 9000
           targetPort: grpc
+</code></pre>
+<p>A sidecar counts too. A Service port whose <code>targetPort</code> names a port one of the workload’s <code>sidecars</code> declares belongs to that sidecar’s container — the main container leaves it out rather than claiming a port it does not listen on:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080       # containerPort on the web container
+        proxy:
+          port: 9000
+          targetPort: envoy-admin
+    sidecars:
+      envoy:
+        image:
+          repository: envoyproxy/envoy
+          tag: v1.31-latest
+        ports:
+          envoy-admin:
+            containerPort: 9901  # the port the Service name resolves to
 </code></pre>
 <h3 id="service-port-appprotocol"><a class="header" href="#service-port-appprotocol">Service port <code>appProtocol</code></a></h3>
 <p>Both Service port shapes accept an optional <code>appProtocol</code> — the single-port <code>service.port</code>/<code>service.targetPort</code> form and the <code>service.ports.&lt;name&gt;</code> map form (and their <code>headlessService</code> equivalents on StatefulSets). It passes straight through to <code>spec.ports[].appProtocol</code>, the native Kubernetes Service field.</p>

@@ -1,6 +1,11 @@
 # 09-multi-env-overrides — prod overlay.
 # Apply on top of values-base.yaml: helm install -f values-base.yaml -f values-prod.yaml
 
+# Every env carries its own name prefix, so cross-references (the Ingress backend
+# below, dashboards, runbooks) name resources that exist without depending on how
+# the release was named.
+fullnameOverride: orders-prod
+
 commonLabels:
   environment: prod
   cost-center: orders

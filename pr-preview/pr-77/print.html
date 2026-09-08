@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-d678dc0e.js";
+            window.path_to_searchindex_js = "searchindex-4926e140.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -461,7 +461,8 @@
 <tbody>
 <tr><td><code>service.ports</code> (map)</td><td>Replaces single-port <code>service.port</code> shorthand to expose two ports.</td></tr>
 <tr><td><code>metrics.enabled: true</code></td><td>Opt-in to monitoring (defaults are off).</td></tr>
-<tr><td><code>ingress</code></td><td>Routes <code>web.example.com</code> to the Service.</td></tr>
+<tr><td><code>ingress</code></td><td>Routes <code>web.example.com</code> to the Service. Its <code>serviceName</code> is a plain string, so it has to name what the chart renders.</td></tr>
+<tr><td><code>fullnameOverride</code></td><td>Pins the prefix on every resource name to <code>webapp</code>, making the Service <code>webapp-web</code> instead of <code>webapp-universal-helm-chart-web</code> — that is the name the Ingress backend spells out.</td></tr>
 <tr><td><code>hpa</code></td><td>Auto-scales on CPU; <code>replicaCount</code> is omitted from the rendered Deployment because HPA is on (see <a href="#007--autoscaler-mutual-exclusion-hpa--keda--vpa">ADR 007</a>).</td></tr>
 <tr><td><code>integrations.monitoring.defaults.enabled: true</code></td><td>Turns the default scrape on for every workload (per-workload <code>metrics.enabled</code> still acts as opt-out).</td></tr>
 </tbody>
@@ -908,6 +909,7 @@ kubectl apply -f flux/
 <h2 id="what-this-shows-8"><a class="header" href="#what-this-shows-8">What this shows</a></h2>
 <ul>
 <li><strong>Two-file values pattern</strong>: pass <code>values-base.yaml</code> and <code>values-&lt;env&gt;.yaml</code> to Helm via repeated <code>-f</code>. Later files win on key collision.</li>
+<li><strong>Per-env <code>fullnameOverride</code></strong>: each overlay pins its own resource-name prefix (<code>orders-dev</code> / <code>orders-staging</code> / <code>orders-prod</code>), so the prod Ingress backend can name <code>orders-prod-api</code> without depending on the release name Argo CD or Flux passes.</li>
 <li><strong>Argo CD multi-source with multiple <code>valueFiles</code></strong>: the chart source lists both files; Argo CD merges them in order before running Helm.</li>
 <li><strong>Argo CD <code>ApplicationSet</code></strong>: a list generator declares the envs once; the template stamps out an Application per env. Avoids hand-maintaining three near-identical Application CRs.</li>
 <li><strong>Flux <code>valuesFrom</code></strong>: prod values can also live in a ConfigMap (managed separately) — useful when ops change values out-of-band of git.</li>
@@ -1113,11 +1115,11 @@ kubectl apply -f flux/
 <p>The map form falls back the same way: <code>service.ports.&lt;name&gt;.port</code> alone is enough, and the container port follows it.</p>
 <p>An enabled Service with neither form, and no metrics port injected by <code>integrations.monitoring.defaults.exposeService</code>, fails the render. A client-facing Service has nothing sensible to default to, unlike <code>headlessService</code>, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is <code>type: ExternalName</code>, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a <code>ports</code> block, and any ports it does declare are still passed through.</p>
 <h3 id="named-targetport-and-the-workload-ports-map"><a class="header" href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a></h3>
-<p>A Service <code>targetPort</code> may name a port instead of numbering it, but <code>containerPort</code> is an integer, so the chart cannot derive a container port from a name. Setting one fails the render:</p>
-<pre><code>container "web": service.ports.grpc.targetPort is "grpc", a port name rather than
-a number, and containerPort has to be numeric.
+<p>A Service <code>targetPort</code> may name a port instead of numbering it, but <code>containerPort</code> is an integer, so the chart cannot derive a container port from a name on its own. It resolves the name against the containers in the Pod, and fails the render when none of them declares it:</p>
+<pre><code>container "web": service.ports.grpc.targetPort is "grpc", a port name no container
+in this Pod declares, and containerPort has to be numeric.
 </code></pre>
-<p>Declare the port on the workload instead. A workload’s own <code>ports</code> map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:</p>
+<p>Declare the port on the container that serves it. A workload’s own <code>ports</code> map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:</p>
 <pre><code class="language-yaml">deployments:
   web:
     ports:
@@ -1129,6 +1131,26 @@ a number, and containerPort has to be numeric.
         grpc:
           port: 9000
           targetPort: grpc
+</code></pre>
+<p>A sidecar counts too. A Service port whose <code>targetPort</code> names a port one of the workload’s <code>sidecars</code> declares belongs to that sidecar’s container — the main container leaves it out rather than claiming a port it does not listen on:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080       # containerPort on the web container
+        proxy:
+          port: 9000
+          targetPort: envoy-admin
+    sidecars:
+      envoy:
+        image:
+          repository: envoyproxy/envoy
+          tag: v1.31-latest
+        ports:
+          envoy-admin:
+            containerPort: 9901  # the port the Service name resolves to
 </code></pre>
 <h3 id="service-port-appprotocol"><a class="header" href="#service-port-appprotocol">Service port <code>appProtocol</code></a></h3>
 <p>Both Service port shapes accept an optional <code>appProtocol</code> — the single-port <code>service.port</code>/<code>service.targetPort</code> form and the <code>service.ports.&lt;name&gt;</code> map form (and their <code>headlessService</code> equivalents on StatefulSets). It passes straight through to <code>spec.ports[].appProtocol</code>, the native Kubernetes Service field.</p>
@@ -1616,7 +1638,7 @@ helm unittest .
 <tr><td><code>helm lint .</code></td><td>Before pushing — catches schema mismatches and shape problems CI will also reject.</td></tr>
 <tr><td><code>helm unittest .</code></td><td>Before pushing — catches behavioural regressions. Add a new test case in the matching <code>tests/&lt;template&gt;_test.yaml</code> whenever you add a feature.</td></tr>
 <tr><td><code>bash .github/scripts/check-version-pins.sh</code></td><td>After touching <code>Chart.yaml</code> or any install snippet in <code>docs/</code> — holds every documented version to the one in <code>Chart.yaml</code>.</td></tr>
-<tr><td><code>bash .github/scripts/check-examples.sh</code></td><td>After touching the values shape, the schema or anything under <code>docs/02-examples/</code> — renders every example, including the values inlined in its Argo CD and Flux manifests. Needs <code>yq</code>.</td></tr>
+<tr><td><code>bash .github/scripts/check-examples.sh</code></td><td>After touching the values shape, the schema or anything under <code>docs/02-examples/</code> — renders every example, including the values inlined in its Argo CD and Flux manifests, and checks each Ingress backend against the Services the same values render. Needs <code>yq</code>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1628,7 +1650,7 @@ helm unittest .
 <li><strong>Changed the values shape?</strong> Update <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json"><code>values.schema.json</code></a> in the same commit. Schema and <code>values.yaml</code> drift is the most common reviewer comment.</li>
 <li><strong>Added a field?</strong> Add at least one assertion in <code>tests/&lt;template&gt;_test.yaml</code>. Coverage prevents silent regressions on future refactors.</li>
 <li><strong>Bumped the chart version?</strong> Every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names it too. <code>check-version-pins.sh</code> lists the ones you missed; CI runs it on every run, the e2e suites wait on it, and the branch preview build will not publish while it is red.</li>
-<li><strong>Changed an example?</strong> Each example carries the same values three times: <code>values.yaml</code>, the Argo CD <code>Application</code>, and the Flux <code>HelmRelease</code>. Change one and the other two go stale. <code>check-examples.sh</code> renders all three and fails on the ones that no longer install.</li>
+<li><strong>Changed an example?</strong> Each example carries the same values three times: <code>values.yaml</code>, the Argo CD <code>Application</code>, and the Flux <code>HelmRelease</code>. Change one and the other two go stale. <code>check-examples.sh</code> renders all three and fails on the ones that no longer install — or that name a Service nothing renders.</li>
 <li><strong>Writing fixtures or example values?</strong> Use <strong>block-style</strong> YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>

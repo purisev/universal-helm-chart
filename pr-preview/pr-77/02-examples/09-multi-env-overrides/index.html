@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-d678dc0e.js";
+            window.path_to_searchindex_js = "../../searchindex-4926e140.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-9fa66af8.js"></script>
@@ -208,6 +208,7 @@
 <h2 id="what-this-shows"><a class="header" href="#what-this-shows">What this shows</a></h2>
 <ul>
 <li><strong>Two-file values pattern</strong>: pass <code>values-base.yaml</code> and <code>values-&lt;env&gt;.yaml</code> to Helm via repeated <code>-f</code>. Later files win on key collision.</li>
+<li><strong>Per-env <code>fullnameOverride</code></strong>: each overlay pins its own resource-name prefix (<code>orders-dev</code> / <code>orders-staging</code> / <code>orders-prod</code>), so the prod Ingress backend can name <code>orders-prod-api</code> without depending on the release name Argo CD or Flux passes.</li>
 <li><strong>Argo CD multi-source with multiple <code>valueFiles</code></strong>: the chart source lists both files; Argo CD merges them in order before running Helm.</li>
 <li><strong>Argo CD <code>ApplicationSet</code></strong>: a list generator declares the envs once; the template stamps out an Application per env. Avoids hand-maintaining three near-identical Application CRs.</li>
 <li><strong>Flux <code>valuesFrom</code></strong>: prod values can also live in a ConfigMap (managed separately) — useful when ops change values out-of-band of git.</li>
