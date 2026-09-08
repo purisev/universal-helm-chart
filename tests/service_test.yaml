@@ -895,7 +895,23 @@ tests:
       - failedTemplate:
           errorPattern: "statefulSets.db.service and statefulSets.db.headlessService"
 
-  - it: should allow an external headless Service to share a name with the client Service
+  - it: should allow a disabled headless Service to name a Service outside the release
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: externally-managed-peers
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db
+
+  - it: should fail fast when a disabled headless Service names the workload's own client Service
     set:
       image.repository: redis
       image.tag: alpine
@@ -906,11 +922,21 @@ tests:
       statefulSets.db.headlessService.enabled: false
       statefulSets.db.headlessService.nameOverride: shared
     asserts:
-      - hasDocuments:
-          count: 1
-      - equal:
-          path: metadata.name
-          value: shared
+      - failedTemplate:
+          errorPattern: 'statefulSets.db.headlessService is disabled, so spec.serviceName points at "shared" — but that name belongs to statefulSets.db.service'
+
+  - it: should fail fast when a disabled headless Service names another workload's Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: test-release-universal-helm-chart-web
+    asserts:
+      - failedTemplate:
+          errorPattern: 'points at "test-release-universal-helm-chart-web" — but that name belongs to deployments.web.service'
 
   - it: should ignore disabled workloads when checking for collisions
     set:
@@ -975,6 +1001,27 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: 'Service for workload "web" declares no port'
+
+  - it: should fail fast when a service port entry declares neither port nor targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.protocol: TCP
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports for workload "web": port "http" declares neither port nor targetPort'
+
+  - it: should fail fast when a headless Service port entry declares neither port nor targetPort
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.protocol: TCP
+    asserts:
+      - failedTemplate:
+          errorPattern: 'headlessService.ports for workload "db": port "peer" declares neither port nor targetPort'
 
   - it: should render a portless service that only carries the injected metrics port
     set:

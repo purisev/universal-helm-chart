@@ -76,7 +76,12 @@ service:
   targetPort: 8080  # container listens on 8080
 ```
 
-The map form falls back the same way: `service.ports.<name>.port` alone is enough, and the container port follows it.
+The map form falls back the same way: `service.ports.<name>.port` alone is enough, and the container port follows it. An entry with neither key has nothing to fall back to and fails the render:
+
+```
+service.ports for workload "web": port "http" declares neither port nor
+targetPort. Set one of them — the other falls back to it.
+```
 
 An enabled Service with neither form, and no metrics port injected by `integrations.monitoring.defaults.exposeService`, fails the render. A client-facing Service has nothing sensible to default to, unlike `headlessService`, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is `type: ExternalName`, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a `ports` block, and any ports it does declare are still passed through.
 
@@ -196,7 +201,13 @@ Service name "shared-svc" is claimed by both deployments.a.service
 and deployments.b.service.
 ```
 
-The one case that is allowed to look like a collision is `headlessService.enabled: false`, where the name points at a Service the chart does not render.
+`headlessService.enabled: false` is the one case allowed to look like a collision, because the name belongs to a Service outside the release. It still has to stay outside it: a name the chart renders itself is either not headless or selects another workload's pods, so `spec.serviceName` would resolve to a Service that never provides per-pod DNS, and the render fails:
+
+```
+statefulSets.db.headlessService is disabled, so spec.serviceName points at
+"shared" — but that name belongs to statefulSets.db.service, a Service this
+chart renders itself.
+```
 
 ### `jobGroups` group → job merge
 

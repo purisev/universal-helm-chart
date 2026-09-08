@@ -61,8 +61,13 @@ two owners fighting over one object's selector.
 Covers every Service name the chart puts on the cluster: each workload's own Service,
 the metrics-only Service a Deployment gets when it exposes metrics without a Service of
 its own, and, for StatefulSets, the governing headless Service while the chart renders
-it. A headless name under headlessService.enabled: false points at a Service the chart
-does not render, so it is left out.
+it.
+
+A headless name under headlessService.enabled: false names a Service the chart does not
+render, so it claims nothing — but it still has to land outside the release, on an
+externally managed headless Service. Pointed at a name the chart renders it resolves to
+a Service that is either not headless or selects another workload's pods, and stable
+per-pod DNS silently never works. That case is checked once every claim is known.
 Params: $ctx (the dot)
 */}}
 {{- define "uhc.assertUniqueServiceNames" -}}
@@ -99,6 +104,16 @@ Params: $ctx (the dot)
     {{- end -}}
   {{- end -}}
 {{- end -}}
+{{- $statefulSets := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSets | sortAlpha -}}
+  {{- $wl := index $statefulSets $wlName -}}
+  {{- if and (ne (index $wl "enabled") false) (eq (index ($wl.headlessService | default dict) "enabled") false) -}}
+    {{- $hsName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) -}}
+    {{- if hasKey $seen $hsName -}}
+      {{- fail (printf "statefulSets.%s.headlessService is disabled, so spec.serviceName points at %q — but that name belongs to %s, a Service this chart renders itself. A governing Service has to be headless and select this StatefulSet's own pods, or per-pod DNS never resolves. Enable headlessService, or point the override at an externally managed headless Service." $wlName $hsName (index $seen $hsName)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -118,6 +133,7 @@ Emits the leading "---" document separator itself.
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($svc.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" $svc.ports "source" (printf "service.ports for workload %q" $wlName)) }}
 {{- $hasPorts := or $svc.ports $svc.port $svc.targetPort .injectMetricsPort }}
 {{- /* ExternalName resolves to a DNS name and carries no virtual IP, so Kubernetes
      treats its ports as optional and ignores them. Every other type needs at least one:
@@ -248,6 +264,7 @@ Emits the leading "---" document separator itself.
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($hs.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 {{- $headlessName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" $hs.ports "source" (printf "headlessService.ports for workload %q" $wlName)) }}
 ---
 apiVersion: v1
 kind: Service
