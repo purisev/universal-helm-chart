@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d5c2ccd4.js";
+            window.path_to_searchindex_js = "../searchindex-d7b5505e.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -323,7 +323,7 @@ in this Pod declares, and containerPort has to be numeric.
 <pre><code>Service name "shared-svc" is claimed by both deployments.a.service
 and deployments.b.service.
 </code></pre>
-<p><code>headlessService.enabled: false</code> is the one case allowed to look like a collision, because the name belongs to a Service outside the release. It still has to stay outside it: a name the chart renders itself is either not headless or selects another workload’s pods, so <code>spec.serviceName</code> would resolve to a Service that never provides per-pod DNS, and the render fails:</p>
+<p><code>headlessService.enabled: false</code> is the one case allowed to look like a collision, because the name usually belongs to a Service outside the release. The one name inside it that also works is the workload’s own client Service with <code>clusterIP: None</code>, which is headless and already selects these pods. Anything else the chart renders leaves <code>spec.serviceName</code> on a Service that never provides per-pod DNS, and the render fails:</p>
 <pre><code>statefulSets.db.headlessService is disabled, so spec.serviceName points at
 "shared" — but that name belongs to statefulSets.db.service, a Service this
 chart renders itself.
