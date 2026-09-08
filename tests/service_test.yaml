@@ -911,6 +911,27 @@ tests:
           path: metadata.name
           value: test-release-universal-helm-chart-db
 
+  - it: should allow a disabled headless Service to reuse a headless client Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.clusterIP: None
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: db-peers
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: db-peers
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: db-peers
+      - equal:
+          path: spec.clusterIP
+          value: None
+
   - it: should fail fast when a disabled headless Service names the workload's own client Service
     set:
       image.repository: redis
@@ -1022,6 +1043,28 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: 'headlessService.ports for workload "db": port "peer" declares neither port nor targetPort'
+
+  - it: should fail fast when a service port entry names its targetPort and declares no port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.targetPort: grpc
+      deployments.web.ports.grpc.containerPort: 9000
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports for workload "web": port "grpc" names its targetPort "grpc" and declares no port'
+
+  - it: should fail fast when a headless port entry names its targetPort and declares no port
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.targetPort: peer
+    asserts:
+      - failedTemplate:
+          errorPattern: 'headlessService.ports for workload "db": port "peer" names its targetPort "peer" and declares no port'
 
   - it: should render a portless service that only carries the injected metrics port
     set:
