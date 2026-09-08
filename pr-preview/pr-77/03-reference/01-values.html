@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-d7b5505e.js";
+            window.path_to_searchindex_js = "../searchindex-4f200f4b.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -242,7 +242,12 @@
 </code></pre>
 <p>The map form falls back the same way: <code>service.ports.&lt;name&gt;.port</code> alone is enough, and the container port follows it. An entry with neither key has nothing to fall back to and fails the render:</p>
 <pre><code>service.ports for workload "web": port "http" declares neither port nor
-targetPort. Set one of them — the other falls back to it.
+targetPort. Set port, or a numeric targetPort for it to fall back to.
+</code></pre>
+<p>The fallback runs one way only. <code>spec.ports[].port</code> is a number, so an entry that names its <code>targetPort</code> has to declare <code>port</code> itself:</p>
+<pre><code>service.ports for workload "web": port "grpc" names its targetPort "grpc"
+and declares no port. A Service port is a number and cannot fall back to a
+name, so set port explicitly.
 </code></pre>
 <p>An enabled Service with neither form, and no metrics port injected by <code>integrations.monitoring.defaults.exposeService</code>, fails the render. A client-facing Service has nothing sensible to default to, unlike <code>headlessService</code>, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is <code>type: ExternalName</code>, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a <code>ports</code> block, and any ports it does declare are still passed through.</p>
 <h3 id="named-targetport-and-the-workload-ports-map"><a class="header" href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a></h3>
