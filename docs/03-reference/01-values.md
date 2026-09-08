@@ -198,7 +198,7 @@ deployments:
       nameOverride: frontend-web
 ```
 
-The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API `backendRefs` in `httpRoute` / `grpcRoute` / `tlsRoute` rules that carry no explicit `serviceName`. Labels and selectors are untouched: `app.kubernetes.io/name` and `app.kubernetes.io/instance` keep the workload's own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload with `service.enabled: false` keeps its `<fullname>-<workloadName>-metrics` name.
+The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API `backendRefs` in `httpRoute` / `grpcRoute` / `tlsRoute` rules that carry no explicit `serviceName`. Labels and selectors are untouched: `app.kubernetes.io/name` and `app.kubernetes.io/instance` keep the workload's own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload that has no Service of its own keeps its `<fullname>-<workloadName>-metrics` name.
 
 On a StatefulSet the governing headless Service has its own key, `headlessService.nameOverride`, and `spec.serviceName` follows it. With `headlessService.enabled: false` that key is required and names the externally managed Service providing stable per-pod DNS. `statefulSets.<name>.serviceName` is the older spelling of the same value and still works; `headlessService.nameOverride` wins when both are set.
 

@@ -132,9 +132,9 @@ Output at zero indent; caller controls nindent.
      `service:` without an explicit enabled key counts as enabled, like everywhere else
      in the chart. */ -}}
   {{- $svcDerived := and $wl.service (ne (index $wl.service "enabled") false) (or $wl.service.ports $wl.service.targetPort $wl.service.port) -}}
-  {{- /* A named targetPort a sidecar declares is served by that sidecar's container, so
-     it is dropped here rather than failing on a name that cannot become an int32. */ -}}
-  {{- $sidecarPortNames := include "uhc.sidecarPortNames" (dict "sidecars" $wl.sidecars) | fromJsonArray -}}
+  {{- /* A named targetPort is served by whichever container declares that name, so it
+     contributes no container port here; uhc.assertNamedTargetPorts checks that some
+     container in the Pod does declare it. */ -}}
   {{- $directPorts := and .renderDirectPorts $wl.ports -}}
   {{- $derivedNames := list -}}
   {{- if and (not $directPorts) $svcDerived -}}
@@ -145,16 +145,12 @@ Output at zero indent; caller controls nindent.
         {{- $target := toString ($p.targetPort | default $p.port) -}}
         {{- if regexMatch "^[0-9]+$" $target -}}
           {{- $derivedNames = append $derivedNames $pName -}}
-        {{- else if not (has $target $sidecarPortNames) -}}
-          {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" (printf "service.ports.%s.targetPort" $pName)) -}}
         {{- end -}}
       {{- end -}}
     {{- else -}}
       {{- $target := toString ($wl.service.targetPort | default $wl.service.port) -}}
       {{- if regexMatch "^[0-9]+$" $target -}}
         {{- $derivedNames = append $derivedNames "http" -}}
-      {{- else if not (has $target $sidecarPortNames) -}}
-        {{- include "uhc.assertNumericContainerPort" (dict "value" $target "containerName" $wlName "source" "service.targetPort") -}}
       {{- end -}}
     {{- end -}}
     {{- if not $derivedNames -}}
