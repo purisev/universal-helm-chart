@@ -1,6 +1,11 @@
 # 09-multi-env-overrides — prod overlay.
 # Apply on top of values-base.yaml: helm install -f values-base.yaml -f values-prod.yaml
 
+# Every env carries its own name prefix, so cross-references (the Ingress backend
+# below, dashboards, runbooks) name resources that exist without depending on how
+# the release was named.
+fullnameOverride: orders-prod
+
 commonLabels:
   environment: prod
   cost-center: orders
@@ -26,20 +31,18 @@ ingress:
           serviceName: orders-prod-api
           servicePort: 80
   tls:
-    orders-tls:
-      hosts:
+    - hosts:
         - orders.example.com
+      secretName: orders-tls
 
 podDisruptionBudget:
   enabled: true
   minAvailable: 2
 
 topologySpreadConstraints:
-  enabled: true
-  constraints:
-    - maxSkew: 1
-      topologyKey: topology.kubernetes.io/zone
-      whenUnsatisfiable: ScheduleAnyway
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
 
 deployments:
   api:

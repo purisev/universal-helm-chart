@@ -77,7 +77,7 @@ spec:
     {{- else }}
       {{- $wl = index $ctx.Values.statefulSets $wlName }}
     {{- end }}
-    {{- $svcName := printf "%s-%s" $releaseName $wlName }}
+    {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
     {{- $svcPort := int (($wl.service | default dict).port | default 80) }}
     {{- range $wl.httpRoute.rules }}
     - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" . "defaultBackend" $svcName "defaultPort" $svcPort) | nindent 6 | trimPrefix "\n      " }}

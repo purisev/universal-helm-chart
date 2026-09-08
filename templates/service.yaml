@@ -1,5 +1,5 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
+{{- include "uhc.assertUniqueServiceNames" $ctx }}
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
@@ -8,35 +8,17 @@
 {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
 {{- $hasMetricsPortAlready := and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics") -}}
 {{- $injectMetricsPort := and $addMetricsPort (not $hasMetricsPortAlready) -}}
-{{- if and (ne (index $wl "enabled") false) $wl.service (ne (index $wl.service "enabled") false) }}
-{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
+{{- if ne (index $wl "enabled") false }}
+{{- if and $wl.service (ne (index $wl.service "enabled") false) }}
+{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
 {{- end }}
-{{- /* Standalone metrics-only Service for deployments without main service */ -}}
-{{- if and (ne (index $wl "enabled") false) $injectMetricsPort (not (and $wl.service (ne (index $wl.service "enabled") false))) }}
-{{- $expose := $exposeJson | fromJson }}
-{{- $metricsSvcName := printf "%s-%s-metrics" $releaseName $wlName }}
-{{- include "uhc.assertNameLength" (dict "name" $metricsSvcName "kind" (printf "standalone metrics Service for workload %q" $wlName)) }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $metricsSvcName }}
-  labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" (($promAnnots | fromYaml) | default dict)) }}
-  {{- if $annots }}
-  {{- $annots | nindent 2 }}
-  {{- end }}
-spec:
-  type: ClusterIP
-  ports:
-    - name: metrics
-      port: {{ $expose.port }}
-      targetPort: {{ $expose.targetPort }}
-      protocol: TCP
-  selector:
-    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- /* Standalone metrics-only Service for a workload that renders no Service of its own.
+     uhc.metricsOnlyServiceName asserts the name it builds, so a disabled workload
+     never reaches it — its names go on no cluster and must not fail the render. */ -}}
+{{- $metricsSvcName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments") }}
+{{- if $metricsSvcName }}
+{{- include "uhc.metricsOnlyService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "name" $metricsSvcName "exposeJson" $exposeJson) }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
@@ -58,9 +40,17 @@ spec:
      rendered Service for client traffic (same shape/name as the Deployment Service),
      never merged into headlessService's spec regardless of headlessService.enabled. */ -}}
 {{- if and (ne (index $wl "enabled") false) $hsEnabled }}
-{{- include "uhc.headlessService" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName "injectMetricsPort" (and $injectMetricsPort (not $svcEnabled)) "exposeJson" $exposeJson) }}
+{{- include "uhc.headlessService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" (and $injectMetricsPort (not $svcEnabled)) "exposeJson" $exposeJson) }}
 {{- end }}
 {{- if and (ne (index $wl "enabled") false) $svcEnabled }}
-{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
+{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $injectMetricsPort "exposeJson" $exposeJson) }}
+{{- end }}
+{{- /* Neither Service renders, so nothing carries the exposed metrics port and the
+     ServiceMonitor would select an object that does not exist. */ -}}
+{{- if ne (index $wl "enabled") false }}
+{{- $metricsSvcName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "statefulSets") }}
+{{- if $metricsSvcName }}
+{{- include "uhc.metricsOnlyService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "name" $metricsSvcName "exposeJson" $exposeJson) }}
+{{- end }}
 {{- end }}
 {{- end }}

@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: ghcr.io/purisev
     chart: universal-helm-chart
-    targetRevision: 3.1.0
+    targetRevision: 3.2.0
     helm:
       releaseName: batch
       values: |
@@ -36,11 +36,9 @@ spec:
                 enabled: true
                 tasks:
                   01-structure:
-                    enabled: true
                     command: |
                       psql -c "CREATE TABLE IF NOT EXISTS schema_version (id SERIAL PRIMARY KEY)"
                   02-seed:
-                    enabled: true
                     args:
                       - "seed"
                       - "--rows=100"

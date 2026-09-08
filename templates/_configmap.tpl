@@ -1,6 +1,46 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
+Fail fast when two ConfigMaps in the release resolve to the same name. A
+workload's own ConfigMap is <workload resource name>-config and an entry in
+.Values.configMaps is <fullname>-<key>, so the two families meet whenever a
+key spells out the other's suffix — `configMaps.web-config` beside a workload
+`web`, and under naming.omitWorkloadSuffix simply `configMaps.config`. Two
+documents under one name is something Kubernetes rejects on apply, and a
+server-side-apply controller turns into two owners of one object.
+Params: $ctx (the dot)
+*/}}
+{{- define "uhc.assertUniqueConfigMapNames" -}}
+{{- $ctx := . -}}
+{{- $seen := dict -}}
+{{- range $kind := (list "deployments" "statefulSets") -}}
+  {{- $specs := index $ctx.Values $kind | default dict -}}
+  {{- range $wlName := keys $specs | sortAlpha -}}
+    {{- $wl := index $specs $wlName -}}
+    {{- if and (ne (index $wl "enabled") false) $wl.createConfigmap -}}
+      {{- $name := printf "%s-config" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) -}}
+      {{- $origin := printf "%s.%s.createConfigmap" $kind $wlName -}}
+      {{- if hasKey $seen $name -}}
+        {{- fail (printf "ConfigMap name %q is claimed by both %s and %s. Two ConfigMaps cannot share a name in one namespace; rename one of them." $name (index $seen $name) $origin) -}}
+      {{- end -}}
+      {{- $_ := set $seen $name $origin -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- range $cmName := keys ($ctx.Values.configMaps | default dict) | sortAlpha -}}
+  {{- $cm := index $ctx.Values.configMaps $cmName -}}
+  {{- if ne (index $cm "enabled") false -}}
+    {{- $name := printf "%s-%s" (include "uhc.fullname" $ctx) $cmName -}}
+    {{- $origin := printf "configMaps.%s" $cmName -}}
+    {{- if hasKey $seen $name -}}
+      {{- fail (printf "ConfigMap name %q is claimed by both %s and %s. Two ConfigMaps cannot share a name in one namespace; rename one of them." $name (index $seen $name) $origin) -}}
+    {{- end -}}
+    {{- $_ := set $seen $name $origin -}}
+  {{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Auto-generated volumes for all configMaps entries that have mountPath set.
 Opt-in per entry: only rendered when entry.enabled and entry.mountPath are both set.
 Skips entries explicitly disabled by inherit.configMapMount.<name>: false (granular form).

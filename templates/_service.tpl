@@ -1,27 +1,161 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
+Resolves the name of a workload's client-facing Service: service.nameOverride when set,
+otherwise <fullname>-<workloadName>. Every reference to that Service goes through this
+helper — the Service object itself and the Gateway API backendRefs that default to it —
+so an override stays consistent across the release.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
+*/}}
+{{- define "uhc.serviceName" -}}
+{{- $svc := .wl.service | default dict -}}
+{{- $name := $svc.nameOverride | default (include "uhc.workloadResourceName" (dict "ctx" .ctx "wlName" .wlName)) -}}
+{{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "Service for workload %q" .wlName)) -}}
+{{- $name -}}
+{{- end }}
+
+{{/*
+Resolves the name of a StatefulSet's governing headless Service:
+headlessService.nameOverride, then the older serviceName spelling, otherwise
+<fullname>-<workloadName>-headless. With headlessService.enabled=false the resolved
+value names an externally managed Service that spec.serviceName points at.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
+*/}}
+{{- define "uhc.headlessServiceName" -}}
+{{- $hs := .wl.headlessService | default dict -}}
+{{- $default := printf "%s-headless" (include "uhc.workloadResourceName" (dict "ctx" .ctx "wlName" .wlName)) -}}
+{{- $name := $hs.nameOverride | default .wl.serviceName | default $default -}}
+{{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "headless Service for StatefulSet workload %q" .wlName)) -}}
+{{- $name -}}
+{{- end }}
+
+{{/*
+Resolves the name of the metrics-only Service the chart renders for a workload that
+exposes a metrics port but has no Service of its own. Returns "" when no such Service
+is rendered — the workload already has a Service to carry the port, or nothing exposes
+one. On a StatefulSet the governing headless Service carries the port whenever the
+chart renders it, so only a workload without either Service needs this one. Both the
+renderer and uhc.assertUniqueServiceNames resolve the name through here, so the two
+cannot disagree about which workloads claim it.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statefulSets"
+*/}}
+{{- define "uhc.metricsOnlyServiceName" -}}
+{{- $ctx := .ctx -}}
+{{- $wl := .wl -}}
+{{- $wlName := .wlName -}}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
+{{- $svcEnabled := and $wl.service (ne (index $wl.service "enabled") false) -}}
+{{- $hsEnabled := and (eq .kind "statefulSets") (ne (index ($wl.headlessService | default dict) "enabled") false) -}}
+{{- if and $exposeJson (ne $metricsType "pod") (not $svcEnabled) (not $hsEnabled) -}}
+{{- $name := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) -}}
+{{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "standalone metrics Service for workload %q" $wlName)) -}}
+{{- $name -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Fail fast when two workloads resolve to the same Service name. Defaults never collide,
+so a duplicate always comes from service.nameOverride or headlessService.nameOverride
+(or the older serviceName spelling) — and it renders two Service documents under one
+name, which Kubernetes rejects on apply and a server-side-apply controller turns into
+two owners fighting over one object's selector.
+
+Covers every Service name the chart puts on the cluster: each workload's own Service,
+the metrics-only Service a Deployment gets when it exposes metrics without a Service of
+its own, and, for StatefulSets, the governing headless Service while the chart renders
+it.
+
+A headless name under headlessService.enabled: false names a Service the chart does not
+render, so it claims nothing — but it still has to resolve to a headless Service that
+selects this StatefulSet's own pods, or stable per-pod DNS silently never works. Inside
+the release only one shape qualifies: the workload's own client Service with
+clusterIP: None. Every other claim it lands on is rejected once all of them are known.
+Params: $ctx (the dot)
+*/}}
+{{- define "uhc.assertUniqueServiceNames" -}}
+{{- $ctx := . -}}
+{{- $seen := dict -}}
+{{- range $kind := (list "deployments" "statefulSets") -}}
+  {{- $specs := index $ctx.Values $kind | default dict -}}
+  {{- range $wlName := keys $specs | sortAlpha -}}
+    {{- $wl := index $specs $wlName -}}
+    {{- if ne (index $wl "enabled") false -}}
+      {{- $claims := dict -}}
+      {{- if and $wl.service (ne (index $wl.service "enabled") false) -}}
+        {{- $_ := set $claims (include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName)) (printf "%s.%s.service" $kind $wlName) -}}
+      {{- end -}}
+      {{- $metricsName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) -}}
+      {{- if $metricsName -}}
+        {{- $_ := set $claims $metricsName (printf "%s.%s.metrics.exposeService" $kind $wlName) -}}
+      {{- end -}}
+      {{- if and (eq $kind "statefulSets") (ne (index ($wl.headlessService | default dict) "enabled") false) -}}
+        {{- $hsName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) -}}
+        {{- if hasKey $claims $hsName -}}
+          {{- fail (printf "Service name %q is claimed by both statefulSets.%s.service and statefulSets.%s.headlessService. A StatefulSet's client Service and its governing headless Service are two separate objects and cannot share a name." $hsName $wlName $wlName) -}}
+        {{- end -}}
+        {{- $_ := set $claims $hsName (printf "%s.%s.headlessService" $kind $wlName) -}}
+      {{- end -}}
+      {{- range $name, $origin := $claims -}}
+        {{- if hasKey $seen $name -}}
+          {{- fail (printf "Service name %q is claimed by both %s and %s. Two Services cannot share a name in one namespace; give one of them a different service.nameOverride / headlessService.nameOverride." $name (index $seen $name) $origin) -}}
+        {{- end -}}
+        {{- $_ := set $seen $name $origin -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- $statefulSets := $ctx.Values.statefulSets | default dict -}}
+{{- range $wlName := keys $statefulSets | sortAlpha -}}
+  {{- $wl := index $statefulSets $wlName -}}
+  {{- if and (ne (index $wl "enabled") false) (eq (index ($wl.headlessService | default dict) "enabled") false) -}}
+    {{- $hsName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) -}}
+    {{- /* A client Service with clusterIP: None is a headless Service selecting this
+       workload's own pods, so pointing spec.serviceName at it is the one in-release
+       target that carries per-pod DNS. Any other claim is not. */ -}}
+    {{- $ownSvc := $wl.service | default dict -}}
+    {{- $reusesOwnHeadless := and (eq (index $seen $hsName | default "") (printf "statefulSets.%s.service" $wlName)) (eq ($ownSvc.clusterIP | default "") "None") -}}
+    {{- if and (hasKey $seen $hsName) (not $reusesOwnHeadless) -}}
+      {{- fail (printf "statefulSets.%s.headlessService is disabled, so spec.serviceName points at %q — but that name belongs to %s, a Service this chart renders itself. A governing Service has to be headless and select this StatefulSet's own pods, or per-pod DNS never resolves. Enable headlessService, or point the override at an externally managed headless Service." $wlName $hsName (index $seen $hsName)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Renders one complete, independent Service document from a workload's $wl.service
 block. Used by Deployment and StatefulSet — for StatefulSet this is always a
 second, separate object alongside the headless Service (never merged into it);
 see uhc.headlessService for the governing-service counterpart.
-Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
         "injectMetricsPort" bool "exposeJson" (JSON string or "")
 Emits the leading "---" document separator itself.
 */}}
 {{- define "uhc.plainService" -}}
 {{- $ctx := .ctx }}
 {{- $wl := .wl }}
-{{- $releaseName := .releaseName }}
 {{- $wlName := .wlName }}
 {{- $svc := $wl.service }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($svc.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
+{{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" $svc.ports "source" (printf "service.ports for workload %q" $wlName)) }}
+{{- if and (not $svc.ports) $svc.targetPort (not $svc.port) }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict "http" (dict "targetPort" $svc.targetPort)) "source" (printf "service for workload %q" $wlName)) }}
+{{- end }}
+{{- include "uhc.assertNamedTargetPorts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "ports" $svc.ports "scalarTarget" (and (not $svc.ports) $svc.targetPort) "prefix" "service") }}
+{{- $hasPorts := or $svc.ports $svc.port $svc.targetPort .injectMetricsPort }}
+{{- /* ExternalName resolves to a DNS name and carries no virtual IP, so Kubernetes
+     treats its ports as optional and ignores them. Every other type needs at least one:
+     unlike headlessService, a client-facing Service has no port to fall back on. */ -}}
+{{- if and (not $hasPorts) (ne ($svc.type | default "ClusterIP") "ExternalName") }}
+{{- fail (printf "Service for workload %q declares no port. Set service.ports.<name>.port for the map form, or service.port / service.targetPort for the single-port form." $wlName) }}
+{{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ $svcName }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" $extra) }}
@@ -86,6 +220,7 @@ spec:
   {{- if hasKey $svc "publishNotReadyAddresses" }}
   publishNotReadyAddresses: {{ $svc.publishNotReadyAddresses }}
   {{- end }}
+  {{- if $hasPorts }}
   ports:
     {{- if $svc.ports }}
     {{- range $pName := include "uhc.orderedPortNames" $svc.ports | fromJsonArray }}
@@ -98,7 +233,7 @@ spec:
       appProtocol: {{ . }}
       {{- end }}
     {{- end }}
-    {{- else }}
+    {{- else if or $svc.port $svc.targetPort }}
     - port: {{ $svc.port | default $svc.targetPort }}
       targetPort: {{ $svc.targetPort | default $svc.port }}
       protocol: TCP
@@ -114,6 +249,7 @@ spec:
       targetPort: {{ $expose.targetPort }}
       protocol: TCP
     {{- end }}
+  {{- end }}
   selector:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 {{- end }}
@@ -126,22 +262,23 @@ Service). Only ports, annotations, publishNotReadyAddresses, ipFamilies, and
 ipFamilyPolicy are exposed here — type, the loadBalancer fields, the traffic
 policy fields, and the sessionAffinity fields have no meaning without a
 virtual IP, which a headless Service never has.
-Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
         "injectMetricsPort" bool "exposeJson" (JSON string or "")
 Emits the leading "---" document separator itself.
 */}}
 {{- define "uhc.headlessService" -}}
 {{- $ctx := .ctx }}
 {{- $wl := .wl }}
-{{- $releaseName := .releaseName }}
 {{- $wlName := .wlName }}
 {{- $hs := $wl.headlessService | default dict }}
 {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
 {{- $extra := mergeOverwrite (deepCopy ($hs.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
-{{- $headlessName := $wl.serviceName | default (printf "%s-%s-headless" $releaseName $wlName) }}
-{{- if not $wl.serviceName }}
-{{- include "uhc.assertNameLength" (dict "name" $headlessName "kind" (printf "headless Service for StatefulSet workload %q" $wlName)) }}
+{{- $headlessName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" $hs.ports "source" (printf "headlessService.ports for workload %q" $wlName)) }}
+{{- if and (not $hs.ports) $hs.targetPort (not $hs.port) }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict "http" (dict "targetPort" $hs.targetPort)) "source" (printf "headlessService for workload %q" $wlName)) }}
 {{- end }}
+{{- include "uhc.assertNamedTargetPorts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "ports" $hs.ports "scalarTarget" (and (not $hs.ports) $hs.targetPort) "prefix" "headlessService") }}
 ---
 apiVersion: v1
 kind: Service
@@ -198,6 +335,42 @@ spec:
       targetPort: {{ $expose.targetPort }}
       protocol: TCP
     {{- end }}
+  selector:
+    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- end }}
+
+{{/*
+Renders the metrics-only Service: a ClusterIP Service carrying nothing but the port
+uhc.metricsExposeService describes, for a workload whose metrics are scraped through a
+Service but which renders no Service of its own. Callers resolve the name first through
+uhc.metricsOnlyServiceName and skip this when it comes back empty.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "name" $name "exposeJson" (JSON string)
+Emits the leading "---" document separator itself.
+*/}}
+{{- define "uhc.metricsOnlyService" -}}
+{{- $ctx := .ctx }}
+{{- $wl := .wl }}
+{{- $wlName := .wlName }}
+{{- $expose := .exposeJson | fromJson }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $promAnnots := include "uhc.metricsAnnotations" (dict "ctx" $ctx "wl" $wl "kind" "service") }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service" "extra" (($promAnnots | fromYaml) | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: {{ $expose.port }}
+      targetPort: {{ $expose.targetPort }}
+      protocol: TCP
   selector:
     {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
 {{- end }}

@@ -408,7 +408,7 @@ tests:
 
   # --- headlessService.enabled=false fail-fast ---
 
-  - it: should fail fast when headlessService.enabled=false without serviceName
+  - it: should fail fast when headlessService.enabled=false without a headless Service name
     set:
       image.repository: redis
       image.tag: alpine
@@ -416,7 +416,7 @@ tests:
       statefulSets.redis.headlessService.enabled: false
     asserts:
       - failedTemplate:
-          errorPattern: "headlessService.enabled=false requires serviceName"
+          errorPattern: "headlessService.enabled=false requires headlessService.nameOverride"
 
   - it: should render when headlessService.enabled=false with serviceName provided
     set:
@@ -431,6 +431,68 @@ tests:
       - equal:
           path: spec.serviceName
           value: my-existing-headless
+
+  - it: should render when headlessService.enabled=false with headlessService.nameOverride provided
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.headlessService.enabled: false
+      statefulSets.redis.headlessService.nameOverride: my-existing-headless
+    asserts:
+      - isKind:
+          of: StatefulSet
+      - equal:
+          path: spec.serviceName
+          value: my-existing-headless
+
+  # --- headless Service name override ---
+
+  - it: should point spec.serviceName at headlessService.nameOverride
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.headlessService.nameOverride: redis-peers
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: redis-peers
+
+  - it: should prefer headlessService.nameOverride over serviceName
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.serviceName: legacy-name
+      statefulSets.redis.headlessService.nameOverride: redis-peers
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: redis-peers
+
+  - it: should leave spec.serviceName on the default when only service.nameOverride is set
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.service.enabled: true
+      statefulSets.redis.service.port: 6379
+      statefulSets.redis.service.nameOverride: redis-clients
+    asserts:
+      - equal:
+          path: spec.serviceName
+          value: test-release-universal-helm-chart-redis-headless
+
+  - it: should fail fast when headlessService.nameOverride exceeds 63 characters
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.enabled: true
+      statefulSets.redis.headlessService.nameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: "exceeds 63 characters"
 
   - it: should respect replicaCount=0 on StatefulSet (scale-to-zero)
     set:
@@ -710,3 +772,15 @@ tests:
     asserts:
       - hasDocuments:
           count: 2
+
+  - it: should fall back to service.port for containerPort when targetPort is absent
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 6379

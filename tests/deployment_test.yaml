@@ -1300,6 +1300,29 @@ tests:
           path: spec.template.spec.containers[0].ports
           count: 1
 
+  - it: should keep the injected metrics port off sidecars and init containers
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.sidecars.log-shipper.image.repository: fluent/fluent-bit
+      deployments.web.sidecars.log-shipper.image.tag: "3.1"
+      deployments.web.initContainers.wait-db.image.repository: busybox
+      deployments.web.initContainers.wait-db.image.tag: "1.36"
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[1].name
+          value: metrics
+      - notExists:
+          path: spec.template.spec.containers[1].ports
+      - notExists:
+          path: spec.template.spec.initContainers[0].ports
+
   - it: should render imagePullSecrets as name entries
     set:
       image.repository: nginx
@@ -1681,3 +1704,120 @@ tests:
           path: spec.template.spec.containers[0].resources.claims
           value:
             - name: gpu-claim
+
+  # --- container port from the single-port service form ---
+
+  - it: should take containerPort from service.targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: http
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  - it: should fall back to service.port when targetPort is absent
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 80
+
+  - it: should fall back to the map form's port when its targetPort is absent
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.port: 80
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 80
+
+  - it: should let the workload ports map carry a named targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.port: 9000
+      deployments.web.service.ports.grpc.targetPort: grpc
+      deployments.web.ports.grpc.containerPort: 9000
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: grpc
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 9000
+
+  - it: should leave a named targetPort a sidecar declares to that sidecar
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: 8080
+      deployments.web.service.ports.proxy.port: 9000
+      deployments.web.service.ports.proxy.targetPort: envoy-admin
+      deployments.web.sidecars.envoy.image.repository: envoyproxy/envoy
+      deployments.web.sidecars.envoy.image.tag: v1.31-latest
+      deployments.web.sidecars.envoy.ports.envoy-admin.containerPort: 9901
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.containers[0].ports
+          count: 1
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].name
+          value: http
+      - equal:
+          path: spec.template.spec.containers[1].ports[0].name
+          value: envoy-admin
+
+  - it: should omit the ports key when every service port belongs to a sidecar
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.service.ports.proxy.port: 9000
+      deployments.web.service.ports.proxy.targetPort: envoy-admin
+      deployments.web.sidecars.envoy.image.repository: envoyproxy/envoy
+      deployments.web.sidecars.envoy.image.tag: v1.31-latest
+      deployments.web.sidecars.envoy.ports.envoy-admin.containerPort: 9901
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].ports
+
+  - it: should derive container ports from a service without an explicit enabled key
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: 8080
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  - it: should omit container ports for a portless ExternalName service
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: db.example.com
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].ports

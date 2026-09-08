@@ -12,7 +12,7 @@ spec:
   source:
     repoURL: ghcr.io/purisev
     chart: universal-helm-chart
-    targetRevision: 3.1.0
+    targetRevision: 3.2.0
     helm:
       releaseName: stateful
       values: |
@@ -38,16 +38,17 @@ spec:
             envSecrets:
               - db-credentials
             volumeClaimTemplates:
-              data:
-                accessModes:
-                  - ReadWriteOnce
-                resources:
-                  requests:
-                    storage: 10Gi
+              - metadata:
+                  name: data
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 10Gi
             volumeMounts:
-              db:
-                data:
-                  mountPath: /var/lib/postgresql/data
+              data:
+                mountPath: /var/lib/postgresql/data
             resources:
               requests:
                 cpu: 200m

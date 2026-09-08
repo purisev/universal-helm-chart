@@ -1,6 +1,10 @@
 # 99-kitchen-sink — every chart feature exercised in one release.
 # DO NOT deploy verbatim. Use as a reference; copy sections into a real values file.
 
+# Pins the name prefix on every resource, so the Ingress backends further down can
+# name the Service the chart renders instead of guessing at the release name.
+fullnameOverride: kitchen-sink
+
 # Cluster-wide env (subchart "global:" mechanism — propagates everywhere)
 global:
   env:
@@ -355,18 +359,19 @@ statefulSets:
       enabled: false               # postgres-exporter not in this example
 
     volumeClaimTemplates:
-      data:
-        accessModes:
-          - ReadWriteOnce
-        storageClassName: standard
-        resources:
-          requests:
-            storage: 10Gi
+      - metadata:
+          name: data
+        spec:
+          accessModes:
+            - ReadWriteOnce
+          storageClassName: standard
+          resources:
+            requests:
+              storage: 10Gi
 
     volumeMounts:
-      db:
-        data:
-          mountPath: /var/lib/postgresql/data
+      data:
+        mountPath: /var/lib/postgresql/data
 
     env:
       POSTGRES_DB:

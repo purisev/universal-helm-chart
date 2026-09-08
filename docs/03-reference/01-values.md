@@ -8,7 +8,7 @@ For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). Fo
 
 | Topic | Top-level keys | Read more |
 |-------|----------------|-----------|
-| Identity & metadata | `commonLabels`, `commonAnnotations`, `labels.standard`, `nameOverride`, `fullnameOverride` | [ADR 011](../05-adr/011-standard-wins-labels-and-invariant-selectors.md) |
+| Identity & metadata | `commonLabels`, `commonAnnotations`, `labels.standard`, `nameOverride`, `fullnameOverride`, `naming.omitWorkloadSuffix` | [ADR 011](../05-adr/011-standard-wins-labels-and-invariant-selectors.md) · [ADR 021](../05-adr/021-optional-single-workload-naming.md) |
 | Environment & config | `global.env`, `env`, `envSecrets`, `envConfigMaps`, `configMaps`, `podAnnotations`, `jobPodAnnotations` | [ADR 003](../05-adr/003-layered-inheritance-and-override.md) · [ADR 015](../05-adr/015-eso-data-vs-datafrom.md) |
 | Image & pulls | `image`, `imagePullSecrets`, `jobCompletionImage` | [`02-examples/01-minimal/`](../02-examples/01-minimal/) |
 | Deployments / StatefulSets | `deployments`, `statefulSets`, `strategy`, `statefulSetUpdateStrategy`, `revisionHistoryLimit`, `progressDeadlineSeconds`, `minReadySeconds` | [ADR 002](../05-adr/002-multi-workload-keyed-maps.md) · [`02-examples/03-statefulset-pvc/`](../02-examples/03-statefulset-pvc/) |
@@ -59,6 +59,88 @@ http (if present)  →  others alphabetically  →  metrics (if present)
 
 Auto-injected metrics port (from `integrations.monitoring.defaults.exposeService`) lands last. See [ADR 014](../05-adr/014-deterministic-ordering.md) and [ADR 016](../05-adr/016-metrics-port-auto-exposure.md).
 
+### The single-port service form
+
+A workload's Service takes ports either as the `service.ports.<name>` map or as the shorthand pair `service.port` / `service.targetPort`. In the shorthand, each side falls back to the other, in the Service and in the container spec alike:
+
+```yaml
+service:
+  enabled: true
+  port: 80          # container listens on 80 as well
+```
+
+```yaml
+service:
+  enabled: true
+  port: 80
+  targetPort: 8080  # container listens on 8080
+```
+
+The map form falls back the same way: `service.ports.<name>.port` alone is enough, and the container port follows it. An entry with neither key has nothing to fall back to and fails the render:
+
+```
+service.ports for workload "web": port "http" declares neither port nor
+targetPort. Set port, or a numeric targetPort for it to fall back to.
+```
+
+The fallback runs one way only. `spec.ports[].port` is a number, so an entry that names its `targetPort` has to declare `port` itself:
+
+```
+service.ports for workload "web": port "grpc" names its targetPort "grpc"
+and declares no port. A Service port is a number and cannot fall back to a
+name, so set port explicitly.
+```
+
+An enabled Service with neither form, and no metrics port injected by `integrations.monitoring.defaults.exposeService`, fails the render. A client-facing Service has nothing sensible to default to, unlike `headlessService`, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is `type: ExternalName`, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a `ports` block, and any ports it does declare are still passed through.
+
+### Named `targetPort` and the workload `ports` map
+
+A Service `targetPort` may name a port instead of numbering it, but `containerPort` is an integer, so the chart cannot derive a container port from a name on its own. It resolves the name against the containers in the Pod, and fails the render when none of them declares it:
+
+```
+container "web": service.ports.grpc.targetPort is "grpc", a port name no container
+in this Pod declares, and containerPort has to be numeric.
+```
+
+Declare the port on the container that serves it. A workload's own `ports` map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:
+
+```yaml
+deployments:
+  web:
+    ports:
+      grpc:
+        containerPort: 9000
+    service:
+      enabled: true
+      ports:
+        grpc:
+          port: 9000
+          targetPort: grpc
+```
+
+A sidecar counts too. A Service port whose `targetPort` names a port one of the workload's `sidecars` declares belongs to that sidecar's container — the main container leaves it out rather than claiming a port it does not listen on:
+
+```yaml
+deployments:
+  web:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080       # containerPort on the web container
+        proxy:
+          port: 9000
+          targetPort: envoy-admin
+    sidecars:
+      envoy:
+        image:
+          repository: envoyproxy/envoy
+          tag: v1.31-latest
+        ports:
+          envoy-admin:
+            containerPort: 9901  # the port the Service name resolves to
+```
+
 ### Service port `appProtocol`
 
 Both Service port shapes accept an optional `appProtocol` — the single-port `service.port`/`service.targetPort` form and the `service.ports.<name>` map form (and their `headlessService` equivalents on StatefulSets). It passes straight through to `spec.ports[].appProtocol`, the native Kubernetes Service field.
@@ -72,6 +154,67 @@ service:
       port: 9000
       targetPort: 9000
       appProtocol: kubernetes.io/h2c
+```
+
+### Dropping the workload suffix from names
+
+Every per-workload resource is named `<fullname>-<workloadName>`, and the workload name also lands in `app.kubernetes.io/name` while `app.kubernetes.io/instance` carries the full construction. A release that runs one workload can drop that suffix:
+
+```yaml
+naming:
+  omitWorkloadSuffix: true   # default: false
+```
+
+With it on, a release named `myrel` renders `myrel-universal-helm-chart` for the Deployment, the Service, the HPA, the PDB, the VPA, the ScaledObject and the NetworkPolicy, and keeps the usual trailing parts elsewhere: `-headless`, `-metrics`, `-config`. Labels and selectors follow: `app.kubernetes.io/name` becomes the chart name (`nameOverride` when set) and `app.kubernetes.io/instance` becomes `<fullname>`.
+
+Note that `<fullname>` is not what singleton resources carry. `uhc.labels` puts `app.kubernetes.io/instance: <release name>` on the ServiceAccount, Ingress and Routes, and that stays as it is. So a release `myrel` gives the Deployment `instance: myrel-universal-helm-chart` and the ServiceAccount `instance: myrel`. A `kubectl -l` selector, or an external ServiceMonitor, has to pick the one it means.
+
+Three things stay where they are.
+
+Container names keep the workload key, so `kubectl logs -c api` still works and KEDA's `envSourceContainerName` still resolves.
+
+`jobGroups` keep both their names and their labels. The names are built from the group and job keys and never carried a workload suffix; the labels stay on `<groupName>-<jobName>` / `<fullname>-<groupName>-<jobName>` because a release can hold any number of job groups next to its one workload. Collapsing them would file every Job pod under the workload's own selector, and the workload's Service, NetworkPolicy and PDB would then pick up job pods.
+
+ESO `SecretStore` and `ExternalSecret` entries keep their own keys in labels for the same reason.
+
+The flag expects exactly one enabled entry across `deployments` and `statefulSets`. With more than one, `helm template` fails and names the offenders rather than collapsing them onto the same resource names:
+
+```
+naming.omitWorkloadSuffix expects exactly one enabled workload, found 2
+(deployments.api, deployments.worker).
+```
+
+Turning the flag on or off for a release that already exists renames its workload and changes an immutable selector, so the Deployment or StatefulSet is replaced rather than updated. Decide before the first install. See [ADR 021](../05-adr/021-optional-single-workload-naming.md).
+
+### Service naming
+
+A workload's Service is named `<fullname>-<workloadName>`. `service.nameOverride` replaces that name:
+
+```yaml
+deployments:
+  frontend:
+    service:
+      enabled: true
+      nameOverride: frontend-web
+```
+
+The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API `backendRefs` in `httpRoute` / `grpcRoute` / `tlsRoute` rules that carry no explicit `serviceName`. Labels and selectors are untouched: `app.kubernetes.io/name` and `app.kubernetes.io/instance` keep the workload's own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload that has no Service of its own keeps its `<fullname>-<workloadName>-metrics` name.
+
+On a StatefulSet the governing headless Service has its own key, `headlessService.nameOverride`, and `spec.serviceName` follows it. With `headlessService.enabled: false` that key is required and names the externally managed Service providing stable per-pod DNS. `statefulSets.<name>.serviceName` is the older spelling of the same value and still works; `headlessService.nameOverride` wins when both are set.
+
+Either override is checked against the 63-character ceiling the chart applies to every constructed name, and against the other Services in the release. Two workloads resolving to one Service name, or a StatefulSet whose client and headless Services land on the same name, fail the render:
+
+```
+Service name "shared-svc" is claimed by both deployments.a.service
+and deployments.b.service.
+```
+
+`headlessService.enabled: false` is the one case allowed to look like a collision, because the name usually belongs to a Service outside the release. The one name inside it that also works is the workload's own client Service with `clusterIP: None`, which is headless and already selects these pods. Anything else the chart renders leaves `spec.serviceName` on a Service that never provides per-pod DNS, and the render fails:
+
+```
+statefulSets.db.headlessService is disabled, so spec.serviceName points at
+"shared" — but that name belongs to statefulSets.db.service, a Service this
+chart renders itself.
 ```
 
 ### `jobGroups` group → job merge
@@ -169,6 +312,35 @@ TLSRoute itself is in the Gateway API Experimental channel (`gateway.networking.
 
 See [ADR 007](../05-adr/007-autoscaler-mutual-exclusion.md).
 
+### KEDA `advanced` pass-through
+
+`keda.advanced` goes into the ScaledObject's `spec.advanced` verbatim. The chart checks that it is an object and stops there, so `restoreToOriginalReplicaCount`, `horizontalPodAutoscalerConfig` (`name`, `behavior`) and `scalingModifiers` all work, and so does anything KEDA adds later without a chart release in between.
+
+```yaml
+deployments:
+  worker:
+    keda:
+      enabled: true
+      maxReplicas: 20
+      triggers:
+        - type: kafka
+          metadata: {...}
+      advanced:
+        restoreToOriginalReplicaCount: true
+        horizontalPodAutoscalerConfig:
+          behavior:
+            scaleUp:
+              stabilizationWindowSeconds: 60
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 60
+```
+
+`behavior` is the Kubernetes HPA scaling-behavior shape, applied to the HPA that KEDA creates. It is worth setting on a lag-driven trigger: the HPA default doubles the replica count every 15 seconds, which overshoots on a queue that drains quickly. The example above adds one pod a minute instead.
+
+Because nothing here is validated field by field, a typo inside `advanced` reaches the cluster and is rejected by the KEDA CRD rather than by `helm template`. Check the field names against the [ScaledObject spec](https://keda.sh/docs/latest/reference/scaledobject-spec/) for the KEDA version you run.
+
 ### Scheduling field inheritance
 
 `tolerations`, `affinity`, `nodeSelector` and `topologySpreadConstraints` all follow the same rule: if the workload defines the field, it **replaces** the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (`tolerations: []`, `affinity: {}`, `topologySpreadConstraints: []`).
@@ -176,6 +348,17 @@ See [ADR 007](../05-adr/007-autoscaler-mutual-exclusion.md).
 ### Init containers and sidecars share one container shape
 
 `deployments.<name>.initContainers` and `deployments.<name>.sidecars` (same under `statefulSets.<name>`) are maps keyed by container name. Both flow through the same renderer as the main container: `image`, `command`/`args`, `env`, `envSecrets`, `volumeMounts`, `resources`, `securityContext`, `lifecycle`. Both inherit the parent workload's `inherit.env` / `inherit.configMaps` / `inherit.configMapMount` flags. Neither inherits root-level `volumeMounts.<containerName>` — declare local mounts inline. Render order is `sortAlpha`; for `initContainers` Kubernetes runs them sequentially in declared order, so prefix names with `01-`, `02-`, … when run order matters (same convention as `jobGroups[*].tasks`). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. **Two exceptions for `initContainers`:** `probesEnabled` / probe blocks (`readinessProbe`, `livenessProbe`, `startupProbe`) and `lifecycle` are rejected — Kubernetes does not allow these on standard init containers, so `helm template` fail-fasts if either is set on an init entry.
+
+### ConfigMap names
+
+A workload with `createConfigmap: true` gets `<fullname>-<workloadName>-config`, and an entry in `configMaps` gets `<fullname>-<key>`. The two shapes meet whenever a key spells out the other's suffix, so `configMaps.web-config` beside a workload named `web` lands both on one name, and under `naming.omitWorkloadSuffix` a key of just `config` is enough. That fails the render rather than producing two documents Kubernetes will refuse:
+
+```
+ConfigMap name "myrel-universal-helm-chart-web-config" is claimed by both
+deployments.web.createConfigmap and configMaps.web-config.
+```
+
+The same check covers a `deployments.<name>` and a `statefulSets.<name>` sharing a key while both set `createConfigmap`. Disabled workloads and `configMaps` entries are ignored, since neither renders.
 
 ### Chart-owned vs external name resolution
 

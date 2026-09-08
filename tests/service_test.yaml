@@ -754,3 +754,562 @@ tests:
       - equal:
           path: spec.ipFamilyPolicy
           value: RequireDualStack
+
+  # --- service.nameOverride ---
+
+  - it: should name the deployment Service from service.nameOverride
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.nameOverride: legacy-web-svc
+    asserts:
+      - equal:
+          path: metadata.name
+          value: legacy-web-svc
+
+  - it: should keep workload labels and selector on the default names when service.nameOverride is set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.nameOverride: legacy-web-svc
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/name"]
+          value: web
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web
+
+  - it: should name the StatefulSet client Service from service.nameOverride
+    documentIndex: 1
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: db-clients
+    asserts:
+      - equal:
+          path: metadata.name
+          value: db-clients
+
+  - it: should name the headless Service from headlessService.nameOverride
+    documentIndex: 0
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.nameOverride: db-peers
+    asserts:
+      - equal:
+          path: spec.clusterIP
+          value: None
+      - equal:
+          path: metadata.name
+          value: db-peers
+
+  - it: should keep the metrics-only Service on the default name when service is disabled
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: false
+      deployments.web.service.nameOverride: legacy-web-svc
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 9090
+    asserts:
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-web-metrics
+
+  - it: should fail fast when service.nameOverride exceeds 63 characters
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      deployments.web.service.nameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: "exceeds 63 characters"
+
+  # --- Service name collisions ---
+
+  - it: should fail fast when two workloads claim the same Service name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.a.service.enabled: true
+      deployments.a.service.port: 80
+      deployments.a.service.targetPort: 8080
+      deployments.a.service.nameOverride: shared-svc
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: shared-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: 'Service name "shared-svc" is claimed by both deployments.a.service and deployments.b.service'
+
+  - it: should fail fast when an override collides with another workload's default name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.a.service.enabled: true
+      deployments.a.service.port: 80
+      deployments.a.service.targetPort: 8080
+      deployments.a.service.nameOverride: test-release-universal-helm-chart-b
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: "is claimed by both deployments.a.service and deployments.b.service"
+
+  - it: should fail fast when a StatefulSet's client and headless Services share a name
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: db-peers
+      statefulSets.db.headlessService.nameOverride: db-peers
+    asserts:
+      - failedTemplate:
+          errorPattern: "statefulSets.db.service and statefulSets.db.headlessService"
+
+  - it: should allow a disabled headless Service to name a Service outside the release
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: externally-managed-peers
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db
+
+  - it: should allow a disabled headless Service to reuse a headless client Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.clusterIP: None
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: db-peers
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: db-peers
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: db-peers
+      - equal:
+          path: spec.clusterIP
+          value: None
+
+  - it: should fail fast when a disabled headless Service names the workload's own client Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.service.nameOverride: shared
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: shared
+    asserts:
+      - failedTemplate:
+          errorPattern: 'statefulSets.db.headlessService is disabled, so spec.serviceName points at "shared" — but that name belongs to statefulSets.db.service'
+
+  - it: should fail fast when a disabled headless Service names another workload's Service
+    set:
+      image.repository: redis
+      image.tag: alpine
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 8080
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: test-release-universal-helm-chart-web
+    asserts:
+      - failedTemplate:
+          errorPattern: 'points at "test-release-universal-helm-chart-web" — but that name belongs to deployments.web.service'
+
+  - it: should ignore disabled workloads when checking for collisions
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.a.service.enabled: true
+      deployments.a.service.port: 80
+      deployments.a.service.targetPort: 8080
+      deployments.a.service.nameOverride: shared-svc
+      deployments.b.enabled: false
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: shared-svc
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: shared-svc
+
+  - it: should render a metrics-only Service for a StatefulSet with neither Service enabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: false
+      statefulSets.db.headlessService.enabled: false
+      statefulSets.db.headlessService.nameOverride: external-peers
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 9090
+      integrations.monitoring.defaults.exposeService.targetPort: 9090
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-metrics
+      - equal:
+          path: spec.ports[0].name
+          value: metrics
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-db
+
+  - it: should leave the metrics port on the headless Service when the chart renders it
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: false
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 9090
+      integrations.monitoring.defaults.exposeService.targetPort: 9090
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-headless
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+      - equal:
+          path: spec.ports[1].port
+          value: 9090
+
+  - it: should fail fast when an override collides with a StatefulSet metrics-only Service name
+    set:
+      image.repository: redis
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      statefulSets.a.service.enabled: false
+      statefulSets.a.headlessService.enabled: false
+      statefulSets.a.headlessService.nameOverride: external-peers
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: test-release-universal-helm-chart-a-metrics
+    asserts:
+      - failedTemplate:
+          errorPattern: "is claimed by both deployments.b.service and statefulSets.a.metrics.exposeService"
+
+  - it: should fail fast when an override collides with a metrics-only Service name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      deployments.a.enabled: true
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+      deployments.b.service.nameOverride: test-release-universal-helm-chart-a-metrics
+    asserts:
+      - failedTemplate:
+          errorPattern: "is claimed by both deployments.a.metrics.exposeService and deployments.b.service"
+
+  - it: should not assert the metrics-only Service name of a disabled workload
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      deployments.a-name-far-too-long-to-take-a-metrics-suffix.enabled: false
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-b
+
+  # --- a Service needs a port ---
+
+  - it: should fail fast when an enabled service declares no port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: 'Service for workload "web" declares no port'
+
+  - it: should fail fast when a service port entry declares neither port nor targetPort
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.protocol: TCP
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports for workload "web": port "http" declares neither port nor targetPort'
+
+  - it: should fail fast when a headless Service port entry declares neither port nor targetPort
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.protocol: TCP
+    asserts:
+      - failedTemplate:
+          errorPattern: 'headlessService.ports for workload "db": port "peer" declares neither port nor targetPort'
+
+  - it: should fail fast when a service port entry names its targetPort and declares no port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.targetPort: grpc
+      deployments.web.ports.grpc.containerPort: 9000
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports for workload "web": port "grpc" names its targetPort "grpc" and declares no port'
+
+  - it: should ignore a scalar targetPort when the ports map wins
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: 8080
+      deployments.web.service.targetPort: web
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: should ignore a scalar headless targetPort when the ports map wins
+    documentIndex: 0
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.port: 7000
+      statefulSets.db.headlessService.targetPort: peer
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].name
+          value: peer
+      - equal:
+          path: spec.ports[0].port
+          value: 7000
+
+  - it: should fail fast when a scalar targetPort names a port and no port is set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.targetPort: web
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service for workload "web": port "http" names its targetPort "web" and declares no port'
+
+  - it: should fail fast when a headless port entry names its targetPort and declares no port
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.targetPort: peer
+    asserts:
+      - failedTemplate:
+          errorPattern: 'headlessService.ports for workload "db": port "peer" names its targetPort "peer" and declares no port'
+
+  - it: should reject a named targetPort in the single-port form
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: http
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.targetPort is "http", a port name no container in this Pod declares'
+
+  - it: should reject a named targetPort in the map form
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.port: 9000
+      deployments.web.service.ports.grpc.targetPort: grpc
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports.grpc.targetPort is "grpc", a port name no container in this Pod declares'
+
+  - it: should reject a named targetPort no container declares when the workload has its own ports
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.grpc.port: 9000
+      deployments.web.service.ports.grpc.targetPort: nowhere
+      deployments.web.ports.grpc.containerPort: 9000
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service.ports.grpc.targetPort is "nowhere", a port name no container in this Pod declares'
+
+  - it: should reject a named headless targetPort no container declares
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.port: 7000
+      statefulSets.db.headlessService.ports.peer.targetPort: nowhere
+    asserts:
+      - failedTemplate:
+          errorPattern: 'headlessService.ports.peer.targetPort is "nowhere", a port name no container in this Pod declares'
+
+  - it: should accept a named headless targetPort the workload declares
+    documentIndex: 0
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.ports.peer.containerPort: 7000
+      statefulSets.db.headlessService.ports.peer.port: 7000
+      statefulSets.db.headlessService.ports.peer.targetPort: peer
+    asserts:
+      - equal:
+          path: spec.ports[0].targetPort
+          value: peer
+
+  - it: should accept a named headless targetPort a sidecar declares
+    documentIndex: 0
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.port: 7000
+      statefulSets.db.headlessService.ports.peer.targetPort: peer
+      statefulSets.db.sidecars.proxy.image.repository: envoyproxy/envoy
+      statefulSets.db.sidecars.proxy.image.tag: v1.31-latest
+      statefulSets.db.sidecars.proxy.ports.peer.containerPort: 7000
+    asserts:
+      - equal:
+          path: spec.ports[0].targetPort
+          value: peer
+
+  - it: should render a portless service that only carries the injected metrics port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      integrations.monitoring.defaults.exposeService.port: 9090
+      integrations.monitoring.defaults.exposeService.targetPort: 9090
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].name
+          value: metrics
+      - equal:
+          path: spec.ports[0].port
+          value: 9090
+
+  - it: should render a portless ExternalName service without a ports block
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: db.example.com
+    asserts:
+      - equal:
+          path: spec.type
+          value: ExternalName
+      - equal:
+          path: spec.externalName
+          value: db.example.com
+      - isNull:
+          path: spec.ports
+
+  - it: should keep rendering the ports an ExternalName service does declare
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.type: ExternalName
+      deployments.web.service.externalName: db.example.com
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: 80
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 80
