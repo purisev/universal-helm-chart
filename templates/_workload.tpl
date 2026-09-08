@@ -139,6 +139,7 @@ Output at zero indent; caller controls nindent.
   {{- $derivedNames := list -}}
   {{- if and (not $directPorts) $svcDerived -}}
     {{- if $wl.service.ports -}}
+      {{- include "uhc.assertServicePortsDeclared" (dict "ports" $wl.service.ports "source" (printf "service.ports for workload %q" $wlName)) -}}
       {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray -}}
         {{- $p := index $wl.service.ports $pName -}}
         {{- $target := toString ($p.targetPort | default $p.port) -}}
