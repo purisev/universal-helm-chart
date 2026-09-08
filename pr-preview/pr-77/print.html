@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4f200f4b.js";
+            window.path_to_searchindex_js = "searchindex-83831f76.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -1194,7 +1194,7 @@ in this Pod declares, and containerPort has to be numeric.
       enabled: true
       nameOverride: frontend-web
 </code></pre>
-<p>The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API <code>backendRefs</code> in <code>httpRoute</code> / <code>grpcRoute</code> / <code>tlsRoute</code> rules that carry no explicit <code>serviceName</code>. Labels and selectors are untouched: <code>app.kubernetes.io/name</code> and <code>app.kubernetes.io/instance</code> keep the workload’s own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload with <code>service.enabled: false</code> keeps its <code>&lt;fullname&gt;-&lt;workloadName&gt;-metrics</code> name.</p>
+<p>The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API <code>backendRefs</code> in <code>httpRoute</code> / <code>grpcRoute</code> / <code>tlsRoute</code> rules that carry no explicit <code>serviceName</code>. Labels and selectors are untouched: <code>app.kubernetes.io/name</code> and <code>app.kubernetes.io/instance</code> keep the workload’s own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload that has no Service of its own keeps its <code>&lt;fullname&gt;-&lt;workloadName&gt;-metrics</code> name.</p>
 <p>On a StatefulSet the governing headless Service has its own key, <code>headlessService.nameOverride</code>, and <code>spec.serviceName</code> follows it. With <code>headlessService.enabled: false</code> that key is required and names the externally managed Service providing stable per-pod DNS. <code>statefulSets.&lt;name&gt;.serviceName</code> is the older spelling of the same value and still works; <code>headlessService.nameOverride</code> wins when both are set.</p>
 <p>Either override is checked against the 63-character ceiling the chart applies to every constructed name, and against the other Services in the release. Two workloads resolving to one Service name, or a StatefulSet whose client and headless Services land on the same name, fail the render:</p>
 <pre><code>Service name "shared-svc" is claimed by both deployments.a.service
@@ -3155,7 +3155,7 @@ integrations:
 <p>A single switch at <code>integrations.monitoring.defaults.exposeService.enabled: true</code> (overridable per workload via <code>metrics.exposeService.enabled</code>) auto-emits the metrics port. The chart’s behaviour is:</p>
 <ul>
 <li><strong>Workload has a main Service</strong> (<code>service.enabled: true</code> and at least one entry in <code>service.ports</code>): append a <code>metrics</code> port to the Service’s <code>ports[]</code> and a matching <code>containerPort</code> to the workload’s main container. Sidecars, init containers and job containers never get it — <code>ContainerPort.name</code> has to be unique within a Pod, and they do not serve the endpoint. Port name is fixed as <code>metrics</code> (Kubernetes convention).</li>
-<li><strong>Workload has no main Service</strong>: emit a <strong>dedicated</strong> Service with only the metrics port. Name: <code>&lt;release-fullname&gt;-&lt;workload&gt;-metrics</code>. This Service is also picked up by the ServiceMonitor / VMServiceScrape (when CRD discovery + service target is selected — see <a href="#008--multi-provider-monitoring-matrix">ADR 008</a>).</li>
+<li><strong>Workload has no main Service</strong>: emit a <strong>dedicated</strong> Service with only the metrics port. Name: <code>&lt;release-fullname&gt;-&lt;workload&gt;-metrics</code>. On a StatefulSet the governing headless Service takes the port instead whenever the chart renders it; the dedicated Service appears only when neither Service exists. This Service is also picked up by the ServiceMonitor / VMServiceScrape (when CRD discovery + service target is selected — see <a href="#008--multi-provider-monitoring-matrix">ADR 008</a>).</li>
 <li><strong><code>metrics.type: pod</code></strong>: this whole feature is skipped. PodMonitor / VMPodScrape don’t need a Service — the scrape happens directly against pod IPs.</li>
 <li><strong><code>service.ports.metrics</code> already declared</strong>: the auto-injection is skipped to avoid a duplicate port. The user’s explicit declaration wins.</li>
 </ul>

@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4f200f4b.js";
+            window.path_to_searchindex_js = "../searchindex-83831f76.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -322,7 +322,7 @@ in this Pod declares, and containerPort has to be numeric.
       enabled: true
       nameOverride: frontend-web
 </code></pre>
-<p>The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API <code>backendRefs</code> in <code>httpRoute</code> / <code>grpcRoute</code> / <code>tlsRoute</code> rules that carry no explicit <code>serviceName</code>. Labels and selectors are untouched: <code>app.kubernetes.io/name</code> and <code>app.kubernetes.io/instance</code> keep the workload’s own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload with <code>service.enabled: false</code> keeps its <code>&lt;fullname&gt;-&lt;workloadName&gt;-metrics</code> name.</p>
+<p>The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API <code>backendRefs</code> in <code>httpRoute</code> / <code>grpcRoute</code> / <code>tlsRoute</code> rules that carry no explicit <code>serviceName</code>. Labels and selectors are untouched: <code>app.kubernetes.io/name</code> and <code>app.kubernetes.io/instance</code> keep the workload’s own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload that has no Service of its own keeps its <code>&lt;fullname&gt;-&lt;workloadName&gt;-metrics</code> name.</p>
 <p>On a StatefulSet the governing headless Service has its own key, <code>headlessService.nameOverride</code>, and <code>spec.serviceName</code> follows it. With <code>headlessService.enabled: false</code> that key is required and names the externally managed Service providing stable per-pod DNS. <code>statefulSets.&lt;name&gt;.serviceName</code> is the older spelling of the same value and still works; <code>headlessService.nameOverride</code> wins when both are set.</p>
 <p>Either override is checked against the 63-character ceiling the chart applies to every constructed name, and against the other Services in the release. Two workloads resolving to one Service name, or a StatefulSet whose client and headless Services land on the same name, fail the render:</p>
 <pre><code>Service name "shared-svc" is claimed by both deployments.a.service
