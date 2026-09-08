@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4926e140.js";
+            window.path_to_searchindex_js = "searchindex-d5c2ccd4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -1112,7 +1112,10 @@ kubectl apply -f flux/
   port: 80
   targetPort: 8080  # container listens on 8080
 </code></pre>
-<p>The map form falls back the same way: <code>service.ports.&lt;name&gt;.port</code> alone is enough, and the container port follows it.</p>
+<p>The map form falls back the same way: <code>service.ports.&lt;name&gt;.port</code> alone is enough, and the container port follows it. An entry with neither key has nothing to fall back to and fails the render:</p>
+<pre><code>service.ports for workload "web": port "http" declares neither port nor
+targetPort. Set one of them — the other falls back to it.
+</code></pre>
 <p>An enabled Service with neither form, and no metrics port injected by <code>integrations.monitoring.defaults.exposeService</code>, fails the render. A client-facing Service has nothing sensible to default to, unlike <code>headlessService</code>, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is <code>type: ExternalName</code>, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a <code>ports</code> block, and any ports it does declare are still passed through.</p>
 <h3 id="named-targetport-and-the-workload-ports-map"><a class="header" href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a></h3>
 <p>A Service <code>targetPort</code> may name a port instead of numbering it, but <code>containerPort</code> is an integer, so the chart cannot derive a container port from a name on its own. It resolves the name against the containers in the Pod, and fails the render when none of them declares it:</p>
@@ -1192,7 +1195,11 @@ in this Pod declares, and containerPort has to be numeric.
 <pre><code>Service name "shared-svc" is claimed by both deployments.a.service
 and deployments.b.service.
 </code></pre>
-<p>The one case that is allowed to look like a collision is <code>headlessService.enabled: false</code>, where the name points at a Service the chart does not render.</p>
+<p><code>headlessService.enabled: false</code> is the one case allowed to look like a collision, because the name belongs to a Service outside the release. It still has to stay outside it: a name the chart renders itself is either not headless or selects another workload’s pods, so <code>spec.serviceName</code> would resolve to a Service that never provides per-pod DNS, and the render fails:</p>
+<pre><code>statefulSets.db.headlessService is disabled, so spec.serviceName points at
+"shared" — but that name belongs to statefulSets.db.service, a Service this
+chart renders itself.
+</code></pre>
 <h3 id="jobgroups-group--job-merge"><a class="header" href="#jobgroups-group--job-merge"><code>jobGroups</code> group → job merge</a></h3>
 <p>For each per-job field:</p>
 <ul>
