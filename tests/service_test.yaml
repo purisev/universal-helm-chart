@@ -947,6 +947,23 @@ tests:
       - failedTemplate:
           errorPattern: "is claimed by both deployments.a.metrics.exposeService and deployments.b.service"
 
+  - it: should not assert the metrics-only Service name of a disabled workload
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.monitoring.defaults.enabled: true
+      integrations.monitoring.defaults.exposeService.enabled: true
+      deployments.a-name-far-too-long-to-take-a-metrics-suffix.enabled: false
+      deployments.b.service.enabled: true
+      deployments.b.service.port: 80
+      deployments.b.service.targetPort: 8080
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-b
+
   # --- a Service needs a port ---
 
   - it: should fail fast when an enabled service declares no port

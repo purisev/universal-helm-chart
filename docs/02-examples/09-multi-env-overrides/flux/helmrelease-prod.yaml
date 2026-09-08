@@ -31,6 +31,7 @@ spec:
 
   # Inline overlay — equivalent to values-prod.yaml in this example.
   values:
+    fullnameOverride: orders-prod
     commonLabels:
       environment: prod
       cost-center: orders

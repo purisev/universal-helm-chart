@@ -1,5 +1,10 @@
 # 02-web-app-ingress — Deployment + Service + Ingress + HPA + ServiceMonitor.
 
+# Fixes the name prefix every resource carries. Without it the Service would be
+# <release>-universal-helm-chart-web, and the Ingress backend below has to spell out
+# whatever the chart renders.
+fullnameOverride: webapp
+
 integrations:
   monitoring:
     defaults:
@@ -18,7 +23,7 @@ ingress:
       paths:
         - path: /
           pathType: Prefix
-          serviceName: webapp-web   # <release>-web — release name "webapp" assumed
+          serviceName: webapp-web   # <fullnameOverride>-<workload>
           servicePort: 80
   tls:
     - hosts:

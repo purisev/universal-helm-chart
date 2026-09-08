@@ -16,7 +16,8 @@ A web service reachable from outside the cluster, scaling on CPU.
 |-------|--------------|
 | `service.ports` (map) | Replaces single-port `service.port` shorthand to expose two ports. |
 | `metrics.enabled: true` | Opt-in to monitoring (defaults are off). |
-| `ingress` | Routes `web.example.com` to the Service. |
+| `ingress` | Routes `web.example.com` to the Service. Its `serviceName` is a plain string, so it has to name what the chart renders. |
+| `fullnameOverride` | Pins the prefix on every resource name to `webapp`, making the Service `webapp-web` instead of `webapp-universal-helm-chart-web` — that is the name the Ingress backend spells out. |
 | `hpa` | Auto-scales on CPU; `replicaCount` is omitted from the rendered Deployment because HPA is on (see [ADR 007](../../05-adr/007-autoscaler-mutual-exclusion.md)). |
 | `integrations.monitoring.defaults.enabled: true` | Turns the default scrape on for every workload (per-workload `metrics.enabled` still acts as opt-out). |
 
