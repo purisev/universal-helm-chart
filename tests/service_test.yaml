@@ -1056,6 +1056,56 @@ tests:
       - failedTemplate:
           errorPattern: 'service.ports for workload "web": port "grpc" names its targetPort "grpc" and declares no port'
 
+  - it: should ignore a scalar targetPort when the ports map wins
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: 8080
+      deployments.web.service.targetPort: web
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: should ignore a scalar headless targetPort when the ports map wins
+    documentIndex: 0
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.headlessService.ports.peer.port: 7000
+      statefulSets.db.headlessService.targetPort: peer
+    asserts:
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+      - equal:
+          path: spec.ports[0].name
+          value: peer
+      - equal:
+          path: spec.ports[0].port
+          value: 7000
+
+  - it: should fail fast when a scalar targetPort names a port and no port is set
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.targetPort: web
+    asserts:
+      - failedTemplate:
+          errorPattern: 'service for workload "web": port "http" names its targetPort "web" and declares no port'
+
   - it: should fail fast when a headless port entry names its targetPort and declares no port
     set:
       image.repository: redis

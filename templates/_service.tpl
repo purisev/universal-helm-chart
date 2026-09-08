@@ -139,7 +139,7 @@ Emits the leading "---" document separator itself.
 {{- $extra := mergeOverwrite (deepCopy ($svc.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
 {{- include "uhc.assertServicePortsDeclared" (dict "ports" $svc.ports "source" (printf "service.ports for workload %q" $wlName)) }}
-{{- if and $svc.targetPort (not $svc.port) }}
+{{- if and (not $svc.ports) $svc.targetPort (not $svc.port) }}
 {{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict "http" (dict "targetPort" $svc.targetPort)) "source" (printf "service for workload %q" $wlName)) }}
 {{- end }}
 {{- $hasPorts := or $svc.ports $svc.port $svc.targetPort .injectMetricsPort }}
@@ -273,7 +273,7 @@ Emits the leading "---" document separator itself.
 {{- $extra := mergeOverwrite (deepCopy ($hs.annotations | default dict)) (($promAnnots | fromYaml) | default dict) }}
 {{- $headlessName := include "uhc.headlessServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
 {{- include "uhc.assertServicePortsDeclared" (dict "ports" $hs.ports "source" (printf "headlessService.ports for workload %q" $wlName)) }}
-{{- if and $hs.targetPort (not $hs.port) }}
+{{- if and (not $hs.ports) $hs.targetPort (not $hs.port) }}
 {{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict "http" (dict "targetPort" $hs.targetPort)) "source" (printf "headlessService for workload %q" $wlName)) }}
 {{- end }}
 ---
