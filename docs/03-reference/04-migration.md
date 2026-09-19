@@ -2,6 +2,44 @@
 
 What changes between releases that may require values-file edits when you upgrade. The chart's value surface is intentionally large; most edits are additive, but a few iterations on the `release-2.0.0` line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the **63-char enforcement** (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the `app.kubernetes.io/instance` label value the chart sets on the same resource.
 
+## 3.2.0
+
+No values-file edits are required. Two things are worth checking before the upgrade, and a few shapes that never produced an installable manifest now fail at render time.
+
+### Finished Jobs under `exposeService` have to go before the upgrade
+
+With `integrations.monitoring.defaults.exposeService.enabled: true`, 3.1.0 declared the `metrics` container port on every container, job containers included. 3.2.0 declares it on the main container of a Deployment or StatefulSet only, the one that serves the endpoint.
+
+The name suffix from `hashSuffix` is computed from the job's own values, which do not change, so a Job left in the cluster by 3.1.0 keeps its name while its pod template loses the port. `spec.template` of a Job is immutable, so Kubernetes rejects the update with a `field is immutable` error.
+
+Delete the finished Jobs of the release first. `app.kubernetes.io/part-of` carries the chart fullname on every resource, so with the default labels:
+
+```bash
+kubectl get job -n <namespace> -l app.kubernetes.io/part-of=<fullname>
+kubectl delete job -n <namespace> -l app.kubernetes.io/part-of=<fullname>
+```
+
+The upgrade recreates them under the same names, and they run again.
+
+Releases that leave `exposeService` off are unaffected.
+
+### One rollout of the pods
+
+The pod template of a Deployment or StatefulSet changes in two cases, and the upgrade rolls those pods once:
+
+- `service:` written without `enabled: true`. The Service rendered in 3.1.0 as well, but the container declared no ports; it now declares the ones derived from the Service, as it does with `enabled: true`.
+- Sidecars and init containers of a workload whose metrics port the chart exposes. They no longer declare the `metrics` port.
+
+### Shapes that fail at render time
+
+Each of these rendered in 3.1.0 into manifests that could not be applied:
+
+- An enabled `service` with no port in either form rendered `port: null`. Set `service.port` / `service.targetPort` or `service.ports.<name>.port`. `type: ExternalName` is exempt and renders without a `ports` block.
+- A `service.ports.<name>` or `headlessService.ports.<name>` entry with neither `port` nor `targetPort`, or with a named `targetPort` and no `port`. Set `port`.
+- Two ConfigMaps under one name: a `configMaps.<key>` entry spelling out the `<workload>-config` name of a workload with `createConfigmap: true` (`configMaps.web-config` beside a workload `web`), or a Deployment and a StatefulSet with the same key that both set `createConfigmap`. Rename one of them.
+
+A named `targetPort` with no matching `ports` entry used to put the name into `containerPort`. It now renders: the name stays on the Service and adds no container port. See [Named `targetPort` and the workload `ports` map](01-values.md#named-targetport-and-the-workload-ports-map).
+
 ## 3.0.0
 
 ### StatefulSet `service` no longer merges into the headless Service
