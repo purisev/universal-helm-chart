@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-eb179ad3.js";
+            window.path_to_searchindex_js = "searchindex-a1e8fdae.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -1493,6 +1493,31 @@ deployments:
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="migration"><a class="header" href="#migration">Migration</a></h1>
 <p>What changes between releases that may require values-file edits when you upgrade. The chart’s value surface is intentionally large; most edits are additive, but a few iterations on the <code>release-2.0.0</code> line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the <strong>63-char enforcement</strong> (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the <code>app.kubernetes.io/instance</code> label value the chart sets on the same resource.</p>
+<h2 id="320"><a class="header" href="#320">3.2.0</a></h2>
+<p>No values-file edits are required. Two things are worth checking before the upgrade, and a few shapes that never produced an installable manifest now fail at render time.</p>
+<h3 id="finished-jobs-under-exposeservice-have-to-go-before-the-upgrade"><a class="header" href="#finished-jobs-under-exposeservice-have-to-go-before-the-upgrade">Finished Jobs under <code>exposeService</code> have to go before the upgrade</a></h3>
+<p>With <code>integrations.monitoring.defaults.exposeService.enabled: true</code>, 3.1.0 declared the <code>metrics</code> container port on every container, job containers included. 3.2.0 declares it on the main container of a Deployment or StatefulSet only, the one that serves the endpoint.</p>
+<p>The name suffix from <code>hashSuffix</code> is computed from the job’s own values, which do not change, so a Job left in the cluster by 3.1.0 keeps its name while its pod template loses the port. <code>spec.template</code> of a Job is immutable, so Kubernetes rejects the update with a <code>field is immutable</code> error.</p>
+<p>Delete the finished Jobs of the release first. <code>app.kubernetes.io/part-of</code> carries the chart fullname on every resource, so with the default labels:</p>
+<pre><code class="language-bash">kubectl get job -n &lt;namespace&gt; -l app.kubernetes.io/part-of=&lt;fullname&gt;
+kubectl delete job -n &lt;namespace&gt; -l app.kubernetes.io/part-of=&lt;fullname&gt;
+</code></pre>
+<p>The upgrade recreates them under the same names, and they run again.</p>
+<p>Releases that leave <code>exposeService</code> off are unaffected.</p>
+<h3 id="one-rollout-of-the-pods"><a class="header" href="#one-rollout-of-the-pods">One rollout of the pods</a></h3>
+<p>The pod template of a Deployment or StatefulSet changes in two cases, and the upgrade rolls those pods once:</p>
+<ul>
+<li><code>service:</code> written without <code>enabled: true</code>. The Service rendered in 3.1.0 as well, but the container declared no ports; it now declares the ones derived from the Service, as it does with <code>enabled: true</code>.</li>
+<li>Sidecars and init containers of a workload whose metrics port the chart exposes. They no longer declare the <code>metrics</code> port.</li>
+</ul>
+<h3 id="shapes-that-fail-at-render-time"><a class="header" href="#shapes-that-fail-at-render-time">Shapes that fail at render time</a></h3>
+<p>Each of these rendered in 3.1.0 into manifests that could not be applied:</p>
+<ul>
+<li>An enabled <code>service</code> with no port in either form rendered <code>port: null</code>. Set <code>service.port</code> / <code>service.targetPort</code> or <code>service.ports.&lt;name&gt;.port</code>. <code>type: ExternalName</code> is exempt and renders without a <code>ports</code> block.</li>
+<li>A <code>service.ports.&lt;name&gt;</code> or <code>headlessService.ports.&lt;name&gt;</code> entry with neither <code>port</code> nor <code>targetPort</code>, or with a named <code>targetPort</code> and no <code>port</code>. Set <code>port</code>.</li>
+<li>Two ConfigMaps under one name: a <code>configMaps.&lt;key&gt;</code> entry spelling out the <code>&lt;workload&gt;-config</code> name of a workload with <code>createConfigmap: true</code> (<code>configMaps.web-config</code> beside a workload <code>web</code>), or a Deployment and a StatefulSet with the same key that both set <code>createConfigmap</code>. Rename one of them.</li>
+</ul>
+<p>A named <code>targetPort</code> with no matching <code>ports</code> entry used to put the name into <code>containerPort</code>. It now renders: the name stays on the Service and adds no container port. See <a href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a>.</p>
 <h2 id="300"><a class="header" href="#300">3.0.0</a></h2>
 <h3 id="statefulset-service-no-longer-merges-into-the-headless-service"><a class="header" href="#statefulset-service-no-longer-merges-into-the-headless-service">StatefulSet <code>service</code> no longer merges into the headless Service</a></h3>
 <p><code>statefulSets.&lt;name&gt;.service</code> always renders as its own, independent Service now. Previously, whenever <code>headlessService</code> stayed enabled (the default), <code>service.*</code> fields configured the single headless Service object instead of creating a separate one — so a StatefulSet couldn’t have a headless Service for stable per-pod DNS <em>and</em> a regular client-facing Service at the same time without setting <code>serviceName</code> to work around it.</p>
