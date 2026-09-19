@@ -784,3 +784,15 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].ports[0].containerPort
           value: 6379
+
+  - it: should derive no container port from a named service targetPort
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.enabled: true
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.ports.client.port: 6379
+      statefulSets.db.service.ports.client.targetPort: peer
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].ports

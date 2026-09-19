@@ -43,11 +43,7 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
 {{- $ctx := .ctx -}}
 {{- $wl := .wl -}}
 {{- $wlName := .wlName -}}
-{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
-{{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
-{{- $svcEnabled := and $wl.service (ne (index $wl.service "enabled") false) -}}
-{{- $hsEnabled := and (eq .kind "statefulSets") (ne (index ($wl.headlessService | default dict) "enabled") false) -}}
-{{- if and $exposeJson (ne $metricsType "pod") (not $svcEnabled) (not $hsEnabled) -}}
+{{- if (include "uhc.metricsPortPlacement" (dict "ctx" $ctx "wl" $wl "kind" .kind) | fromJson).standalone -}}
 {{- $name := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) -}}
 {{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "standalone metrics Service for workload %q" $wlName)) -}}
 {{- $name -}}
@@ -143,7 +139,6 @@ Emits the leading "---" document separator itself.
 {{- if and (not $svc.ports) $svc.targetPort (not $svc.port) }}
 {{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict "http" (dict "targetPort" $svc.targetPort)) "source" (printf "service for workload %q" $wlName)) }}
 {{- end }}
-{{- include "uhc.assertNamedTargetPorts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "ports" $svc.ports "scalarTarget" (and (not $svc.ports) $svc.targetPort) "prefix" "service") }}
 {{- $hasPorts := or $svc.ports $svc.port $svc.targetPort .injectMetricsPort }}
 {{- /* ExternalName resolves to a DNS name and carries no virtual IP, so Kubernetes
      treats its ports as optional and ignores them. Every other type needs at least one:
@@ -278,7 +273,6 @@ Emits the leading "---" document separator itself.
 {{- if and (not $hs.ports) $hs.targetPort (not $hs.port) }}
 {{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict "http" (dict "targetPort" $hs.targetPort)) "source" (printf "headlessService for workload %q" $wlName)) }}
 {{- end }}
-{{- include "uhc.assertNamedTargetPorts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "ports" $hs.ports "scalarTarget" (and (not $hs.ports) $hs.targetPort) "prefix" "headlessService") }}
 ---
 apiVersion: v1
 kind: Service
