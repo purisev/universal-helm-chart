@@ -1,0 +1,58 @@
+# 10-init-containers — Deployment with two init containers run before the main app starts.
+#
+# Demonstrates the chart's per-workload `initContainers` map: a wait step blocks
+# pod startup until the database is reachable, and a second step applies a
+# schema migration. Both run sequentially, in declared order. The chart sorts
+# the map alphabetically, so the names use 01-/02- prefixes to control order
+# (same convention as jobGroups[*].tasks).
+#
+# Notes:
+# - Reloader does not re-trigger init containers on config changes — they run
+#   only on Pod creation. Rolling the workload (e.g. via Reloader on a
+#   ConfigMap change) starts a fresh pod, which runs the init pass again.
+# - volumeMounts.<initContainerName> at root level is NOT inherited; per-init
+#   mounts are declared inline.
+
+deployments:
+  web:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: nginx
+      tag: "1.27"
+      pullPolicy: IfNotPresent
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 80
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+    # Map key → spec.initContainers[].name. Render order is sortAlpha;
+    # Kubernetes runs initContainers sequentially in declared order.
+    initContainers:
+      01-wait-for-db:
+        image:
+          repository: busybox
+          tag: "1.36"
+          pullPolicy: IfNotPresent
+        command: |
+          until nc -z postgres.example.svc 5432; do
+            echo "waiting for postgres..."
+            sleep 2
+          done
+      02-migrate:
+        image:
+          repository: myrepo/migrations
+          tag: v1.2.3
+        command:
+          - /bin/migrate
+          - --database=$(DATABASE_URL)
+          - --source=file:///etc/migrations
+        # Per-init env from a Secret — merges with root envSecrets automatically.
+        envSecrets:
+          - db-credentials
