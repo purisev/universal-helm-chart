@@ -35,16 +35,17 @@ spec:
         envSecrets:
           - db-credentials
         volumeClaimTemplates:
-          data:
-            accessModes:
-              - ReadWriteOnce
-            resources:
-              requests:
-                storage: 10Gi
+          - metadata:
+              name: data
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 10Gi
         volumeMounts:
-          db:
-            data:
-              mountPath: /var/lib/postgresql/data
+          data:
+            mountPath: /var/lib/postgresql/data
         resources:
           requests:
             cpu: 200m

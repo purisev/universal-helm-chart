@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-36f9f0b4.js";
+            window.path_to_searchindex_js = "searchindex-a1e8fdae.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-447daa91.js"></script>
+        <script src="toc-9fa66af8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -316,7 +316,7 @@
 </code></pre>
 <p>There is no Helm “repo add” step — Helm 3.8+ pulls OCI charts directly:</p>
 <pre><code class="language-bash">helm install my-app oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.1.0 \
+  --version 3.2.0 \
   -f values.yaml
 </code></pre>
 <h2 id="optional-crds"><a class="header" href="#optional-crds">Optional CRDs</a></h2>
@@ -352,7 +352,7 @@
           port: 80
 </code></pre>
 <p>Install:</p>
-<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.1.0 -f values.yaml
+<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.2.0 -f values.yaml
 </code></pre>
 <p>A complete copy-and-deploy version of this scenario, including Argo CD and Flux manifests, lives at <a href="02-examples/01-minimal"><code>../02-examples/01-minimal/</code></a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -461,7 +461,8 @@
 <tbody>
 <tr><td><code>service.ports</code> (map)</td><td>Replaces single-port <code>service.port</code> shorthand to expose two ports.</td></tr>
 <tr><td><code>metrics.enabled: true</code></td><td>Opt-in to monitoring (defaults are off).</td></tr>
-<tr><td><code>ingress</code></td><td>Routes <code>web.example.com</code> to the Service.</td></tr>
+<tr><td><code>ingress</code></td><td>Routes <code>web.example.com</code> to the Service. Its <code>serviceName</code> is a plain string, so it has to name what the chart renders.</td></tr>
+<tr><td><code>fullnameOverride</code></td><td>Pins the prefix on every resource name to <code>webapp</code>, making the Service <code>webapp-web</code> instead of <code>webapp-universal-helm-chart-web</code> — that is the name the Ingress backend spells out.</td></tr>
 <tr><td><code>hpa</code></td><td>Auto-scales on CPU; <code>replicaCount</code> is omitted from the rendered Deployment because HPA is on (see <a href="#007--autoscaler-mutual-exclusion-hpa--keda--vpa">ADR 007</a>).</td></tr>
 <tr><td><code>integrations.monitoring.defaults.enabled: true</code></td><td>Turns the default scrape on for every workload (per-workload <code>metrics.enabled</code> still acts as opt-out).</td></tr>
 </tbody>
@@ -505,11 +506,11 @@ kubectl apply -f flux/
 <h2 id="what-this-shows-2"><a class="header" href="#what-this-shows-2">What this shows</a></h2>
 <ul>
 <li>A <code>statefulSets.db</code> workload — replaces <code>deployments.&lt;n&gt;</code> for ordered, stateful pods.</li>
-<li><code>volumeClaimTemplates.data</code> — every pod gets its own PVC, retained across restarts and scale-up.</li>
+<li><code>volumeClaimTemplates</code> — a list of embedded PVCs, one entry named <code>data</code>, so every pod gets its own PVC, retained across restarts and scale-up.</li>
 <li><code>service.clusterIP: None</code> — headless Service required by StatefulSet for stable per-pod DNS.</li>
 <li><code>replicaCount: 3</code> with <code>podManagementPolicy: OrderedReady</code> (chart default).</li>
 <li><code>envSecrets</code> referencing an externally-managed Secret for <code>POSTGRES_PASSWORD</code> (no ESO here — see <code>07-external-secrets/</code> for that).</li>
-<li>Per-pod <code>volumeMounts</code> map keyed by mount name, referencing the <code>volumeClaimTemplates</code> entry by name.</li>
+<li>Per-pod <code>volumeMounts</code> map keyed by mount name, referencing the <code>volumeClaimTemplates</code> entry by its <code>metadata.name</code>.</li>
 </ul>
 <h2 id="delta-from-02-web-app-ingress"><a class="header" href="#delta-from-02-web-app-ingress">Delta from <code>02-web-app-ingress</code></a></h2>
 <div class="table-wrapper">
@@ -558,7 +559,7 @@ kubectl apply -f flux/
 </code></pre>
 <h2 id="prerequisites-1"><a class="header" href="#prerequisites-1">Prerequisites</a></h2>
 <ul>
-<li>A default StorageClass in the cluster, or override <code>volumeClaimTemplates.data.storageClassName</code> for your provisioner.</li>
+<li>A default StorageClass in the cluster, or set <code>storageClassName</code> in the <code>data</code> entry’s <code>spec</code> for your provisioner.</li>
 <li>The <code>db-credentials</code> Secret pre-existing in the target namespace.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -824,6 +825,7 @@ kubectl apply -f flux/
 <li><code>keda.enabled: true</code> on the worker, with a <code>kafka</code> trigger keyed on consumer-group lag.</li>
 <li><code>minReplicas: 1</code>, not <code>0</code> — this worker should never have a gap in consumption. Set <code>minReplicas: 0</code> instead when the workload can tolerate sitting idle (e.g. a <code>cron</code> trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.</li>
 <li><code>hpa.enabled: false</code> (default) — KEDA itself manages an internal HPA; mixing both would be rejected by the chart’s mutual-exclusion guard.</li>
+<li><code>keda.advanced</code> — passed into the ScaledObject verbatim. <code>horizontalPodAutoscalerConfig.behavior</code> shapes the HPA that KEDA creates: one pod a minute up instead of the HPA default of doubling every 15 seconds, and 15 minutes of quiet before a replica is given back. Kafka lag is spiky, and the default behaviour overshoots a queue that drains fast. <code>restoreToOriginalReplicaCount: true</code> puts the Deployment back on its pre-KEDA replica count if the ScaledObject is ever deleted. The chart validates the block as an object and nothing else, so any field in the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> works here.</li>
 <li><code>verticalPodAutoscaler.enabled: true</code> with <code>updateMode: Initial</code> — VPA sets the resource request the first time each pod is created. Works alongside KEDA because VPA touches <code>requests</code>, KEDA touches <code>replicas</code>. (<a href="#007--autoscaler-mutual-exclusion-hpa--keda--vpa">ADR 007</a>)</li>
 <li><code>service.enabled: false</code> — pure consumer, no inbound traffic.</li>
 <li><code>metrics.type: pod</code> + <code>integrations.monitoring.defaults.exposeService.enabled: true</code> → a metrics-only Service <code>&lt;release&gt;-worker-metrics</code> is auto-emitted, and a <code>PodMonitor</code> scrapes the worker pods directly.</li>
@@ -837,6 +839,7 @@ kubectl apply -f flux/
 </thead>
 <tbody>
 <tr><td>HPA → KEDA</td><td>Event-driven scaling; HPA off, KEDA on.</td></tr>
+<tr><td>Scaling behaviour</td><td><code>keda.advanced.horizontalPodAutoscalerConfig.behavior</code> caps the ramp at one pod a minute.</td></tr>
 <tr><td>Added VPA</td><td>Orthogonal, recommends/sets memory requests on initial pod create.</td></tr>
 <tr><td>Service off</td><td>Worker has no listener; metrics-only Service auto-emitted instead.</td></tr>
 <tr><td><code>metrics.type: pod</code></td><td>PodMonitor instead of ServiceMonitor.</td></tr>
@@ -906,6 +909,7 @@ kubectl apply -f flux/
 <h2 id="what-this-shows-8"><a class="header" href="#what-this-shows-8">What this shows</a></h2>
 <ul>
 <li><strong>Two-file values pattern</strong>: pass <code>values-base.yaml</code> and <code>values-&lt;env&gt;.yaml</code> to Helm via repeated <code>-f</code>. Later files win on key collision.</li>
+<li><strong>Per-env <code>fullnameOverride</code></strong>: each overlay pins its own resource-name prefix (<code>orders-dev</code> / <code>orders-staging</code> / <code>orders-prod</code>), so the prod Ingress backend can name <code>orders-prod-api</code> without depending on the release name Argo CD or Flux passes.</li>
 <li><strong>Argo CD multi-source with multiple <code>valueFiles</code></strong>: the chart source lists both files; Argo CD merges them in order before running Helm.</li>
 <li><strong>Argo CD <code>ApplicationSet</code></strong>: a list generator declares the envs once; the template stamps out an Application per env. Avoids hand-maintaining three near-identical Application CRs.</li>
 <li><strong>Flux <code>valuesFrom</code></strong>: prod values can also live in a ConfigMap (managed separately) — useful when ops change values out-of-band of git.</li>
@@ -1058,7 +1062,7 @@ kubectl apply -f flux/
 <tr><th>Topic</th><th>Top-level keys</th><th>Read more</th></tr>
 </thead>
 <tbody>
-<tr><td>Identity &amp; metadata</td><td><code>commonLabels</code>, <code>commonAnnotations</code>, <code>labels.standard</code>, <code>nameOverride</code>, <code>fullnameOverride</code></td><td><a href="#011--standard-wins-labels-and-invariant-workload-selectors">ADR 011</a></td></tr>
+<tr><td>Identity &amp; metadata</td><td><code>commonLabels</code>, <code>commonAnnotations</code>, <code>labels.standard</code>, <code>nameOverride</code>, <code>fullnameOverride</code>, <code>naming.omitWorkloadSuffix</code></td><td><a href="#011--standard-wins-labels-and-invariant-workload-selectors">ADR 011</a> · <a href="#021--optional-single-workload-naming">ADR 021</a></td></tr>
 <tr><td>Environment &amp; config</td><td><code>global.env</code>, <code>env</code>, <code>envSecrets</code>, <code>envConfigMaps</code>, <code>configMaps</code>, <code>podAnnotations</code>, <code>jobPodAnnotations</code></td><td><a href="#003--layered-inheritance-and-explicit-override">ADR 003</a> · <a href="#015--eso-data-vs-datafrom-and-chart-vs-external-disambiguation">ADR 015</a></td></tr>
 <tr><td>Image &amp; pulls</td><td><code>image</code>, <code>imagePullSecrets</code>, <code>jobCompletionImage</code></td><td><a href="02-examples/01-minimal"><code>02-examples/01-minimal/</code></a></td></tr>
 <tr><td>Deployments / StatefulSets</td><td><code>deployments</code>, <code>statefulSets</code>, <code>strategy</code>, <code>statefulSetUpdateStrategy</code>, <code>revisionHistoryLimit</code>, <code>progressDeadlineSeconds</code>, <code>minReadySeconds</code></td><td><a href="#002--multi-workload-via-keyed-maps-in-a-single-release">ADR 002</a> · <a href="02-examples/03-statefulset-pvc"><code>02-examples/03-statefulset-pvc/</code></a></td></tr>
@@ -1097,6 +1101,78 @@ kubectl apply -f flux/
 <pre><code>http (if present)  →  others alphabetically  →  metrics (if present)
 </code></pre>
 <p>Auto-injected metrics port (from <code>integrations.monitoring.defaults.exposeService</code>) lands last. See <a href="#014--deterministic-ordering-of-map-iterated-collections">ADR 014</a> and <a href="#016--metrics-port-auto-exposure-on-service">ADR 016</a>.</p>
+<h3 id="the-single-port-service-form"><a class="header" href="#the-single-port-service-form">The single-port service form</a></h3>
+<p>A workload’s Service takes ports either as the <code>service.ports.&lt;name&gt;</code> map or as the shorthand pair <code>service.port</code> / <code>service.targetPort</code>. In the shorthand, each side falls back to the other, in the Service and in the container spec alike:</p>
+<pre><code class="language-yaml">service:
+  enabled: true
+  port: 80          # container listens on 80 as well
+</code></pre>
+<pre><code class="language-yaml">service:
+  enabled: true
+  port: 80
+  targetPort: 8080  # container listens on 8080
+</code></pre>
+<p>The map form falls back the same way: <code>service.ports.&lt;name&gt;.port</code> alone is enough, and the container port follows it. An entry with neither key has nothing to fall back to and fails the render:</p>
+<pre><code>service.ports for workload "web": port "http" declares neither port nor
+targetPort. Set port, or a numeric targetPort for it to fall back to.
+</code></pre>
+<p>The fallback runs one way only. <code>spec.ports[].port</code> is a number, so an entry that names its <code>targetPort</code> has to declare <code>port</code> itself:</p>
+<pre><code>service.ports for workload "web": port "grpc" names its targetPort "grpc"
+and declares no port. A Service port is a number and cannot fall back to a
+name, so set port explicitly.
+</code></pre>
+<p>An enabled Service with neither form, and no metrics port injected by <code>integrations.monitoring.defaults.exposeService</code>, fails the render. A client-facing Service has nothing sensible to default to, unlike <code>headlessService</code>, which falls back to port 80 because a StatefulSet needs its governing Service to exist at all. The exception is <code>type: ExternalName</code>, which resolves to a DNS name, carries no virtual IP and so needs no ports; a portless one renders without a <code>ports</code> block, and any ports it does declare are still passed through.</p>
+<h3 id="named-targetport-and-the-workload-ports-map"><a class="header" href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a></h3>
+<p>A Service <code>targetPort</code> may name a port instead of numbering it. <code>containerPort</code> is an integer, so the chart derives container ports from numeric targets only: a named <code>targetPort</code> is passed through to the Service as written and adds nothing to the container spec. Kubernetes resolves the name against whichever container in the Pod declares it.</p>
+<p>Declare the port on the container that serves it. A workload’s own <code>ports</code> map replaces the Service-derived container ports entirely, which leaves the Service free to refer to the port by name:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    ports:
+      grpc:
+        containerPort: 9000
+    service:
+      enabled: true
+      ports:
+        grpc:
+          port: 9000
+          targetPort: grpc
+</code></pre>
+<p>A sidecar can serve it as well. A Service port whose <code>targetPort</code> names a port one of the workload’s <code>sidecars</code> declares belongs to that sidecar’s container, and the main container leaves it out:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080       # containerPort on the web container
+        proxy:
+          port: 9000
+          targetPort: envoy-admin
+    sidecars:
+      envoy:
+        image:
+          repository: envoyproxy/envoy
+          tag: v1.31-latest
+        ports:
+          envoy-admin:
+            containerPort: 9901  # the port the Service name resolves to
+</code></pre>
+<p>The chart does not check that some container declares the name. A container added by an admission webhook — a service-mesh proxy, for one — declares ports no values key describes, and a Service may target those by name:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    ports:
+      http:
+        containerPort: 8080
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: http
+        envoy-prom:
+          port: 15090
+          targetPort: http-envoy-prom  # declared by the injected proxy
+</code></pre>
+<p>A name nothing in the Pod declares leaves that Service port without endpoints, so a typo shows up as an empty <code>kubectl get endpointslices</code> rather than as a render error.</p>
 <h3 id="service-port-appprotocol"><a class="header" href="#service-port-appprotocol">Service port <code>appProtocol</code></a></h3>
 <p>Both Service port shapes accept an optional <code>appProtocol</code> — the single-port <code>service.port</code>/<code>service.targetPort</code> form and the <code>service.ports.&lt;name&gt;</code> map form (and their <code>headlessService</code> equivalents on StatefulSets). It passes straight through to <code>spec.ports[].appProtocol</code>, the native Kubernetes Service field.</p>
 <p>Set it when a port speaks something other than plain HTTP/1.1 and the consumer needs to know — most commonly <code>kubernetes.io/h2c</code> on a gRPC port, so a Gateway API implementation routing a GRPCRoute to that Service configures the upstream connection as HTTP/2 cleartext instead of assuming HTTP/1.1:</p>
@@ -1106,6 +1182,41 @@ kubectl apply -f flux/
       port: 9000
       targetPort: 9000
       appProtocol: kubernetes.io/h2c
+</code></pre>
+<h3 id="dropping-the-workload-suffix-from-names"><a class="header" href="#dropping-the-workload-suffix-from-names">Dropping the workload suffix from names</a></h3>
+<p>Every per-workload resource is named <code>&lt;fullname&gt;-&lt;workloadName&gt;</code>, and the workload name also lands in <code>app.kubernetes.io/name</code> while <code>app.kubernetes.io/instance</code> carries the full construction. A release that runs one workload can drop that suffix:</p>
+<pre><code class="language-yaml">naming:
+  omitWorkloadSuffix: true   # default: false
+</code></pre>
+<p>With it on, a release named <code>myrel</code> renders <code>myrel-universal-helm-chart</code> for the Deployment, the Service, the HPA, the PDB, the VPA, the ScaledObject and the NetworkPolicy, and keeps the usual trailing parts elsewhere: <code>-headless</code>, <code>-metrics</code>, <code>-config</code>. Labels and selectors follow: <code>app.kubernetes.io/name</code> becomes the chart name (<code>nameOverride</code> when set) and <code>app.kubernetes.io/instance</code> becomes <code>&lt;fullname&gt;</code>.</p>
+<p>Note that <code>&lt;fullname&gt;</code> is not what singleton resources carry. <code>uhc.labels</code> puts <code>app.kubernetes.io/instance: &lt;release name&gt;</code> on the ServiceAccount, Ingress and Routes, and that stays as it is. So a release <code>myrel</code> gives the Deployment <code>instance: myrel-universal-helm-chart</code> and the ServiceAccount <code>instance: myrel</code>. A <code>kubectl -l</code> selector, or an external ServiceMonitor, has to pick the one it means.</p>
+<p>Three things stay where they are.</p>
+<p>Container names keep the workload key, so <code>kubectl logs -c api</code> still works and KEDA’s <code>envSourceContainerName</code> still resolves.</p>
+<p><code>jobGroups</code> keep both their names and their labels. The names are built from the group and job keys and never carried a workload suffix; the labels stay on <code>&lt;groupName&gt;-&lt;jobName&gt;</code> / <code>&lt;fullname&gt;-&lt;groupName&gt;-&lt;jobName&gt;</code> because a release can hold any number of job groups next to its one workload. Collapsing them would file every Job pod under the workload’s own selector, and the workload’s Service, NetworkPolicy and PDB would then pick up job pods.</p>
+<p>ESO <code>SecretStore</code> and <code>ExternalSecret</code> entries keep their own keys in labels for the same reason.</p>
+<p>The flag expects exactly one enabled entry across <code>deployments</code> and <code>statefulSets</code>. With more than one, <code>helm template</code> fails and names the offenders rather than collapsing them onto the same resource names:</p>
+<pre><code>naming.omitWorkloadSuffix expects exactly one enabled workload, found 2
+(deployments.api, deployments.worker).
+</code></pre>
+<p>Turning the flag on or off for a release that already exists renames its workload and changes an immutable selector, so the Deployment or StatefulSet is replaced rather than updated. Decide before the first install. See <a href="#021--optional-single-workload-naming">ADR 021</a>.</p>
+<h3 id="service-naming"><a class="header" href="#service-naming">Service naming</a></h3>
+<p>A workload’s Service is named <code>&lt;fullname&gt;-&lt;workloadName&gt;</code>. <code>service.nameOverride</code> replaces that name:</p>
+<pre><code class="language-yaml">deployments:
+  frontend:
+    service:
+      enabled: true
+      nameOverride: frontend-web
+</code></pre>
+<p>The override covers the Service object and every chart-rendered reference that defaults to it — Gateway API <code>backendRefs</code> in <code>httpRoute</code> / <code>grpcRoute</code> / <code>tlsRoute</code> rules that carry no explicit <code>serviceName</code>. Labels and selectors are untouched: <code>app.kubernetes.io/name</code> and <code>app.kubernetes.io/instance</code> keep the workload’s own values, so the Service still selects the same pods. The metrics-only Service rendered for a workload that has no Service of its own keeps its <code>&lt;fullname&gt;-&lt;workloadName&gt;-metrics</code> name.</p>
+<p>On a StatefulSet the governing headless Service has its own key, <code>headlessService.nameOverride</code>, and <code>spec.serviceName</code> follows it. With <code>headlessService.enabled: false</code> that key is required and names the externally managed Service providing stable per-pod DNS. <code>statefulSets.&lt;name&gt;.serviceName</code> is the older spelling of the same value and still works; <code>headlessService.nameOverride</code> wins when both are set.</p>
+<p>Either override is checked against the 63-character ceiling the chart applies to every constructed name, and against the other Services in the release. Two workloads resolving to one Service name, or a StatefulSet whose client and headless Services land on the same name, fail the render:</p>
+<pre><code>Service name "shared-svc" is claimed by both deployments.a.service
+and deployments.b.service.
+</code></pre>
+<p><code>headlessService.enabled: false</code> is the one case allowed to look like a collision, because the name usually belongs to a Service outside the release. The one name inside it that also works is the workload’s own client Service with <code>clusterIP: None</code>, which is headless and already selects these pods. Anything else the chart renders leaves <code>spec.serviceName</code> on a Service that never provides per-pod DNS, and the render fails:</p>
+<pre><code>statefulSets.db.headlessService is disabled, so spec.serviceName points at
+"shared" — but that name belongs to statefulSets.db.service, a Service this
+chart renders itself.
 </code></pre>
 <h3 id="jobgroups-group--job-merge"><a class="header" href="#jobgroups-group--job-merge"><code>jobGroups</code> group → job merge</a></h3>
 <p>For each per-job field:</p>
@@ -1216,10 +1327,39 @@ kubectl apply -f flux/
 <li>When any HPA-class scaler is on, <code>spec.replicas</code> is omitted from the rendered manifest so Helm doesn’t bounce the count on every apply.</li>
 </ul>
 <p>See <a href="#007--autoscaler-mutual-exclusion-hpa--keda--vpa">ADR 007</a>.</p>
+<h3 id="keda-advanced-pass-through"><a class="header" href="#keda-advanced-pass-through">KEDA <code>advanced</code> pass-through</a></h3>
+<p><code>keda.advanced</code> goes into the ScaledObject’s <code>spec.advanced</code> verbatim. The chart checks that it is an object and stops there, so <code>restoreToOriginalReplicaCount</code>, <code>horizontalPodAutoscalerConfig</code> (<code>name</code>, <code>behavior</code>) and <code>scalingModifiers</code> all work, and so does anything KEDA adds later without a chart release in between.</p>
+<pre><code class="language-yaml">deployments:
+  worker:
+    keda:
+      enabled: true
+      maxReplicas: 20
+      triggers:
+        - type: kafka
+          metadata: {...}
+      advanced:
+        restoreToOriginalReplicaCount: true
+        horizontalPodAutoscalerConfig:
+          behavior:
+            scaleUp:
+              stabilizationWindowSeconds: 60
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 60
+</code></pre>
+<p><code>behavior</code> is the Kubernetes HPA scaling-behavior shape, applied to the HPA that KEDA creates. It is worth setting on a lag-driven trigger: the HPA default doubles the replica count every 15 seconds, which overshoots on a queue that drains quickly. The example above adds one pod a minute instead.</p>
+<p>Because nothing here is validated field by field, a typo inside <code>advanced</code> reaches the cluster and is rejected by the KEDA CRD rather than by <code>helm template</code>. Check the field names against the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> for the KEDA version you run.</p>
 <h3 id="scheduling-field-inheritance"><a class="header" href="#scheduling-field-inheritance">Scheduling field inheritance</a></h3>
 <p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
 <h3 id="init-containers-and-sidecars-share-one-container-shape"><a class="header" href="#init-containers-and-sidecars-share-one-container-shape">Init containers and sidecars share one container shape</a></h3>
 <p><code>deployments.&lt;name&gt;.initContainers</code> and <code>deployments.&lt;name&gt;.sidecars</code> (same under <code>statefulSets.&lt;name&gt;</code>) are maps keyed by container name. Both flow through the same renderer as the main container: <code>image</code>, <code>command</code>/<code>args</code>, <code>env</code>, <code>envSecrets</code>, <code>volumeMounts</code>, <code>resources</code>, <code>securityContext</code>, <code>lifecycle</code>. Both inherit the parent workload’s <code>inherit.env</code> / <code>inherit.configMaps</code> / <code>inherit.configMapMount</code> flags. Neither inherits root-level <code>volumeMounts.&lt;containerName&gt;</code> — declare local mounts inline. Render order is <code>sortAlpha</code>; for <code>initContainers</code> Kubernetes runs them sequentially in declared order, so prefix names with <code>01-</code>, <code>02-</code>, … when run order matters (same convention as <code>jobGroups[*].tasks</code>). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. <strong>Two exceptions for <code>initContainers</code>:</strong> <code>probesEnabled</code> / probe blocks (<code>readinessProbe</code>, <code>livenessProbe</code>, <code>startupProbe</code>) and <code>lifecycle</code> are rejected — Kubernetes does not allow these on standard init containers, so <code>helm template</code> fail-fasts if either is set on an init entry.</p>
+<h3 id="configmap-names"><a class="header" href="#configmap-names">ConfigMap names</a></h3>
+<p>A workload with <code>createConfigmap: true</code> gets <code>&lt;fullname&gt;-&lt;workloadName&gt;-config</code>, and an entry in <code>configMaps</code> gets <code>&lt;fullname&gt;-&lt;key&gt;</code>. The two shapes meet whenever a key spells out the other’s suffix, so <code>configMaps.web-config</code> beside a workload named <code>web</code> lands both on one name, and under <code>naming.omitWorkloadSuffix</code> a key of just <code>config</code> is enough. That fails the render rather than producing two documents Kubernetes will refuse:</p>
+<pre><code>ConfigMap name "myrel-universal-helm-chart-web-config" is claimed by both
+deployments.web.createConfigmap and configMaps.web-config.
+</code></pre>
+<p>The same check covers a <code>deployments.&lt;name&gt;</code> and a <code>statefulSets.&lt;name&gt;</code> sharing a key while both set <code>createConfigmap</code>. Disabled workloads and <code>configMaps</code> entries are ignored, since neither renders.</p>
 <h3 id="chart-owned-vs-external-name-resolution"><a class="header" href="#chart-owned-vs-external-name-resolution">Chart-owned vs external name resolution</a></h3>
 <p>When the same name appears in both a chart-owned map (<code>configMaps</code>, <code>integrations.eso.externalSecrets</code>) and an external reference list (<code>envConfigMaps</code>, <code>envSecrets</code>):</p>
 <ul>
@@ -1271,7 +1411,7 @@ kubectl apply -f flux/
 <h2 id="ide-setup"><a class="header" href="#ide-setup">IDE setup</a></h2>
 <h3 id="yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><a class="header" href="#yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><code>yaml-language-server</code> / Red Hat YAML extension (VS Code, Neovim, others)</a></h3>
 <p>Add a directive at the top of any values file you author:</p>
-<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.1.0/values.schema.json
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.2.0/values.schema.json
 deployments:
   api:
     image:
@@ -1282,7 +1422,7 @@ deployments:
 <h3 id="jetbrains-ides-intellij-goland-pycharm-"><a class="header" href="#jetbrains-ides-intellij-goland-pycharm-">JetBrains IDEs (IntelliJ, GoLand, PyCharm, …)</a></h3>
 <p><code>Settings</code> → <code>Languages &amp; Frameworks</code> → <code>Schemas and DTDs</code> → <code>JSON Schema Mappings</code>:</p>
 <ul>
-<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.1.0/values.schema.json</code></li>
+<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.2.0/values.schema.json</code></li>
 <li><strong>Schema version:</strong> JSON Schema 2020-12 (the latest)</li>
 <li><strong>File path pattern:</strong> <code>*values*.yaml</code> (or per-project glob).</li>
 </ul>
@@ -1297,7 +1437,7 @@ deployments:
 </code></pre>
 <p>Use this when iterating on overlay values in a config repo where Helm isn’t installed.</p>
 <h2 id="pinning-the-schema-url"><a class="header" href="#pinning-the-schema-url">Pinning the schema URL</a></h2>
-<p>The <code>v3.1.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
+<p>The <code>v3.2.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="compatibility"><a class="header" href="#compatibility">Compatibility</a></h1>
 <p>Versions and APIs the chart targets. The intent here is to be honest about <strong>what the chart renders</strong> rather than to claim a tested SemVer matrix that rots on every operator release.</p>
@@ -1353,6 +1493,31 @@ deployments:
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="migration"><a class="header" href="#migration">Migration</a></h1>
 <p>What changes between releases that may require values-file edits when you upgrade. The chart’s value surface is intentionally large; most edits are additive, but a few iterations on the <code>release-2.0.0</code> line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the <strong>63-char enforcement</strong> (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the <code>app.kubernetes.io/instance</code> label value the chart sets on the same resource.</p>
+<h2 id="320"><a class="header" href="#320">3.2.0</a></h2>
+<p>No values-file edits are required. Two things are worth checking before the upgrade, and a few shapes that never produced an installable manifest now fail at render time.</p>
+<h3 id="finished-jobs-under-exposeservice-have-to-go-before-the-upgrade"><a class="header" href="#finished-jobs-under-exposeservice-have-to-go-before-the-upgrade">Finished Jobs under <code>exposeService</code> have to go before the upgrade</a></h3>
+<p>With <code>integrations.monitoring.defaults.exposeService.enabled: true</code>, 3.1.0 declared the <code>metrics</code> container port on every container, job containers included. 3.2.0 declares it on the main container of a Deployment or StatefulSet only, the one that serves the endpoint.</p>
+<p>The name suffix from <code>hashSuffix</code> is computed from the job’s own values, which do not change, so a Job left in the cluster by 3.1.0 keeps its name while its pod template loses the port. <code>spec.template</code> of a Job is immutable, so Kubernetes rejects the update with a <code>field is immutable</code> error.</p>
+<p>Delete the finished Jobs of the release first. <code>app.kubernetes.io/part-of</code> carries the chart fullname on every resource, so with the default labels:</p>
+<pre><code class="language-bash">kubectl get job -n &lt;namespace&gt; -l app.kubernetes.io/part-of=&lt;fullname&gt;
+kubectl delete job -n &lt;namespace&gt; -l app.kubernetes.io/part-of=&lt;fullname&gt;
+</code></pre>
+<p>The upgrade recreates them under the same names, and they run again.</p>
+<p>Releases that leave <code>exposeService</code> off are unaffected.</p>
+<h3 id="one-rollout-of-the-pods"><a class="header" href="#one-rollout-of-the-pods">One rollout of the pods</a></h3>
+<p>The pod template of a Deployment or StatefulSet changes in two cases, and the upgrade rolls those pods once:</p>
+<ul>
+<li><code>service:</code> written without <code>enabled: true</code>. The Service rendered in 3.1.0 as well, but the container declared no ports; it now declares the ones derived from the Service, as it does with <code>enabled: true</code>.</li>
+<li>Sidecars and init containers of a workload whose metrics port the chart exposes. They no longer declare the <code>metrics</code> port.</li>
+</ul>
+<h3 id="shapes-that-fail-at-render-time"><a class="header" href="#shapes-that-fail-at-render-time">Shapes that fail at render time</a></h3>
+<p>Each of these rendered in 3.1.0 into manifests that could not be applied:</p>
+<ul>
+<li>An enabled <code>service</code> with no port in either form rendered <code>port: null</code>. Set <code>service.port</code> / <code>service.targetPort</code> or <code>service.ports.&lt;name&gt;.port</code>. <code>type: ExternalName</code> is exempt and renders without a <code>ports</code> block.</li>
+<li>A <code>service.ports.&lt;name&gt;</code> or <code>headlessService.ports.&lt;name&gt;</code> entry with neither <code>port</code> nor <code>targetPort</code>, or with a named <code>targetPort</code> and no <code>port</code>. Set <code>port</code>.</li>
+<li>Two ConfigMaps under one name: a <code>configMaps.&lt;key&gt;</code> entry spelling out the <code>&lt;workload&gt;-config</code> name of a workload with <code>createConfigmap: true</code> (<code>configMaps.web-config</code> beside a workload <code>web</code>), or a Deployment and a StatefulSet with the same key that both set <code>createConfigmap</code>. Rename one of them.</li>
+</ul>
+<p>A named <code>targetPort</code> with no matching <code>ports</code> entry used to put the name into <code>containerPort</code>. It now renders: the name stays on the Service and adds no container port. See <a href="#named-targetport-and-the-workload-ports-map">Named <code>targetPort</code> and the workload <code>ports</code> map</a>.</p>
 <h2 id="300"><a class="header" href="#300">3.0.0</a></h2>
 <h3 id="statefulset-service-no-longer-merges-into-the-headless-service"><a class="header" href="#statefulset-service-no-longer-merges-into-the-headless-service">StatefulSet <code>service</code> no longer merges into the headless Service</a></h3>
 <p><code>statefulSets.&lt;name&gt;.service</code> always renders as its own, independent Service now. Previously, whenever <code>headlessService</code> stayed enabled (the default), <code>service.*</code> fields configured the single headless Service object instead of creating a separate one — so a StatefulSet couldn’t have a headless Service for stable per-pod DNS <em>and</em> a regular client-facing Service at the same time without setting <code>serviceName</code> to work around it.</p>
@@ -1522,6 +1687,8 @@ helm unittest .
 <tr><td><code>helm template my-app .</code></td><td>After any template or values change — fastest visual check of the rendered manifests.</td></tr>
 <tr><td><code>helm lint .</code></td><td>Before pushing — catches schema mismatches and shape problems CI will also reject.</td></tr>
 <tr><td><code>helm unittest .</code></td><td>Before pushing — catches behavioural regressions. Add a new test case in the matching <code>tests/&lt;template&gt;_test.yaml</code> whenever you add a feature.</td></tr>
+<tr><td><code>bash .github/scripts/check-version-pins.sh</code></td><td>After touching <code>Chart.yaml</code> or any install snippet in <code>docs/</code> — holds every documented version to the one in <code>Chart.yaml</code>.</td></tr>
+<tr><td><code>bash .github/scripts/check-examples.sh</code></td><td>After touching the values shape, the schema or anything under <code>docs/02-examples/</code> — renders every example, including the values inlined in its Argo CD and Flux manifests, and checks each Ingress backend against the Services the same values render. Needs <code>yq</code>.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1532,6 +1699,8 @@ helm unittest .
 <ul>
 <li><strong>Changed the values shape?</strong> Update <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json"><code>values.schema.json</code></a> in the same commit. Schema and <code>values.yaml</code> drift is the most common reviewer comment.</li>
 <li><strong>Added a field?</strong> Add at least one assertion in <code>tests/&lt;template&gt;_test.yaml</code>. Coverage prevents silent regressions on future refactors.</li>
+<li><strong>Bumped the chart version?</strong> Every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names it too. <code>check-version-pins.sh</code> lists the ones you missed; CI runs it on every run, the e2e suites wait on it, and the branch preview build will not publish while it is red.</li>
+<li><strong>Changed an example?</strong> Each example carries the same values three times: <code>values.yaml</code>, the Argo CD <code>Application</code>, and the Flux <code>HelmRelease</code>. Change one and the other two go stale. <code>check-examples.sh</code> renders all three and fails on the ones that no longer install — or that name a Service nothing renders.</li>
 <li><strong>Writing fixtures or example values?</strong> Use <strong>block-style</strong> YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -1621,6 +1790,10 @@ helm unittest .
 <li>the workflow is triggered manually (<code>workflow_dispatch</code>) — runs every job.</li>
 </ul>
 <p>A <code>gate</code> job reads the PR’s labels and sets one boolean output per job; every <code>e2e-*</code> job is <code>if: needs.gate.outputs.&lt;job&gt; == 'true'</code>. Label a PR with the narrowest <code>e2e:&lt;job&gt;</code> that covers what you changed — not the blanket <code>e2e</code> label — so CI time stays proportional to the change.</p>
+<h2 id="linting-runs-first"><a class="header" href="#linting-runs-first">Linting runs first</a></h2>
+<p>Once the gate decides at least one suite should run, two preflight jobs go ahead of it: <code>Lint and Test</code> (<code>helm lint</code>, <code>helm template</code>, <code>helm unittest</code>) and <code>Check version pins</code>. Every <code>e2e-*</code> job waits on both, so a chart that does not lint, or a version the docs disagree about, never reaches a kind cluster — fix the lint first, then the suites run on something that can plausibly pass.</p>
+<p>Both are the same checks <code>ci.yaml</code> runs, not copies of them. The chart lint lives in <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/actions/lint-chart/action.yml"><code>.github/actions/lint-chart</code></a>, a composite action both files invoke, and the version check is <code>.github/scripts/check-version-pins.sh</code> in both. Add a step to the action and it guards the e2e suites too. Running the steps inside the calling job rather than through a reusable workflow keeps the status check named <code>Lint and Test</code>, which is the name branch protection requires.</p>
+<p>They are skipped along with everything else when the gate enables no suite, so a PR that never asked for e2e pays nothing.</p>
 <h2 id="the-jobs"><a class="header" href="#the-jobs">The jobs</a></h2>
 <div class="table-wrapper">
 <table>
@@ -1672,6 +1845,10 @@ chainsaw test test/e2e/chainsaw/&lt;job&gt; --config test/e2e/chainsaw/&lt;job&g
 <ol>
 <li>
 <p><strong>Check <code>Chart.yaml</code>.</strong> The <code>version</code> field is pinned to the in-flight release line and must already match the version you want to publish — don’t bump per-PR.</p>
+<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. Given a ref that names a version — a <code>release-X.Y.Z</code> branch or a <code>vX.Y.Z</code> tag — it additionally holds <code>Chart.yaml</code> to that version. CI hands it the branch a PR targets, the branch it comes from and the tag, so the release PR asserts the version too rather than only the PRs into the release branch. Run it locally with:</p>
+<pre><code class="language-bash">TARGET_REFS=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
+</code></pre>
+<p>It runs on every CI run, and the branch preview build in <code>ci.yaml</code> will not publish while it is red. <code>release.yaml</code> runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
 </li>
 <li>
 <p><strong>Tag and push</strong> from the matching release branch:</p>
@@ -1681,7 +1858,7 @@ git push origin v&lt;X.Y.Z&gt;
 </code></pre>
 </li>
 <li>
-<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity.</p>
+<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, checks the tag against <code>Chart.yaml</code> and the docs, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity.</p>
 </li>
 <li>
 <p><strong>Verify the artifact:</strong></p>
@@ -1741,8 +1918,9 @@ git push origin v&lt;X.Y.Z&gt;
 <tr><td>016</td><td><a href="#016--metrics-port-auto-exposure-on-service">Metrics port auto-exposure on Service</a></td><td>Accepted</td></tr>
 <tr><td>017</td><td><a href="#017--reloader-annotation-injection">Reloader annotation injection</a></td><td>Accepted</td></tr>
 <tr><td>018</td><td><a href="#018--testing-with-helm-unittest-and-fixtures">Testing with <code>helm-unittest</code> and fixtures</a></td><td>Accepted</td></tr>
-<tr><td>019</td><td><a href="05-adr/019-explicit-atomic-list-defaults.html">Pre-fill API-server defaults on atomic list fields</a></td><td>Accepted</td></tr>
-<tr><td>020</td><td><a href="05-adr/020-tpl-hostnames-and-parentrefs.html"><code>tpl</code>-evaluated hostnames and parentRefs</a></td><td>Accepted</td></tr>
+<tr><td>019</td><td><a href="#019--pre-fill-api-server-defaults-on-atomic-list-fields">Pre-fill API-server defaults on atomic list fields</a></td><td>Accepted</td></tr>
+<tr><td>020</td><td><a href="#020--tpl-evaluated-hostnames-and-parentrefs"><code>tpl</code>-evaluated hostnames and parentRefs</a></td><td>Accepted</td></tr>
+<tr><td>021</td><td><a href="#021--optional-single-workload-naming">Optional single-workload naming</a></td><td>Accepted</td></tr>
 </tbody>
 </table>
 </div>
@@ -2785,7 +2963,7 @@ labels:
 <li><strong>K8s-native shapes stay open.</strong> <code>resources</code>, <code>affinity</code>, <code>securityContext</code>, <code>podSecurityContext</code>, <code>volumes.&lt;name&gt;</code>, <code>volumeMounts.&lt;container&gt;.&lt;mount&gt;</code>, <code>tolerations</code>, <code>topologySpreadConstraints</code> (the array of constraints), <code>livenessProbe</code> / <code>readinessProbe</code> / <code>startupProbe</code>, <code>lifecycle</code>, <code>nodeSelector</code>, <code>podAnnotations</code> — these mirror upstream Kubernetes types whose fields grow each minor release. Closing them would force-fail on values that pass <code>kubectl apply</code> on a newer cluster, which is worse than letting a typo through. Treat them as pass-through and rely on the API server to reject malformed shapes at admission time.</li>
 <li><strong>Open maps use <code>additionalProperties: &lt;object schema&gt;</code> with patternProperties on keys.</strong> Example: <code>deployments</code> (any DNS-1123 key, value must match the <code>deploymentEntry</code> schema in <code>$defs</code>).</li>
 <li><strong>Per-feature toggles use <code>if/then</code></strong> to make required fields conditional: e.g. when <code>integrations.eso.externalSecrets.&lt;name&gt;.dataFrom</code> is set, <code>secretStore</code> becomes required.</li>
-<li><strong>Keep regex sane.</strong> Port names: <code>^[a-z]([-a-z0-9]*[a-z0-9])?$</code> and <code>length(name) &lt;= 15</code>. Hostnames: standard DNS pattern. Anything more elaborate is suspect. Exception: hosts/hostnames, <code>parentRefs.name</code>, and the templatable ReferenceGrant fields are exempt from a DNS-pattern constraint here. See <a href="05-adr/020-tpl-hostnames-and-parentrefs.html">ADR 020</a>, which evaluates them through <code>tpl</code>; a pre-render pattern would reject legitimate <code>{{ }}</code> values.</li>
+<li><strong>Keep regex sane.</strong> Port names: <code>^[a-z]([-a-z0-9]*[a-z0-9])?$</code> and <code>length(name) &lt;= 15</code>. Hostnames: standard DNS pattern. Anything more elaborate is suspect. Exception: hosts/hostnames, <code>parentRefs.name</code>, and the templatable ReferenceGrant fields are exempt from a DNS-pattern constraint here. See <a href="#020--tpl-evaluated-hostnames-and-parentrefs">ADR 020</a>, which evaluates them through <code>tpl</code>; a pre-render pattern would reject legitimate <code>{{ }}</code> values.</li>
 </ul>
 <h2 id="alternatives-considered-12"><a class="header" href="#alternatives-considered-12">Alternatives considered</a></h2>
 <ul>
@@ -3014,8 +3192,8 @@ integrations:
 <h2 id="decision-15"><a class="header" href="#decision-15">Decision</a></h2>
 <p>A single switch at <code>integrations.monitoring.defaults.exposeService.enabled: true</code> (overridable per workload via <code>metrics.exposeService.enabled</code>) auto-emits the metrics port. The chart’s behaviour is:</p>
 <ul>
-<li><strong>Workload has a main Service</strong> (<code>service.enabled: true</code> and at least one entry in <code>service.ports</code>): append a <code>metrics</code> port to the Service’s <code>ports[]</code> and a matching <code>containerPort</code> to the pod template. Port name is fixed as <code>metrics</code> (Kubernetes convention).</li>
-<li><strong>Workload has no main Service</strong>: emit a <strong>dedicated</strong> Service with only the metrics port. Name: <code>&lt;release-fullname&gt;-&lt;workload&gt;-metrics</code>. This Service is also picked up by the ServiceMonitor / VMServiceScrape (when CRD discovery + service target is selected — see <a href="#008--multi-provider-monitoring-matrix">ADR 008</a>).</li>
+<li><strong>Workload has a main Service</strong> (<code>service.enabled: true</code> and at least one entry in <code>service.ports</code>): append a <code>metrics</code> port to the Service’s <code>ports[]</code> and a matching <code>containerPort</code> to the workload’s main container. Sidecars, init containers and job containers never get it — <code>ContainerPort.name</code> has to be unique within a Pod, and they do not serve the endpoint. Port name is fixed as <code>metrics</code> (Kubernetes convention).</li>
+<li><strong>Workload has no main Service</strong>: emit a <strong>dedicated</strong> Service with only the metrics port. Name: <code>&lt;release-fullname&gt;-&lt;workload&gt;-metrics</code>. On a StatefulSet the governing headless Service takes the port instead whenever the chart renders it; the dedicated Service appears only when neither Service exists. This Service is also picked up by the ServiceMonitor / VMServiceScrape (when CRD discovery + service target is selected — see <a href="#008--multi-provider-monitoring-matrix">ADR 008</a>).</li>
 <li><strong><code>metrics.type: pod</code></strong>: this whole feature is skipped. PodMonitor / VMPodScrape don’t need a Service — the scrape happens directly against pod IPs.</li>
 <li><strong><code>service.ports.metrics</code> already declared</strong>: the auto-injection is skipped to avoid a duplicate port. The user’s explicit declaration wins.</li>
 </ul>
@@ -3217,6 +3395,249 @@ deployments:
 <li><code>.github/workflows/ci.yaml</code>, <code>.github/workflows/release.yaml</code> — CI pipelines</li>
 <li><code>helm-unittest</code>: https://github.com/helm-unittest/helm-unittest</li>
 <li>Related: <a href="#013--schema-driven-validation-not-template-side">ADR 013</a> (schema validation runs as part of unittest)</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="019--pre-fill-api-server-defaults-on-atomic-list-fields"><a class="header" href="#019--pre-fill-api-server-defaults-on-atomic-list-fields">019 — Pre-fill API-server defaults on atomic list fields</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-08-19</li>
+</ul>
+<h2 id="context-18"><a class="header" href="#context-18">Context</a></h2>
+<p>Argo CD synced with <code>syncOptions: [ServerSideApply=true]</code> reported a handful of this chart’s resources as permanently <code>OutOfSync</code>, even immediately after a clean sync with no pending git change: <code>StatefulSet.spec.volumeClaimTemplates</code>, and every Gateway API route kind’s <code>spec.parentRefs</code> / <code>spec.rules[].backendRefs</code> (<code>HTTPRoute</code>, <code>GRPCRoute</code>, <code>TLSRoute</code>).</p>
+<p>Reproduced directly against a kind cluster: the Kubernetes API server (or, for Gateway API, the CRD’s own OpenAPI schema defaults) fills in fields on these objects that the chart never rendered — <code>apiVersion: v1</code>, <code>kind: PersistentVolumeClaim</code>, <code>spec.volumeMode: Filesystem</code>, and <code>status: {phase: Pending}</code> on each <code>volumeClaimTemplates</code> entry; <code>group</code>/<code>kind</code> on <code>parentRefs</code> and <code>backendRefs</code> entries; <code>weight: 1</code> on <code>backendRefs</code>; <code>matches[].method.type: Exact</code> on <code>GRPCRoute</code> matches left unset.</p>
+<p>None of this is a bug in the objects themselves — Kubernetes is allowed to default fields the client didn’t set. The problem is specific to how these fields are <em>shaped</em>: each one lives inside a list field with no merge key (<code>x-kubernetes-list-type: atomic</code>, or no strategic-merge-patch directive at all for core <code>volumeClaimTemplates</code>). Struct-shaped fields we partially specify (e.g. <code>ExternalSecret.spec.target</code>, which gets <code>deletionPolicy</code> and <code>template.engineVersion</code> defaulted) merge key-by-key under both classic apply and Server-Side Apply, so an unmentioned sibling field is simply left alone. List entries without a merge key don’t get that courtesy: once a field manager owns the list, it owns it <em>as a whole unit</em>, and any element field present live but absent from the desired manifest reads as a pending patch back to the (shorter) desired version — forever <code>OutOfSync</code>, because the server immediately re-adds the same defaults on the next reconcile.</p>
+<p>This only surfaces under <code>ServerSideApply=true</code>. Argo CD’s default (client-side) apply path doesn’t flag it — its diff has more lenient handling of fields it never took ownership of. <code>ServerSideApply=true</code> is a common Argo CD recommendation, though, so charts that skip this only work by accident for users on the default sync strategy.</p>
+<h2 id="decision-18"><a class="header" href="#decision-18">Decision</a></h2>
+<p>Where the chart renders an atomic-list field whose element shape includes fields we know the server (or CRD schema) will default, <strong>pre-fill those exact defaults in the template</strong>, using a plain-key-wins merge (<code>merge (deepCopy $userValue) $defaults</code>) so any value the user <em>did</em> set is untouched:</p>
+<ul>
+<li><code>templates/statefulset.yaml</code> — each <code>volumeClaimTemplates</code> entry gets <code>apiVersion: v1</code>, <code>kind: PersistentVolumeClaim</code>, <code>spec.volumeMode: Filesystem</code> (default), <code>status: {phase: Pending}</code>.</li>
+<li><code>templates/_gateway.tpl</code> — <code>uhc.gatewayParentRefs</code> fills <code>group: gateway.networking.k8s.io</code>, <code>kind: Gateway</code> on every <code>parentRefs</code> entry; <code>uhc.gatewayBackendRefs</code> fills <code>group: ""</code>, <code>kind: Service</code>, <code>weight: 1</code> on every <code>backendRefs</code> entry (both helpers, used by <code>HTTPRoute</code>, <code>GRPCRoute</code>, <code>TLSRoute</code>, root and per-workload and plural-map render sites alike). <code>uhc.grpcRouteRuleSpec</code> additionally fills <code>matches[].method.type: Exact</code> when a <code>method</code> match is set without one.</li>
+</ul>
+<p>Desired now equals live byte-for-byte on these fields, so the diff Argo CD would otherwise (re-)compute under Server-Side Apply is empty regardless of sync strategy.</p>
+<h2 id="consequences-18"><a class="header" href="#consequences-18">Consequences</a></h2>
+<p><strong>What this enables:</strong></p>
+<ul>
+<li>No <code>ignoreDifferences</code> required for <code>volumeClaimTemplates</code> / Gateway API routes, on any Argo CD sync strategy (client-side or <code>ServerSideApply=true</code>).</li>
+<li>The fix is invisible to users who never look at the rendered YAML — user-supplied field values always win via the merge, only genuinely-omitted fields get filled.</li>
+</ul>
+<p><strong>What it costs:</strong></p>
+<ul>
+<li>The rendered manifests carry a few more explicit fields (<code>apiVersion</code>, <code>kind</code>, <code>status: {phase: Pending}</code> inside <code>volumeClaimTemplates</code>; <code>group</code>/<code>kind</code>/<code>weight</code> on route refs) that most hand-written manifests leave implicit. <code>status:</code> inside a spec-embedded <code>PersistentVolumeClaim</code> template reads unusually at first glance — it’s real, structurally valid content (<code>StatefulSetSpec.VolumeClaimTemplates</code> is typed <code>[]PersistentVolumeClaim</code>, <code>status</code> included), not a mistake.</li>
+<li>If a future Kubernetes/Gateway API release changes what gets defaulted (e.g. a new <code>PersistentVolumeClaim</code> default field, or Gateway API adding a field to <code>parentRefs</code>), this list of pre-filled defaults needs a matching update, or the diff reappears for that one new field. Confirmed only for the fields listed above — other Gateway API match-level defaults (e.g. <code>HTTPRoute</code> <code>matches[].path.type</code>) follow the identical pattern but weren’t hit by the values used to reproduce this, so aren’t pre-filled yet.</li>
+<li>Only fixes fields shaped as unmerged lists. A struct field the server defaults (like <code>ExternalSecret.spec.target.deletionPolicy</code>) was already fine and needed no change; a chart bug that under-specifies a <em>new</em> unmerged-list field in the future will need the same treatment, not this one applied blindly everywhere.</li>
+</ul>
+<h2 id="alternatives-considered-18"><a class="header" href="#alternatives-considered-18">Alternatives considered</a></h2>
+<ul>
+<li><strong>Document <code>ignoreDifferences</code> for affected users instead of changing chart output.</strong> Rejected as the primary fix: it pushes a per-consumer Argo CD config burden onto everyone who happens to use <code>ServerSideApply=true</code>, for a gap the chart can close for free. Still valid as a fallback for any future unmerged-list default this ADR’s list doesn’t yet cover.</li>
+<li><strong>Switch affected CRD list fields to a merge-key strategy chart-side.</strong> Not possible — <code>x-kubernetes-list-type</code>/patch strategy is defined by the upstream API (core Kubernetes types, Gateway API CRDs), not something a chart consuming those types can override.</li>
+<li><strong>Recommend users avoid <code>ServerSideApply=true</code>.</strong> Rejected: it’s a reasonable, commonly-recommended Argo CD setting for unrelated reasons (large manifests, multi-controller field ownership); the chart shouldn’t have an opinion on it.</li>
+</ul>
+<h2 id="references-18"><a class="header" href="#references-18">References</a></h2>
+<ul>
+<li><code>templates/statefulset.yaml</code>, <code>templates/_gateway.tpl</code> — the fix.</li>
+<li><code>templates/externalsecret.yaml</code> — an example of a struct field (<code>spec.target</code>) that needed no change, for contrast.</li>
+<li>Related: <a href="#010--argo-cd-sync-waves-baked-in-by-default">ADR 010</a> (other Argo CD-specific chart behavior).</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="020--tpl-evaluated-hostnames-and-parentrefs"><a class="header" href="#020--tpl-evaluated-hostnames-and-parentrefs">020 — <code>tpl</code>-evaluated hostnames and parentRefs</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-08-19</li>
+</ul>
+<h2 id="context-19"><a class="header" href="#context-19">Context</a></h2>
+<p><code>values.yaml</code> authors need hostnames and Gateway API refs that vary by
+release, most commonly a per-namespace or per-environment hostname such
+as <code>{{ .Release.Namespace }}.example.com</code>. Until now, <code>templates/ingress.yaml</code>,
+<code>templates/httproute.yaml</code>, <code>templates/grpcroute.yaml</code>,
+<code>templates/tlsroute.yaml</code>, and <code>templates/referencegrant.yaml</code> emitted
+these values straight from <code>.Values</code>, with no <code>tpl</code> pass. A Go-template
+expression written there reached the rendered manifest as a literal
+string, and the Kubernetes API server rejected it (invalid DNS label,
+invalid resource name). Users had no way to parameterize these fields
+short of maintaining a separate values file per environment.</p>
+<h2 id="decision-19"><a class="header" href="#decision-19">Decision</a></h2>
+<p>Evaluate the following fields through Helm’s <code>tpl</code> function against the
+root release context, at every render site (singleton and plural-map
+forms alike):</p>
+<ul>
+<li>Ingress <code>hosts</code> (map keys) and <code>tls[].hosts[]</code>.</li>
+<li>HTTPRoute / GRPCRoute / TLSRoute <code>hostnames[]</code>.</li>
+<li><code>parentRefs[].name</code> / <code>.namespace</code> / <code>.sectionName</code>, shared by all three
+route kinds through <code>uhc.gatewayParentRefs</code>.</li>
+<li>ReferenceGrant <code>from[].namespace</code> and <code>to[].name</code>, through two new
+helpers, <code>uhc.referenceGrantFrom</code> / <code>uhc.referenceGrantTo</code>.</li>
+</ul>
+<p><code>tpl</code> on a plain string with no <code>{{ }}</code> is a no-op, so every site
+templates unconditionally. There’s no <code>if strings.Contains "{{"</code> gate.</p>
+<p><strong>Explicitly out of scope</strong>, left untouched: backend/service-name fields
+(Ingress <code>defaultBackend.serviceName</code>, path-level <code>serviceName</code>,
+<code>backendRefs[].name</code> via <code>uhc.gatewayBackendRefs</code>), and the
+<code>*RouteRuleSpec</code> helpers in general. Per-workload <code>deployments</code> /
+<code>statefulSets</code> shorthand <code>httpRoute</code> / <code>grpcRoute</code> / <code>tlsRoute</code> blocks
+carry no <code>hostnames</code>/<code>parentRefs</code> of their own. Those only live on the
+singleton or plural-map entries (see
+<a href="#009--dual-networking-stack-ingress--gateway-api">ADR 009</a>), so no per-workload
+merge-section changes were needed either.</p>
+<p>Two fields get a post-<code>tpl</code> empty-string <code>fail</code>. Kubernetes structurally
+requires a non-empty value there, and today’s presence-only <code>fail</code>
+guards (checking the raw list/map isn’t empty, never individual entry
+content) would let a template that evaluates to <code>""</code> sail through
+unnoticed: <code>parentRefs[].name</code> (via <code>uhc.gatewayParentRefs</code>) and TLSRoute
+<code>hostnames[]</code> entries (TLSRoute matches purely by SNI, so an empty entry
+is unambiguously broken). Every other touched field gets no such guard:
+Ingress <code>host</code>/<code>tls[].hosts[]</code>, HTTPRoute/GRPCRoute <code>hostnames[]</code>, and
+ReferenceGrant <code>from[].namespace</code>/<code>to[].name</code> are all optional overall,
+an empty Ingress <code>host</code> is legitimately valid Kubernetes (“match all
+hosts”), and the API server already rejects a genuinely broken value
+clearly enough. Adding a chart-side guard everywhere would be scope
+creep beyond fixing the literal-<code>{{ }}</code> bug, per
+<a href="#013--schema-driven-validation-not-template-side">ADR 013</a>’s “templates render, don’t
+over-validate” default for anything the schema or API server can
+already catch.</p>
+<p>Ingress <code>host</code> is a YAML map key, not a plain scalar. Only the <em>emitted</em>
+value is templated. <code>keys .Values.ingress.hosts | sortAlpha</code> and the
+<code>index</code> lookup that pairs a key with its path config both keep using the
+raw, untemplated key string. Templating the key itself would mean
+rendering every host up front to re-key the map, a bigger change not
+needed to stop a literal <code>{{ }}</code> from reaching the API server. One
+consequence: sort order across multiple templated hosts follows the
+literal source text, not the rendered hostname. That’s cosmetic, not
+functional, and worth stating here so it doesn’t read as an oversight.</p>
+<h3 id="resolving-the-tension-with-adr-013"><a class="header" href="#resolving-the-tension-with-adr-013">Resolving the tension with ADR 013</a></h3>
+<p><a href="#013--schema-driven-validation-not-template-side">ADR 013</a>’s schema-conventions section
+states an intent, not yet implemented, that hostname fields should
+eventually get “a standard DNS pattern” in <code>values.schema.json</code>. A
+literal pre-render regex would reject every legitimate <code>{{ }}</code> value this
+ADR now supports. This ADR formally amends that line: <strong>hosts, hostnames,
+parentRefs.name, and the templatable ReferenceGrant fields are exempt
+from any future <code>values.schema.json</code> DNS-pattern constraint.</strong> If
+DNS-shape validation on these fields is wanted later, it must run
+<strong>post-render</strong>: a template-side <code>fail</code> using <code>regexMatch</code> on the
+already-<code>tpl</code>’d value. That’s a deliberate, documented exception to
+ADR 013’s general “no regex in templates” rule, justified because the
+schema literally cannot see a value that only exists after render. It’s
+never a <code>values.schema.json</code> <code>pattern</code>.</p>
+<h2 id="consequences-19"><a class="header" href="#consequences-19">Consequences</a></h2>
+<p><strong>What this enables:</strong></p>
+<ul>
+<li>Per-namespace/per-environment hostnames and refs from one shared
+<code>values.yaml</code>, no more literal-<code>{{ }}</code>-in-manifest rejections, no
+separate values file per environment just to vary a hostname.</li>
+</ul>
+<p><strong>What it costs:</strong></p>
+<ul>
+<li><code>tpl</code> is now a pattern in this chart; it wasn’t used anywhere before
+this change. The scope here is deliberately narrow: hosts/hostnames
+and parentRefs/ReferenceGrant identity fields only, not “every string
+field.” Any future extension should get its own ADR rather than
+assuming this one’s scope silently grows.</li>
+<li>A <code>tpl</code>’d value has access to the full render context (<code>.Values</code>,
+<code>.Release</code>, <code>.Chart</code>, <code>.Capabilities</code>, <code>.Files</code>, <code>.Template</code>). That’s
+standard <code>tpl</code> behavior, not a new trust boundary beyond what chart
+authors already extend to anyone who can write <code>values.yaml</code>.</li>
+<li>The empty-guard asymmetry above (two fields guarded, the rest not) is
+intentional, not an inconsistency. It’s documented here so a future
+reader doesn’t try to “fix” it into either full coverage or none.</li>
+</ul>
+<h2 id="alternatives-considered-19"><a class="header" href="#alternatives-considered-19">Alternatives considered</a></h2>
+<ul>
+<li><strong>Do nothing; tell users to <code>--set</code> fully-resolved hostnames per
+environment, or maintain one values file per environment.</strong> Rejected:
+defeats the point of a shared, reusable <code>values.yaml</code>.</li>
+<li><strong>Gate each <code>tpl</code> call behind <code>if strings.Contains "{{"</code>.</strong> Rejected:
+<code>tpl</code> on a plain string is already a safe no-op, so the gate adds
+complexity for no behavior change.</li>
+<li><strong>Validate hostname shape in <code>values.schema.json</code> pre-render.</strong>
+Rejected: this is the exact tension the “Resolving the tension”
+section above resolves. A pre-render pattern breaks templated values.</li>
+</ul>
+<h2 id="references-19"><a class="header" href="#references-19">References</a></h2>
+<ul>
+<li><code>templates/_gateway.tpl</code>: <code>uhc.gatewayParentRefs</code>,
+<code>uhc.referenceGrantFrom</code>, <code>uhc.referenceGrantTo</code>.</li>
+<li><code>templates/ingress.yaml</code>, <code>templates/httproute.yaml</code>,
+<code>templates/grpcroute.yaml</code>, <code>templates/tlsroute.yaml</code>,
+<code>templates/referencegrant.yaml</code>: the render sites.</li>
+<li><a href="#013--schema-driven-validation-not-template-side">ADR 013</a>: schema-driven validation,
+amended by the “Resolving the tension” section above.</li>
+<li><a href="#009--dual-networking-stack-ingress--gateway-api">ADR 009</a>: confirms hostnames/parentRefs
+live only on singleton/plural-map entries, never per-workload
+shorthand.</li>
+<li><a href="#019--pre-fill-api-server-defaults-on-atomic-list-fields">ADR 019</a>: the <code>parentRefs</code>
+group/kind pre-fill logic this change sits next to in
+<code>uhc.gatewayParentRefs</code>.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="021--optional-single-workload-naming"><a class="header" href="#021--optional-single-workload-naming">021 — Optional single-workload naming</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-09-07</li>
+</ul>
+<h2 id="context-20"><a class="header" href="#context-20">Context</a></h2>
+<p>The chart names every per-workload resource <code>&lt;fullname&gt;-&lt;workloadName&gt;</code> and
+puts the workload key in <code>app.kubernetes.io/name</code>, with the full construction
+in <code>app.kubernetes.io/instance</code>. That suffix is what lets several workloads
+share one release without colliding (see
+<a href="#002--multi-workload-via-keyed-maps-in-a-single-release">ADR 002</a>).</p>
+<p>Plenty of releases run a single workload. There the suffix buys nothing and
+costs something: <code>myrel-payments-api</code> where the service is already called
+<code>payments</code>, DNS names longer than they need to be, and a mismatch with the
+per-service charts teams migrate away from, whose Service was simply
+<code>&lt;release&gt;</code>. Callers that hardcode a Service DNS name have to be edited as
+part of the migration, which is exactly the friction the universal chart is
+supposed to remove.</p>
+<h2 id="decision-20"><a class="header" href="#decision-20">Decision</a></h2>
+<p><code>naming.omitWorkloadSuffix</code> (default <code>false</code>) builds every per-workload
+resource name from <code>&lt;fullname&gt;</code> alone. All names route through one helper,
+<code>uhc.workloadResourceName</code>, so the flag reaches Deployment, StatefulSet,
+Service, HPA, ScaledObject, VPA, PDB, NetworkPolicy, ServiceMonitor,
+PodMonitor and the workload ConfigMap, including the <code>-headless</code>, <code>-metrics</code>
+and <code>-config</code> variants. Labels and selectors follow through
+<code>uhc.workloadLabels</code> / <code>uhc.workloadSelectorLabels</code>: <code>app.kubernetes.io/name</code>
+becomes the chart name and <code>app.kubernetes.io/instance</code> becomes <code>&lt;fullname&gt;</code>.
+Singleton resources are a separate pair and do not move: <code>uhc.labels</code> keeps
+emitting <code>app.kubernetes.io/instance: &lt;release name&gt;</code> there.</p>
+<p>With more than one enabled entry across <code>deployments</code> and <code>statefulSets</code>,
+<code>helm template</code> fails and names the offenders. Silently keeping the suffix
+would make the flag mean different things in different releases, and honoring
+it would render several workloads under one set of names.</p>
+<p>Container names keep the workload key. <code>jobGroups</code> and the ESO entries keep
+both their names and their labels, and say so at the call site with
+<code>keepSuffix</code>: a release holds at most one workload under this flag but any
+number of job groups and secrets beside it, so those are addressed by their
+own key rather than by release identity. Without that, every Job pod would
+carry the workload’s selector labels and land in its Service endpoints,
+NetworkPolicy and PDB.</p>
+<h2 id="consequences-20"><a class="header" href="#consequences-20">Consequences</a></h2>
+<ul>
+<li>Off by default, and the rendered output with it off is byte-identical to
+before, so no existing release moves.</li>
+<li>Flipping it on an existing release renames the workload and changes an
+immutable selector, so the Deployment or StatefulSet is replaced rather than
+updated. It is an install-time decision.</li>
+<li>With the suffix gone, a workload resource and the release ServiceAccount
+share a name. Different kinds, so Kubernetes accepts it.</li>
+<li>Adding a second workload to a release that uses the flag fails the render
+until the flag is turned off. The error says so.</li>
+</ul>
+<h2 id="alternatives-considered-20"><a class="header" href="#alternatives-considered-20">Alternatives considered</a></h2>
+<ul>
+<li><strong>Fall back to suffixed names when a release grows past one workload.</strong> The
+same values would produce different names depending on how many workloads
+are defined, and adding a workload would silently rename the first one.</li>
+<li><strong>Derive it automatically from a single-workload release.</strong> Same problem
+without even an opt-in to point at.</li>
+<li><strong>Leave labels and selectors suffixed and rename objects only.</strong> Cheaper to
+toggle, but it leaves <code>app.kubernetes.io/name: api</code> on a release that no
+longer names anything <code>api</code>.</li>
+</ul>
+<h2 id="references-20"><a class="header" href="#references-20">References</a></h2>
+<ul>
+<li><code>naming.omitWorkloadSuffix</code> in <code>values.yaml</code>.</li>
+<li>Helpers <code>uhc.omitWorkloadSuffix</code>, <code>uhc.workloadResourceName</code> in
+<code>templates/_labels.tpl</code>.</li>
+<li><a href="#002--multi-workload-via-keyed-maps-in-a-single-release">ADR 002</a>,
+<a href="#011--standard-wins-labels-and-invariant-workload-selectors">ADR 011</a>.</li>
 </ul>
 
                     </main>

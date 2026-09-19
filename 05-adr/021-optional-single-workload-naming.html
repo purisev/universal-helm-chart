@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Releasing - universal-helm-chart</title>
+        <title>Optional single-workload naming - universal-helm-chart</title>
 
 
         <!-- Custom HTML head -->
@@ -146,7 +146,7 @@
                         <a href="https://github.com/purisev/universal-helm-chart" title="Git repository" aria-label="Git repository">
                             <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
                         </a>
-                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/04-contributing/04-releasing.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
+                        <a href="https://github.com/purisev/universal-helm-chart/edit/main/docs/05-adr/021-optional-single-workload-naming.md" title="Suggest an edit" aria-label="Suggest an edit" rel="edit">
                             <span class=fa-svg id="git-edit-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M421.7 220.3l-11.3 11.3-22.6 22.6-205 205c-6.6 6.6-14.8 11.5-23.8 14.1L30.8 511c-8.4 2.5-17.5 .2-23.7-6.1S-1.5 489.7 1 481.2L38.7 353.1c2.6-9 7.5-17.2 14.1-23.8l205-205 22.6-22.6 11.3-11.3 33.9 33.9 62.1 62.1 33.9 33.9zM96 353.9l-9.3 9.3c-.9 .9-1.6 2.1-2 3.4l-25.3 86 86-25.3c1.3-.4 2.5-1.1 3.4-2l9.3-9.3H112c-8.8 0-16-7.2-16-16V353.9zM453.3 19.3l39.4 39.4c25 25 25 65.5 0 90.5l-14.5 14.5-22.6 22.6-11.3 11.3-33.9-33.9-62.1-62.1L314.3 67.7l11.3-11.3 22.6-22.6 14.5-14.5c25-25 65.5-25 90.5 0z"/></svg></span>
                         </a>
 
@@ -180,61 +180,86 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="releasing"><a class="header" href="#releasing">Releasing</a></h1>
-<p>The chart is published to GHCR as an OCI artifact under the maintainer’s namespace (<code>oci://ghcr.io/purisev/universal-helm-chart</code> for this repo; <code>${{ github.repository_owner }}</code> for forks — see <a href="#forks">Forks</a> below). Two CI workflows under <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows"><code>.github/workflows/</code></a> handle the publishing automatically.</p>
-<h2 id="cutting-a-release-tagged-build"><a class="header" href="#cutting-a-release-tagged-build">Cutting a release (tagged build)</a></h2>
-<ol>
-<li>
-<p><strong>Check <code>Chart.yaml</code>.</strong> The <code>version</code> field is pinned to the in-flight release line and must already match the version you want to publish — don’t bump per-PR.</p>
-<p>The <code>version-pins</code> CI job checks this for you, and checks that the version in <code>Chart.yaml</code> is also the one every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names. Given a ref that names a version — a <code>release-X.Y.Z</code> branch or a <code>vX.Y.Z</code> tag — it additionally holds <code>Chart.yaml</code> to that version. CI hands it the branch a PR targets, the branch it comes from and the tag, so the release PR asserts the version too rather than only the PRs into the release branch. Run it locally with:</p>
-<pre><code class="language-bash">TARGET_REFS=release-&lt;X.Y.Z&gt; bash .github/scripts/check-version-pins.sh
-</code></pre>
-<p>It runs on every CI run, and the branch preview build in <code>ci.yaml</code> will not publish while it is red. <code>release.yaml</code> runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
-</li>
-<li>
-<p><strong>Tag and push</strong> from the matching release branch:</p>
-<pre><code class="language-bash">git checkout release-&lt;X.Y.Z&gt;
-git tag v&lt;X.Y.Z&gt;
-git push origin v&lt;X.Y.Z&gt;
-</code></pre>
-</li>
-<li>
-<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, checks the tag against <code>Chart.yaml</code> and the docs, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity.</p>
-</li>
-<li>
-<p><strong>Verify the artifact:</strong></p>
-<pre><code class="language-bash">helm pull oci://ghcr.io/purisev/universal-helm-chart --version &lt;X.Y.Z&gt;
-</code></pre>
-</li>
-<li>
-<p><strong>Verify the signature</strong> (optional, proves the artifact was actually built by this repo’s <code>release.yaml</code> and not pushed by hand or from a fork):</p>
-<pre><code class="language-bash">cosign verify \
-  --certificate-identity-regexp "^https://github.com/purisev/universal-helm-chart/" \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  ghcr.io/purisev/universal-helm-chart:&lt;X.Y.Z&gt;
-</code></pre>
-</li>
-</ol>
-<h2 id="branch-builds-pr-previews"><a class="header" href="#branch-builds-pr-previews">Branch builds (PR previews)</a></h2>
-<p><a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/ci.yaml"><code>ci.yaml</code></a> can also publish a preview artifact, tagged <code>&lt;chart-version&gt;-&lt;branch-slug&gt;</code> — for example <code>&lt;X.Y.Z&gt;-feat-xyz</code>. It’s gated behind the <code>publish-preview</code> label (not automatic on every PR) and only runs once linting/tests have actually passed. Apply the label to a non-draft, non-fork PR to trigger it. Reviewers can then pull it directly without cloning:</p>
-<pre><code class="language-bash">helm template demo oci://ghcr.io/purisev/universal-helm-chart --version &lt;X.Y.Z&gt;-feat-xyz -f my-values.yaml
-</code></pre>
-<h2 id="what-gets-published"><a class="header" href="#what-gets-published">What gets published</a></h2>
-<p>The OCI artifact contains only what chart consumers need: <code>Chart.yaml</code>, <code>templates/</code>, <code>values.yaml</code>, <code>values.yaml.example</code>, <code>values.schema.json</code>, <code>README.md</code>, <code>LICENSE</code>, <code>NOTICE</code>, <code>SECURITY.md</code>. Everything else (<code>docs/</code>, <code>tests/</code>, <code>test/</code>, <code>.github/</code>) is excluded via <a href="https://github.com/purisev/universal-helm-chart/blob/main/.helmignore"><code>.helmignore</code></a>.</p>
-<h2 id="forks"><a class="header" href="#forks">Forks</a></h2>
-<p>Both workflows resolve the GHCR namespace from <code>${{ github.repository_owner }}</code>, so a fork publishes to <code>oci://ghcr.io/&lt;your-github-user&gt;/universal-helm-chart</code> automatically — no workflow edits required. Tag a release on your fork’s <code>release-&lt;X.Y.Z&gt;</code> branch the same way and <code>release.yaml</code> runs against your own GHCR namespace using your repo’s <code>GITHUB_TOKEN</code>.</p>
+                        <h1 id="021--optional-single-workload-naming"><a class="header" href="#021--optional-single-workload-naming">021 — Optional single-workload naming</a></h1>
+<ul>
+<li><strong>Status:</strong> Accepted</li>
+<li><strong>Date:</strong> 2026-09-07</li>
+</ul>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>The chart names every per-workload resource <code>&lt;fullname&gt;-&lt;workloadName&gt;</code> and
+puts the workload key in <code>app.kubernetes.io/name</code>, with the full construction
+in <code>app.kubernetes.io/instance</code>. That suffix is what lets several workloads
+share one release without colliding (see
+<a href="002-multi-workload-keyed-maps.html">ADR 002</a>).</p>
+<p>Plenty of releases run a single workload. There the suffix buys nothing and
+costs something: <code>myrel-payments-api</code> where the service is already called
+<code>payments</code>, DNS names longer than they need to be, and a mismatch with the
+per-service charts teams migrate away from, whose Service was simply
+<code>&lt;release&gt;</code>. Callers that hardcode a Service DNS name have to be edited as
+part of the migration, which is exactly the friction the universal chart is
+supposed to remove.</p>
+<h2 id="decision"><a class="header" href="#decision">Decision</a></h2>
+<p><code>naming.omitWorkloadSuffix</code> (default <code>false</code>) builds every per-workload
+resource name from <code>&lt;fullname&gt;</code> alone. All names route through one helper,
+<code>uhc.workloadResourceName</code>, so the flag reaches Deployment, StatefulSet,
+Service, HPA, ScaledObject, VPA, PDB, NetworkPolicy, ServiceMonitor,
+PodMonitor and the workload ConfigMap, including the <code>-headless</code>, <code>-metrics</code>
+and <code>-config</code> variants. Labels and selectors follow through
+<code>uhc.workloadLabels</code> / <code>uhc.workloadSelectorLabels</code>: <code>app.kubernetes.io/name</code>
+becomes the chart name and <code>app.kubernetes.io/instance</code> becomes <code>&lt;fullname&gt;</code>.
+Singleton resources are a separate pair and do not move: <code>uhc.labels</code> keeps
+emitting <code>app.kubernetes.io/instance: &lt;release name&gt;</code> there.</p>
+<p>With more than one enabled entry across <code>deployments</code> and <code>statefulSets</code>,
+<code>helm template</code> fails and names the offenders. Silently keeping the suffix
+would make the flag mean different things in different releases, and honoring
+it would render several workloads under one set of names.</p>
+<p>Container names keep the workload key. <code>jobGroups</code> and the ESO entries keep
+both their names and their labels, and say so at the call site with
+<code>keepSuffix</code>: a release holds at most one workload under this flag but any
+number of job groups and secrets beside it, so those are addressed by their
+own key rather than by release identity. Without that, every Job pod would
+carry the workload’s selector labels and land in its Service endpoints,
+NetworkPolicy and PDB.</p>
+<h2 id="consequences"><a class="header" href="#consequences">Consequences</a></h2>
+<ul>
+<li>Off by default, and the rendered output with it off is byte-identical to
+before, so no existing release moves.</li>
+<li>Flipping it on an existing release renames the workload and changes an
+immutable selector, so the Deployment or StatefulSet is replaced rather than
+updated. It is an install-time decision.</li>
+<li>With the suffix gone, a workload resource and the release ServiceAccount
+share a name. Different kinds, so Kubernetes accepts it.</li>
+<li>Adding a second workload to a release that uses the flag fails the render
+until the flag is turned off. The error says so.</li>
+</ul>
+<h2 id="alternatives-considered"><a class="header" href="#alternatives-considered">Alternatives considered</a></h2>
+<ul>
+<li><strong>Fall back to suffixed names when a release grows past one workload.</strong> The
+same values would produce different names depending on how many workloads
+are defined, and adding a workload would silently rename the first one.</li>
+<li><strong>Derive it automatically from a single-workload release.</strong> Same problem
+without even an opt-in to point at.</li>
+<li><strong>Leave labels and selectors suffixed and rename objects only.</strong> Cheaper to
+toggle, but it leaves <code>app.kubernetes.io/name: api</code> on a release that no
+longer names anything <code>api</code>.</li>
+</ul>
+<h2 id="references"><a class="header" href="#references">References</a></h2>
+<ul>
+<li><code>naming.omitWorkloadSuffix</code> in <code>values.yaml</code>.</li>
+<li>Helpers <code>uhc.omitWorkloadSuffix</code>, <code>uhc.workloadResourceName</code> in
+<code>templates/_labels.tpl</code>.</li>
+<li><a href="002-multi-workload-keyed-maps.html">ADR 002</a>,
+<a href="011-standard-wins-labels-and-invariant-selectors.html">ADR 011</a>.</li>
+</ul>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../04-contributing/03-e2e-testing.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../05-adr/020-tpl-hostnames-and-parentrefs.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../05-adr/index.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -242,13 +267,10 @@ git push origin v&lt;X.Y.Z&gt;
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../04-contributing/03-e2e-testing.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../05-adr/020-tpl-hostnames-and-parentrefs.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../05-adr/index.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                    </a>
             </nav>
 
         </div>

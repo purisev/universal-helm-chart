@@ -42,6 +42,25 @@ deployments:
             topic: orders
             lagThreshold: "100"       # one replica per 100 messages of lag
             offsetResetPolicy: earliest
+      # Tames the HPA that KEDA creates. Passed through verbatim.
+      advanced:
+        restoreToOriginalReplicaCount: true
+        horizontalPodAutoscalerConfig:
+          behavior:
+            # One pod a minute up; the HPA default doubles every 15s.
+            scaleUp:
+              stabilizationWindowSeconds: 60
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 60
+            # 15 minutes of quiet before giving a replica back.
+            scaleDown:
+              stabilizationWindowSeconds: 900
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 300
 
     # VPA is orthogonal to KEDA — VPA touches resources.requests, KEDA touches replicas.
     # Initial mode applies the recommendation only on pod creation; it doesn't evict.

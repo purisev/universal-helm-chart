@@ -12,10 +12,11 @@ spec:
   source:
     repoURL: ghcr.io/purisev
     chart: universal-helm-chart
-    targetRevision: 3.1.0
+    targetRevision: 3.2.0
     helm:
       releaseName: webapp
       values: |
+        fullnameOverride: webapp
         integrations:
           monitoring:
             defaults:
@@ -36,9 +37,9 @@ spec:
                   serviceName: webapp-web
                   servicePort: 80
           tls:
-            web-example-tls:
-              hosts:
+            - hosts:
                 - web.example.com
+              secretName: web-example-tls
         deployments:
           web:
             enabled: true

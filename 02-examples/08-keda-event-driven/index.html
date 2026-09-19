@@ -35,10 +35,10 @@
             const path_to_root = "../../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-36f9f0b4.js";
+            window.path_to_searchindex_js = "../../searchindex-a1e8fdae.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-447daa91.js"></script>
+        <script src="../../toc-9fa66af8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -187,6 +187,7 @@
 <li><code>keda.enabled: true</code> on the worker, with a <code>kafka</code> trigger keyed on consumer-group lag.</li>
 <li><code>minReplicas: 1</code>, not <code>0</code> — this worker should never have a gap in consumption. Set <code>minReplicas: 0</code> instead when the workload can tolerate sitting idle (e.g. a <code>cron</code> trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.</li>
 <li><code>hpa.enabled: false</code> (default) — KEDA itself manages an internal HPA; mixing both would be rejected by the chart’s mutual-exclusion guard.</li>
+<li><code>keda.advanced</code> — passed into the ScaledObject verbatim. <code>horizontalPodAutoscalerConfig.behavior</code> shapes the HPA that KEDA creates: one pod a minute up instead of the HPA default of doubling every 15 seconds, and 15 minutes of quiet before a replica is given back. Kafka lag is spiky, and the default behaviour overshoots a queue that drains fast. <code>restoreToOriginalReplicaCount: true</code> puts the Deployment back on its pre-KEDA replica count if the ScaledObject is ever deleted. The chart validates the block as an object and nothing else, so any field in the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> works here.</li>
 <li><code>verticalPodAutoscaler.enabled: true</code> with <code>updateMode: Initial</code> — VPA sets the resource request the first time each pod is created. Works alongside KEDA because VPA touches <code>requests</code>, KEDA touches <code>replicas</code>. (<a href="../../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a>)</li>
 <li><code>service.enabled: false</code> — pure consumer, no inbound traffic.</li>
 <li><code>metrics.type: pod</code> + <code>integrations.monitoring.defaults.exposeService.enabled: true</code> → a metrics-only Service <code>&lt;release&gt;-worker-metrics</code> is auto-emitted, and a <code>PodMonitor</code> scrapes the worker pods directly.</li>
@@ -200,6 +201,7 @@
 </thead>
 <tbody>
 <tr><td>HPA → KEDA</td><td>Event-driven scaling; HPA off, KEDA on.</td></tr>
+<tr><td>Scaling behaviour</td><td><code>keda.advanced.horizontalPodAutoscalerConfig.behavior</code> caps the ramp at one pod a minute.</td></tr>
 <tr><td>Added VPA</td><td>Orthogonal, recommends/sets memory requests on initial pod create.</td></tr>
 <tr><td>Service off</td><td>Worker has no listener; metrics-only Service auto-emitted instead.</td></tr>
 <tr><td><code>metrics.type: pod</code></td><td>PodMonitor instead of ServiceMonitor.</td></tr>
