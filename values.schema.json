@@ -98,6 +98,7 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "nameOverride": {"type": "string"},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "targetPort": {"type": ["integer", "string"]},
         "appProtocol": {"type": "string"},
@@ -143,6 +144,7 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "nameOverride": {"type": "string"},
         "type": {"type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "targetPort": {"type": ["integer", "string"]},
@@ -214,6 +216,7 @@
         "pollingInterval": {"type": "integer", "minimum": 1},
         "cooldownPeriod": {"type": "integer", "minimum": 0},
         "idleReplicaCount": {"type": "integer", "minimum": 0},
+        "advanced": {"type": "object"},
         "triggers": {"type": "array"}
       }
     },
@@ -1160,6 +1163,13 @@
     },
     "fullnameOverride": {
       "type": "string"
+    },
+    "naming": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "omitWorkloadSuffix": {"type": "boolean"}
+      }
     },
     "priorityClassName": {
       "type": "string"

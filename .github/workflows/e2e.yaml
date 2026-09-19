@@ -7,6 +7,11 @@ on:
     types: [labeled, synchronize]
   workflow_dispatch: {}
 
+# Default for every job in this workflow. A job that needs more declares its
+# own permissions block, which replaces this one rather than adding to it.
+permissions:
+  contents: read
+
 # Every label add (and every push once at least one e2e label is already
 # present) triggers a fresh run; without this, rapid successive label
 # additions pile up concurrent, resource-heavy kind-cluster runs instead of
@@ -29,6 +34,7 @@ jobs:
       observability: ${{ steps.check.outputs.observability }}
       network-policy: ${{ steps.check.outputs.network-policy }}
       argocd: ${{ steps.check.outputs.argocd }}
+      any: ${{ steps.check.outputs.any }}
     steps:
       # `e2e` alone runs every job below; `e2e:<job>` runs just that one.
       # `pre-merge` (see ci.yaml) also runs everything — it's the
@@ -49,37 +55,78 @@ jobs:
             FULL=true
           fi
 
+          ANY=false
           for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy argocd; do
             if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$job=true" >> "$GITHUB_OUTPUT"
+              ANY=true
             else
               echo "$job=false" >> "$GITHUB_OUTPUT"
             fi
           done
 
+          # Whether anything below this gate will run at all. The workflow fires
+          # on every `synchronize`, so most runs enable no job and should not
+          # pay for the preflight either.
+          echo "any=$ANY" >> "$GITHUB_OUTPUT"
+
+  # A kind cluster per suite is the most expensive thing this repository runs,
+  # and a chart that does not lint cannot pass a single one of them, so both
+  # checks go first and every suite below waits on them. They are the same two
+  # ci.yaml runs: the chart lint through the shared composite action, the
+  # version pins through the same script.
+  lint:
+    name: Lint and Test
+    needs: gate
+    if: needs.gate.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Shared with ci.yaml so both check the same things.
+      - uses: ./.github/actions/lint-chart
+
+  version-pins:
+    name: Check version pins
+    needs: gate
+    if: needs.gate.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check docs against Chart.yaml
+        # A run can name the version being prepared in the branch a PR targets,
+        # the branch it comes from, or a tag; refs that name no version are
+        # ignored. They go through the environment rather than into the script
+        # body — a branch name is attacker-controlled on a fork PR, and the
+        # script only ever matches these against a regex.
+        env:
+          TARGET_REFS: ${{ github.base_ref }} ${{ github.head_ref }} ${{ github.ref_name }}
+        run: bash .github/scripts/check-version-pins.sh
+
   e2e-core-workloads:
     name: E2E / core workloads
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.core-workloads == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-core-workloads
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-core-workloads
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -121,27 +168,27 @@ jobs:
 
   e2e-jobs:
     name: E2E / jobs
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.jobs == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-jobs
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-jobs
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -188,27 +235,27 @@ jobs:
 
   e2e-autoscaling:
     name: E2E / autoscaling
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.autoscaling == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-autoscaling
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-autoscaling
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -285,27 +332,27 @@ jobs:
 
   e2e-gateway-ingress:
     name: E2E / gateway ingress
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.gateway-ingress == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-gateway-ingress
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-gateway-ingress
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -424,27 +471,27 @@ jobs:
 
   e2e-secrets-config:
     name: E2E / secrets config
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.secrets-config == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-secrets-config
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-secrets-config
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -561,7 +608,7 @@ jobs:
 
   e2e-observability:
     name: E2E / observability (${{ matrix.provider }})
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.observability == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -571,21 +618,21 @@ jobs:
     env:
       NAMESPACE: e2e-observability
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/default.yaml
           cluster_name: e2e-observability
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -682,27 +729,27 @@ jobs:
 
   e2e-network-policy:
     name: E2E / network policy
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.network-policy == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-network-policy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster (no default CNI)
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/network-policy.yaml
           cluster_name: e2e-network-policy
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 
@@ -750,29 +797,29 @@ jobs:
 
   e2e-argocd:
     name: E2E / argocd
-    needs: gate
+    needs: [gate, lint, version-pins]
     if: needs.gate.outputs.argocd == 'true'
     runs-on: ubuntu-latest
     env:
       NAMESPACE: e2e-argocd
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v4
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
         with:
           version: latest
 
       - name: Create kind cluster
-        uses: helm/kind-action@v1
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
         with:
           config: test/e2e/kind/argocd.yaml
           cluster_name: e2e-argocd
 
       - name: Install Chainsaw
-        uses: kyverno/action-install-chainsaw@v0.1.0
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
         with:
           release: v0.2.15
 

@@ -1,5 +1,4 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName -}}
@@ -11,7 +10,7 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject") }}
@@ -20,7 +19,7 @@ metadata:
   {{- end }}
 spec:
   scaleTargetRef:
-    name: {{ $releaseName }}-{{ $wlName }}
+    name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
     kind: Deployment
     envSourceContainerName: {{ $wlName }}
   {{- $minReplicas := 1 }}
@@ -40,6 +39,14 @@ spec:
   {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
   {{- end }}
+  {{- /* Passed through verbatim: restoreToOriginalReplicaCount,
+     horizontalPodAutoscalerConfig (name, behavior) and scalingModifiers are
+     KEDA's own shapes and track its releases, so the chart does not restate
+     them field by field. */ -}}
+  {{- with $wl.keda.advanced }}
+  advanced:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- $statefulSetSpecs := $ctx.Values.statefulSets | default dict -}}
@@ -53,7 +60,7 @@ spec:
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject") }}
@@ -62,7 +69,7 @@ metadata:
   {{- end }}
 spec:
   scaleTargetRef:
-    name: {{ $releaseName }}-{{ $wlName }}
+    name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
     kind: StatefulSet
     envSourceContainerName: {{ $wlName }}
   {{- $minReplicas := 1 }}
@@ -81,6 +88,14 @@ spec:
   {{- end }}
   {{- if hasKey $wl.keda "idleReplicaCount" }}
   idleReplicaCount: {{ $wl.keda.idleReplicaCount }}
+  {{- end }}
+  {{- /* Passed through verbatim: restoreToOriginalReplicaCount,
+     horizontalPodAutoscalerConfig (name, behavior) and scalingModifiers are
+     KEDA's own shapes and track its releases, so the chart does not restate
+     them field by field. */ -}}
+  {{- with $wl.keda.advanced }}
+  advanced:
+    {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
 {{- end }}

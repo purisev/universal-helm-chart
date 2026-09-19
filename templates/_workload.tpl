@@ -4,7 +4,7 @@
 Reusable container spec: image, command/args, env, envFrom, ports, probes, resources,
 securityContext, volumeMounts.
 Params:
-- dict "ctx" $ctx "wl" $wl "containerName" $wlName — for main workload container
+- dict "ctx" $ctx "wl" $wl "containerName" $wlName "renderMetricsPort" true — for main workload container
 - dict "ctx" $ctx "wl" $sidecarSpec "containerName" $sidecarSpec.name "renderDirectPorts" true "useRootVolumeMounts" false — for sidecars
 Output at zero indent; caller controls nindent.
 */}}
@@ -84,43 +84,77 @@ Output at zero indent; caller controls nindent.
   {{- if $envFromYaml }}
   {{- $envFromYaml | nindent 2 }}
   {{- end }}
-  {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
-  {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
-  {{- $addMetricsPort := and $exposeJson (ne $metricsType "pod") -}}
-  {{- $hasMetricsPortAlready := or (and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics")) (hasKey ($wl.ports | default dict) "metrics") -}}
-  {{- if and .renderDirectPorts $wl.ports }}
+  {{- $placement := include "uhc.metricsPortPlacement" (dict "ctx" $ctx "wl" $wl) | fromJson -}}
+  {{- /* The exposed metrics port belongs to the container the workload's Service and
+     monitor point at, and ContainerPort.name has to be unique within a Pod, so only the
+     caller that renders the main container asks for it. Sidecars, init containers and
+     job containers resolve the same workload-level metrics settings and would otherwise
+     each declare a port they do not serve. */ -}}
+  {{- $addMetricsPort := and .renderMetricsPort $placement.injectContainer -}}
+  {{- /* Container ports derived from the Service. Each targetPort falls back to its own
+     port the same way uhc.plainService resolves it, so the container spec names the port
+     the Service actually sends traffic to. A Service carrying no port at all (ExternalName,
+     or a workload whose only port is the injected metrics one) contributes nothing here.
+     `service:` without an explicit enabled key counts as enabled, like everywhere else
+     in the chart. */ -}}
+  {{- $svcDerived := and $wl.service (ne (index $wl.service "enabled") false) (or $wl.service.ports $wl.service.targetPort $wl.service.port) -}}
+  {{- /* containerPort is an int32, so only a numeric target becomes a container port.
+     A named targetPort is served by whichever container declares that name — the
+     workload's own ports map, a sidecar, or a container an admission webhook injects,
+     which the chart never sees — and contributes nothing here. */ -}}
+  {{- $directPorts := and .renderDirectPorts $wl.ports -}}
+  {{- $derivedNames := list -}}
+  {{- if and (not $directPorts) $svcDerived -}}
+    {{- if $wl.service.ports -}}
+      {{- include "uhc.assertServicePortsDeclared" (dict "ports" $wl.service.ports "source" (printf "service.ports for workload %q" $wlName)) -}}
+      {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray -}}
+        {{- $p := index $wl.service.ports $pName -}}
+        {{- $target := toString ($p.targetPort | default $p.port) -}}
+        {{- if regexMatch "^[0-9]+$" $target -}}
+          {{- $derivedNames = append $derivedNames $pName -}}
+        {{- end -}}
+      {{- end -}}
+    {{- else -}}
+      {{- $target := toString ($wl.service.targetPort | default $wl.service.port) -}}
+      {{- if regexMatch "^[0-9]+$" $target -}}
+        {{- $derivedNames = append $derivedNames "http" -}}
+      {{- end -}}
+    {{- end -}}
+    {{- if not $derivedNames -}}
+      {{- $svcDerived = false -}}
+    {{- end -}}
+  {{- end -}}
+  {{- if $directPorts }}
   ports:
     {{- range $pName := include "uhc.orderedPortNames" $wl.ports | fromJsonArray }}
     {{- $p := index $wl.ports $pName }}
     - name: {{ $pName }}
       {{- toYaml $p | nindent 6 }}
     {{- end }}
-    {{- if and $addMetricsPort (not $hasMetricsPortAlready) }}
-    {{- $expose := $exposeJson | fromJson }}
+    {{- if $addMetricsPort }}
     - name: metrics
-      containerPort: {{ $expose.targetPort }}
+      containerPort: {{ $placement.targetPort }}
       protocol: TCP
     {{- end }}
-  {{- else if or (and $wl.service $wl.service.enabled) $addMetricsPort }}
+  {{- else if or $svcDerived $addMetricsPort }}
   ports:
-    {{- if and $wl.service $wl.service.enabled }}
+    {{- if $svcDerived }}
     {{- if $wl.service.ports }}
-    {{- range $pName := include "uhc.orderedPortNames" $wl.service.ports | fromJsonArray }}
+    {{- range $pName := $derivedNames }}
     {{- $p := index $wl.service.ports $pName }}
     - name: {{ $pName }}
-      containerPort: {{ $p.targetPort }}
+      containerPort: {{ $p.targetPort | default $p.port }}
       protocol: {{ $p.protocol | default "TCP" }}
     {{- end }}
     {{- else }}
     - name: http
-      containerPort: {{ $wl.service.targetPort }}
+      containerPort: {{ $wl.service.targetPort | default $wl.service.port }}
       protocol: TCP
     {{- end }}
     {{- end }}
-    {{- if and $addMetricsPort (not $hasMetricsPortAlready) }}
-    {{- $expose := $exposeJson | fromJson }}
+    {{- if $addMetricsPort }}
     - name: metrics
-      containerPort: {{ $expose.targetPort }}
+      containerPort: {{ $placement.targetPort }}
       protocol: TCP
     {{- end }}
   {{- end }}
@@ -210,7 +244,9 @@ Output at zero indent; caller controls nindent.
 {{- end }}
 
 {{/*
-Full spec for the main workload container.
+Full spec for the main workload container. Deployments and StatefulSets add
+"renderMetricsPort" true so the container carries the exposed metrics port; job
+containers are never scraped and leave it off.
 Params: dict "ctx" $ctx "wl" $wl "containerName" $wlName
 Output at zero indent; caller controls nindent.
 */}}
@@ -311,10 +347,13 @@ resourceClaims:
 
 {{/*
 Scheduling: affinity (with inheritance), tolerations (merge root + local), topologySpreadConstraints.
-Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName
+Params: dict "ctx" $ctx "wl" $wl "releaseName" $releaseName "wlName" $wlName ["keepSuffix" true]
+keepSuffix is forwarded to uhc.workloadSelectorLabels for the default
+topologySpreadConstraints selector; jobGroups pass it.
 Output at zero indent; caller controls nindent.
 */}}
 {{- define "uhc.scheduling" -}}
+{{- $keepSuffix := .keepSuffix }}
 {{- $ctx := .ctx }}
 {{- $wl := .wl }}
 {{- $releaseName := .releaseName }}
@@ -352,7 +391,7 @@ topologySpreadConstraints:
       {{- toYaml .labelSelector | nindent 6 }}
       {{- else }}
       matchLabels:
-        {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 8 }}
+        {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName "keepSuffix" $keepSuffix) | nindent 8 }}
       {{- end }}
     {{- if .matchLabelKeys }}
     matchLabelKeys:

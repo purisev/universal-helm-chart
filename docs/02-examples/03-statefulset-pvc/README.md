@@ -5,11 +5,11 @@ A 3-replica PostgreSQL-style StatefulSet with stable storage and stable network 
 ## What this shows
 
 - A `statefulSets.db` workload — replaces `deployments.<n>` for ordered, stateful pods.
-- `volumeClaimTemplates.data` — every pod gets its own PVC, retained across restarts and scale-up.
+- `volumeClaimTemplates` — a list of embedded PVCs, one entry named `data`, so every pod gets its own PVC, retained across restarts and scale-up.
 - `service.clusterIP: None` — headless Service required by StatefulSet for stable per-pod DNS.
 - `replicaCount: 3` with `podManagementPolicy: OrderedReady` (chart default).
 - `envSecrets` referencing an externally-managed Secret for `POSTGRES_PASSWORD` (no ESO here — see `07-external-secrets/` for that).
-- Per-pod `volumeMounts` map keyed by mount name, referencing the `volumeClaimTemplates` entry by name.
+- Per-pod `volumeMounts` map keyed by mount name, referencing the `volumeClaimTemplates` entry by its `metadata.name`.
 
 ## Delta from `02-web-app-ingress`
 
@@ -51,5 +51,5 @@ kubectl apply -f flux/
 
 ## Prerequisites
 
-- A default StorageClass in the cluster, or override `volumeClaimTemplates.data.storageClassName` for your provisioner.
+- A default StorageClass in the cluster, or set `storageClassName` in the `data` entry's `spec` for your provisioner.
 - The `db-credentials` Secret pre-existing in the target namespace.

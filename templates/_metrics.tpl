@@ -97,6 +97,53 @@ When disabled or unset, returns empty string. Caller does:
 {{- end -}}
 
 {{/*
+Resolves where a workload's exposed metrics port goes, for every renderer that has to
+agree about it: the main container, the workload's own Service, the governing headless
+Service of a StatefulSet, and the metrics-only Service.
+
+metrics.type "pod" places the port nowhere: a PodMonitor scrapes pod IPs directly and
+the exposeService feature is skipped for it. A "metrics" entry the values already
+declare is never doubled, and on a StatefulSet one such entry on either Service covers
+both, because the ServiceMonitor selects both and a second port would scrape every
+target twice.
+
+Returns JSON:
+  targetPort       the container port uhc.metricsExposeService resolved (0 when off)
+  injectContainer  the main container declares the metrics containerPort
+  injectService    the workload's own Service carries the metrics port
+  injectHeadless   the headless Service carries it (StatefulSet with no Service of its own)
+  standalone       neither Service renders, so the metrics-only Service does
+
+Params: dict "ctx" $ctx "wl" $wl "kind" "deployments" / "statefulSets"
+  kind may be omitted by a caller that reads only injectContainer.
+*/}}
+{{- define "uhc.metricsPortPlacement" -}}
+{{- $ctx := .ctx -}}
+{{- $wl := .wl -}}
+{{- $isStatefulSet := eq (.kind | default "") "statefulSets" -}}
+{{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
+{{- $type := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
+{{- $wanted := and (ne $exposeJson "") (ne $type "pod") -}}
+{{- $targetPort := 0 -}}
+{{- if $exposeJson -}}{{- $targetPort = ($exposeJson | fromJson).targetPort -}}{{- end -}}
+{{- $svc := $wl.service | default dict -}}
+{{- $hs := $wl.headlessService | default dict -}}
+{{- $svcEnabled := and (not (empty $wl.service)) (ne (index $svc "enabled") false) -}}
+{{- $hsEnabled := and $isStatefulSet (ne (index $hs "enabled") false) -}}
+{{- $svcHasMetrics := hasKey ($svc.ports | default dict) "metrics" -}}
+{{- $hsHasMetrics := and $isStatefulSet (hasKey ($hs.ports | default dict) "metrics") -}}
+{{- $serviceSideDeclares := or $svcHasMetrics $hsHasMetrics -}}
+{{- $podDeclares := or $svcHasMetrics (hasKey ($wl.ports | default dict) "metrics") -}}
+{{- dict
+      "targetPort" $targetPort
+      "injectContainer" (and $wanted (not $podDeclares))
+      "injectService" (and $wanted $svcEnabled (not $serviceSideDeclares))
+      "injectHeadless" (and $wanted $hsEnabled (not $svcEnabled) (not $serviceSideDeclares))
+      "standalone" (and $wanted (not $svcEnabled) (not $hsEnabled))
+    | toJson -}}
+{{- end -}}
+
+{{/*
 Renders prometheus.io/* annotations block (or nothing).
 Output has no leading indent; caller controls placement via nindent.
 Params: dict "ctx" $ctx "wl" $wl "kind" "service"|"pod"

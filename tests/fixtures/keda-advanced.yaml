@@ -1,0 +1,31 @@
+image:
+  repository: nginx
+  tag: v1.0.0
+deployments:
+  worker:
+    enabled: true
+    keda:
+      enabled: true
+      maxReplicas: 20
+      triggers:
+        - type: rabbitmq
+          metadata:
+            queueName: tasks
+            hostFromEnv: RABBITMQ_URI
+      advanced:
+        restoreToOriginalReplicaCount: true
+        horizontalPodAutoscalerConfig:
+          name: worker-hpa
+          behavior:
+            scaleUp:
+              stabilizationWindowSeconds: 60
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 60
+            scaleDown:
+              stabilizationWindowSeconds: 900
+              policies:
+                - type: Pods
+                  value: 1
+                  periodSeconds: 300

@@ -1,5 +1,4 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
 {{- $deploymentSpecs := $ctx.Values.deployments -}}
 {{- range $wlName := keys $deploymentSpecs | sortAlpha }}
 {{- $wl := index $deploymentSpecs $wlName }}
@@ -12,7 +11,7 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "hpa") }}
@@ -23,7 +22,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ $releaseName }}-{{ $wlName }}
+    name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   minReplicas: {{ $wl.hpa.minReplicas | default 1 }}
   maxReplicas: {{ required (printf "deployments.%s.hpa.maxReplicas is required" $wlName) $wl.hpa.maxReplicas }}
   {{- if $wl.hpa.metrics }}
@@ -49,7 +48,7 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ $releaseName }}-{{ $wlName }}
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
     {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
   {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "hpa") }}
@@ -60,7 +59,7 @@ spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: StatefulSet
-    name: {{ $releaseName }}-{{ $wlName }}
+    name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   minReplicas: {{ $wl.hpa.minReplicas | default 1 }}
   maxReplicas: {{ required (printf "statefulSets.%s.hpa.maxReplicas is required" $wlName) $wl.hpa.maxReplicas }}
   {{- if $wl.hpa.metrics }}

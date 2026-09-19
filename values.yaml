@@ -123,6 +123,9 @@ envConfigMaps: []
 nameOverride: ""
 fullnameOverride: ""
 
+naming:
+  omitWorkloadSuffix: false
+
 serviceAccount:
   create: true
   annotations: {}

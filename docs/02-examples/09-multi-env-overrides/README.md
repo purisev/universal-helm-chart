@@ -23,6 +23,7 @@ This shows how the chart's keyed-map structure ([ADR 002](../../05-adr/002-multi
 ## What this shows
 
 - **Two-file values pattern**: pass `values-base.yaml` and `values-<env>.yaml` to Helm via repeated `-f`. Later files win on key collision.
+- **Per-env `fullnameOverride`**: each overlay pins its own resource-name prefix (`orders-dev` / `orders-staging` / `orders-prod`), so the prod Ingress backend can name `orders-prod-api` without depending on the release name Argo CD or Flux passes.
 - **Argo CD multi-source with multiple `valueFiles`**: the chart source lists both files; Argo CD merges them in order before running Helm.
 - **Argo CD `ApplicationSet`**: a list generator declares the envs once; the template stamps out an Application per env. Avoids hand-maintaining three near-identical Application CRs.
 - **Flux `valuesFrom`**: prod values can also live in a ConfigMap (managed separately) — useful when ops change values out-of-band of git.

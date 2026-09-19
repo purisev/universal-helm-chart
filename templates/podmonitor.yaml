@@ -1,5 +1,4 @@
 {{- $ctx := . }}
-{{- $releaseName := include "uhc.fullname" . -}}
 {{- $defaults := $ctx.Values.integrations.monitoring.defaults | default dict -}}
 {{- $allWorkloads := include "uhc.serviceWorkloads" $ctx | fromJson -}}
 {{- range $wlName := keys $allWorkloads | sortAlpha }}
@@ -10,7 +9,7 @@
 {{- $discovery := include "uhc.metricsDiscovery" (dict "ctx" $ctx "wl" $wl) -}}
 {{- $provider := include "uhc.metricsProvider" (dict "ctx" $ctx "wl" $wl) -}}
 {{- if and $metricsEnabled (eq $metricsType "pod") (ne $discovery "annotations") }}
-{{- $pmName := printf "%s-%s-metrics" $releaseName $wlName }}
+{{- $pmName := printf "%s-metrics" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName)) }}
 {{- include "uhc.assertSubdomainLength" (dict "name" $pmName "kind" (printf "PodMonitor for workload %q" $wlName)) }}
 ---
 {{- if eq $provider "victoriametrics" }}

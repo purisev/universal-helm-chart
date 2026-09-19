@@ -61,3 +61,6 @@
   - [Metrics port auto-exposure on Service](05-adr/016-metrics-port-auto-exposure.md)
   - [Reloader annotation injection](05-adr/017-reloader-annotation-injection.md)
   - [Testing with helm-unittest and fixtures](05-adr/018-testing-with-helm-unittest.md)
+  - [Pre-fill API-server defaults on atomic list fields](05-adr/019-explicit-atomic-list-defaults.md)
+  - [tpl-evaluated hostnames and parentRefs](05-adr/020-tpl-hostnames-and-parentrefs.md)
+  - [Optional single-workload naming](05-adr/021-optional-single-workload-naming.md)

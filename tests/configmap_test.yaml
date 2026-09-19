@@ -117,3 +117,70 @@ tests:
       - equal:
           path: metadata.annotations["reloader.stakater.com/auto"]
           value: "true"
+
+  # --- name collisions ---
+
+  - it: should fail fast when a configMaps entry claims a workload's ConfigMap name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.createConfigmap: true
+      deployments.web.configData.app\.conf: key = value
+      configMaps.web-config.data.other\.conf: x = y
+    asserts:
+      - failedTemplate:
+          errorPattern: 'is claimed by both deployments.web.createConfigmap and configMaps.web-config'
+
+  - it: should fail fast when a deployment and a statefulSet share a ConfigMap name
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.api.createConfigmap: true
+      deployments.api.configData.app\.conf: key = value
+      statefulSets.api.createConfigmap: true
+      statefulSets.api.configData.app\.conf: key = value
+    asserts:
+      - failedTemplate:
+          errorPattern: 'is claimed by both deployments.api.createConfigmap and statefulSets.api.createConfigmap'
+
+  - it: should fail fast when omitWorkloadSuffix makes a configMaps entry named config collide
+    set:
+      naming.omitWorkloadSuffix: true
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.createConfigmap: true
+      deployments.web.configData.app\.conf: key = value
+      configMaps.config.data.other\.conf: x = y
+    asserts:
+      - failedTemplate:
+          errorPattern: 'is claimed by both deployments.web.createConfigmap and configMaps.config'
+
+  - it: should ignore a disabled configMaps entry when checking for collisions
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.createConfigmap: true
+      deployments.web.configData.app\.conf: key = value
+      configMaps.web-config.enabled: false
+      configMaps.web-config.data.other\.conf: x = y
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-web-config
+
+  - it: should ignore a disabled workload when checking for collisions
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: false
+      deployments.web.createConfigmap: true
+      deployments.web.configData.app\.conf: key = value
+      configMaps.web-config.data.other\.conf: x = y
+    asserts:
+      - hasDocuments:
+          count: 1
+      - equal:
+          path: metadata.name
+          value: test-release-universal-helm-chart-web-config
