@@ -1,38 +1,6 @@
 {{/* vim: set filetype=mustache: */}}
 
 {{/*
-Fail fast when a Service targetPort that becomes a containerPort is a port name no
-container in the Pod declares. Service.targetPort accepts a name or a number, but
-ContainerPort.containerPort is an int32, so a name the chart cannot resolve renders a
-container the API server rejects. A name a sidecar declares is resolved by that
-sidecar's own port and never reaches here.
-Params: dict "value" $v "containerName" $n "source" "<values path>"
-*/}}
-{{- define "uhc.assertNumericContainerPort" -}}
-{{- $value := .value -}}
-{{- if not (regexMatch "^[0-9]+$" (toString $value)) -}}
-{{- fail (printf "container %q: %s is %q, a port name no container in this Pod declares, and containerPort has to be numeric. Declare it on the container that serves it — ports.%s.containerPort: <number> on the workload itself, or sidecars.<name>.ports.%s.containerPort on the sidecar — and the Service can keep referring to it by name." .containerName .source (toString $value) (toString $value) (toString $value)) -}}
-{{- end -}}
-{{- end }}
-
-{{/*
-Port names declared by a workload's sidecars. A Service targetPort naming one of these
-is served by that sidecar's container, so the main container leaves it out instead of
-failing on a name it cannot turn into a number.
-Params: dict "sidecars" $wl.sidecars
-Returns a JSON array of names.
-*/}}
-{{- define "uhc.sidecarPortNames" -}}
-{{- $names := list -}}
-{{- range $sidecar := (.sidecars | default dict) -}}
-{{- range $pName := keys ($sidecar.ports | default dict) -}}
-{{- $names = append $names $pName -}}
-{{- end -}}
-{{- end -}}
-{{- toJson (uniq $names) -}}
-{{- end }}
-
-{{/*
 Reusable container spec: image, command/args, env, envFrom, ports, probes, resources,
 securityContext, volumeMounts.
 Params:
@@ -116,15 +84,13 @@ Output at zero indent; caller controls nindent.
   {{- if $envFromYaml }}
   {{- $envFromYaml | nindent 2 }}
   {{- end }}
-  {{- $exposeJson := include "uhc.metricsExposeService" (dict "ctx" $ctx "wl" $wl) -}}
-  {{- $metricsType := ($wl.metrics | default dict).type | default (($ctx.Values.integrations.monitoring.defaults | default dict).type | default "service") -}}
+  {{- $placement := include "uhc.metricsPortPlacement" (dict "ctx" $ctx "wl" $wl) | fromJson -}}
   {{- /* The exposed metrics port belongs to the container the workload's Service and
-     ServiceMonitor point at, and ContainerPort.name has to be unique within a Pod, so
-     only the caller that renders the main container asks for it. Sidecars, init
-     containers and job containers resolve the same workload-level metrics settings and
-     would otherwise each declare a port they do not serve. */ -}}
-  {{- $addMetricsPort := and .renderMetricsPort $exposeJson (ne $metricsType "pod") -}}
-  {{- $hasMetricsPortAlready := or (and $wl.service $wl.service.ports (hasKey ($wl.service.ports | default dict) "metrics")) (hasKey ($wl.ports | default dict) "metrics") -}}
+     monitor point at, and ContainerPort.name has to be unique within a Pod, so only the
+     caller that renders the main container asks for it. Sidecars, init containers and
+     job containers resolve the same workload-level metrics settings and would otherwise
+     each declare a port they do not serve. */ -}}
+  {{- $addMetricsPort := and .renderMetricsPort $placement.injectContainer -}}
   {{- /* Container ports derived from the Service. Each targetPort falls back to its own
      port the same way uhc.plainService resolves it, so the container spec names the port
      the Service actually sends traffic to. A Service carrying no port at all (ExternalName,
@@ -132,9 +98,10 @@ Output at zero indent; caller controls nindent.
      `service:` without an explicit enabled key counts as enabled, like everywhere else
      in the chart. */ -}}
   {{- $svcDerived := and $wl.service (ne (index $wl.service "enabled") false) (or $wl.service.ports $wl.service.targetPort $wl.service.port) -}}
-  {{- /* A named targetPort is served by whichever container declares that name, so it
-     contributes no container port here; uhc.assertNamedTargetPorts checks that some
-     container in the Pod does declare it. */ -}}
+  {{- /* containerPort is an int32, so only a numeric target becomes a container port.
+     A named targetPort is served by whichever container declares that name — the
+     workload's own ports map, a sidecar, or a container an admission webhook injects,
+     which the chart never sees — and contributes nothing here. */ -}}
   {{- $directPorts := and .renderDirectPorts $wl.ports -}}
   {{- $derivedNames := list -}}
   {{- if and (not $directPorts) $svcDerived -}}
@@ -164,13 +131,12 @@ Output at zero indent; caller controls nindent.
     - name: {{ $pName }}
       {{- toYaml $p | nindent 6 }}
     {{- end }}
-    {{- if and $addMetricsPort (not $hasMetricsPortAlready) }}
-    {{- $expose := $exposeJson | fromJson }}
+    {{- if $addMetricsPort }}
     - name: metrics
-      containerPort: {{ $expose.targetPort }}
+      containerPort: {{ $placement.targetPort }}
       protocol: TCP
     {{- end }}
-  {{- else if or $svcDerived (and $addMetricsPort (not $hasMetricsPortAlready)) }}
+  {{- else if or $svcDerived $addMetricsPort }}
   ports:
     {{- if $svcDerived }}
     {{- if $wl.service.ports }}
@@ -186,10 +152,9 @@ Output at zero indent; caller controls nindent.
       protocol: TCP
     {{- end }}
     {{- end }}
-    {{- if and $addMetricsPort (not $hasMetricsPortAlready) }}
-    {{- $expose := $exposeJson | fromJson }}
+    {{- if $addMetricsPort }}
     - name: metrics
-      containerPort: {{ $expose.targetPort }}
+      containerPort: {{ $placement.targetPort }}
       protocol: TCP
     {{- end }}
   {{- end }}

@@ -95,14 +95,9 @@ An enabled Service with neither form, and no metrics port injected by `integrati
 
 ### Named `targetPort` and the workload `ports` map
 
-A Service `targetPort` may name a port instead of numbering it, but `containerPort` is an integer, so the chart cannot derive a container port from a name on its own. It resolves the name against the containers in the Pod, and fails the render when none of them declares it:
+A Service `targetPort` may name a port instead of numbering it. `containerPort` is an integer, so the chart derives container ports from numeric targets only: a named `targetPort` is passed through to the Service as written and adds nothing to the container spec. Kubernetes resolves the name against whichever container in the Pod declares it.
 
-```
-container "web": service.ports.grpc.targetPort is "grpc", a port name no container
-in this Pod declares, and containerPort has to be numeric.
-```
-
-Declare the port on the container that serves it. A workload's own `ports` map replaces the Service-derived container ports entirely, which leaves the Service free to keep referring to the port by name:
+Declare the port on the container that serves it. A workload's own `ports` map replaces the Service-derived container ports entirely, which leaves the Service free to refer to the port by name:
 
 ```yaml
 deployments:
@@ -118,7 +113,7 @@ deployments:
           targetPort: grpc
 ```
 
-A sidecar counts too. A Service port whose `targetPort` names a port one of the workload's `sidecars` declares belongs to that sidecar's container — the main container leaves it out rather than claiming a port it does not listen on:
+A sidecar can serve it as well. A Service port whose `targetPort` names a port one of the workload's `sidecars` declares belongs to that sidecar's container, and the main container leaves it out:
 
 ```yaml
 deployments:
@@ -140,6 +135,26 @@ deployments:
           envoy-admin:
             containerPort: 9901  # the port the Service name resolves to
 ```
+
+The chart does not check that some container declares the name. A container added by an admission webhook — a service-mesh proxy, for one — declares ports no values key describes, and a Service may target those by name:
+
+```yaml
+deployments:
+  web:
+    ports:
+      http:
+        containerPort: 8080
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: http
+        envoy-prom:
+          port: 15090
+          targetPort: http-envoy-prom  # declared by the injected proxy
+```
+
+A name nothing in the Pod declares leaves that Service port without endpoints, so a typo shows up as an empty `kubectl get endpointslices` rather than as a render error.
 
 ### Service port `appProtocol`
 

@@ -1764,6 +1764,54 @@ tests:
           path: spec.template.spec.containers[0].ports[0].containerPort
           value: 9000
 
+  - it: should derive no container port from a named targetPort in the single-port form
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.service.targetPort: http
+    asserts:
+      - isNull:
+          path: spec.template.spec.containers[0].ports
+
+  - it: should derive container ports from the numeric targetPorts only
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: 8080
+      deployments.web.service.ports.admin.port: 81
+      deployments.web.service.ports.admin.targetPort: admin
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+  - it: should leave the workload ports map untouched by a targetPort naming another port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.ports.http.containerPort: 8080
+      deployments.web.service.enabled: true
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: http
+      deployments.web.service.ports.envoy-prom.port: 15090
+      deployments.web.service.ports.envoy-prom.targetPort: http-envoy-prom
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports
+          value:
+            - name: http
+              containerPort: 8080
+
   - it: should leave a named targetPort a sidecar declares to that sidecar
     set:
       image.repository: nginx

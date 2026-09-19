@@ -1025,6 +1025,56 @@ tests:
           path: spec.ports[1].port
           value: 9090
 
+  - it: should put the exposed metrics port on the client Service when a StatefulSet renders both
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.metrics.enabled: true
+      statefulSets.db.metrics.exposeService.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 2
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+        documentSelector:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db-headless
+      - equal:
+          path: spec.ports[1].name
+          value: metrics
+        documentSelector:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db
+
+  - it: should not add the exposed metrics port to the client Service when the headless Service declares one
+    # The ServiceMonitor selects both Services, so a second metrics port scrapes every
+    # pod twice.
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 6379
+      statefulSets.db.service.targetPort: 6379
+      statefulSets.db.headlessService.ports.peer.port: 7000
+      statefulSets.db.headlessService.ports.metrics.port: 9100
+      statefulSets.db.metrics.enabled: true
+      statefulSets.db.metrics.exposeService.enabled: true
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - port: 6379
+              targetPort: 6379
+              protocol: TCP
+              name: http
+        documentSelector:
+          path: metadata.name
+          value: test-release-universal-helm-chart-db
+
   - it: should fail fast when an override collides with a StatefulSet metrics-only Service name
     set:
       image.repository: redis
@@ -1179,7 +1229,7 @@ tests:
       - failedTemplate:
           errorPattern: 'headlessService.ports for workload "db": port "peer" names its targetPort "peer" and declares no port'
 
-  - it: should reject a named targetPort in the single-port form
+  - it: should keep a named targetPort in the single-port form
     set:
       image.repository: nginx
       image.tag: alpine
@@ -1188,10 +1238,15 @@ tests:
       deployments.web.service.port: 80
       deployments.web.service.targetPort: http
     asserts:
-      - failedTemplate:
-          errorPattern: 'service.targetPort is "http", a port name no container in this Pod declares'
+      - equal:
+          path: spec.ports
+          value:
+            - port: 80
+              targetPort: http
+              protocol: TCP
+              name: http
 
-  - it: should reject a named targetPort in the map form
+  - it: should keep a named targetPort in the map form
     set:
       image.repository: nginx
       image.tag: alpine
@@ -1200,32 +1255,56 @@ tests:
       deployments.web.service.ports.grpc.port: 9000
       deployments.web.service.ports.grpc.targetPort: grpc
     asserts:
-      - failedTemplate:
-          errorPattern: 'service.ports.grpc.targetPort is "grpc", a port name no container in this Pod declares'
+      - equal:
+          path: spec.ports
+          value:
+            - name: grpc
+              port: 9000
+              targetPort: grpc
+              protocol: TCP
 
-  - it: should reject a named targetPort no container declares when the workload has its own ports
+  - it: should keep a targetPort naming a port of a container the chart does not render
+    # An admission webhook adds the container that declares this port, so no values
+    # key can name it.
     set:
       image.repository: nginx
       image.tag: alpine
       deployments.web.enabled: true
+      deployments.web.ports.http.containerPort: 8080
       deployments.web.service.enabled: true
-      deployments.web.service.ports.grpc.port: 9000
-      deployments.web.service.ports.grpc.targetPort: nowhere
-      deployments.web.ports.grpc.containerPort: 9000
+      deployments.web.service.ports.http.port: 80
+      deployments.web.service.ports.http.targetPort: http
+      deployments.web.service.ports.envoy-prom.port: 15090
+      deployments.web.service.ports.envoy-prom.targetPort: http-envoy-prom
     asserts:
-      - failedTemplate:
-          errorPattern: 'service.ports.grpc.targetPort is "nowhere", a port name no container in this Pod declares'
+      - equal:
+          path: spec.ports
+          value:
+            - name: http
+              port: 80
+              targetPort: http
+              protocol: TCP
+            - name: envoy-prom
+              port: 15090
+              targetPort: http-envoy-prom
+              protocol: TCP
 
-  - it: should reject a named headless targetPort no container declares
+  - it: should keep a named headless targetPort the values declare on no container
+    documentIndex: 0
     set:
       image.repository: redis
       image.tag: alpine
       statefulSets.db.enabled: true
       statefulSets.db.headlessService.ports.peer.port: 7000
-      statefulSets.db.headlessService.ports.peer.targetPort: nowhere
+      statefulSets.db.headlessService.ports.peer.targetPort: peer
     asserts:
-      - failedTemplate:
-          errorPattern: 'headlessService.ports.peer.targetPort is "nowhere", a port name no container in this Pod declares'
+      - equal:
+          path: spec.ports
+          value:
+            - name: peer
+              port: 7000
+              targetPort: peer
+              protocol: TCP
 
   - it: should accept a named headless targetPort the workload declares
     documentIndex: 0
