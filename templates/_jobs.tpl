@@ -59,7 +59,11 @@ Merges group spec with per-job spec, applying:
     automountServiceAccountToken, terminationGracePeriodSeconds, useRootVolumes,
     useRootVolumeMounts, hashSuffix, hashIncludePodAnnotations, schedule, timeZone,
     concurrencyPolicy, successfulJobsHistoryLimit, failedJobsHistoryLimit,
-    startingDeadlineSeconds, command, args, tasks)
+    startingDeadlineSeconds, command, args, tasks, topologySpreadConstraints).
+    topologySpreadConstraints is a list taken whole from the job, else the group:
+    two constraints on one topologyKey + whenUnsatisfiable pair are invalid, so
+    concatenation would break a job that tunes a group constraint. When neither
+    declares it the key is left absent and uhc.scheduling falls back to root.
   - kind: from group only (per-job override intentionally not supported)
   - podAnnotations: full effective merge of root .Values.podAnnotations,
     .Values.jobPodAnnotations, group.podAnnotations and job.podAnnotations
@@ -143,7 +147,7 @@ Params: dict "ctx" $ctx "group" $group "job" $job "groupName" $g "jobName" $j
 {{- end -}}
 {{- $_ := set $merged "volumeMounts" $vmMerged -}}
 {{/* Scalars: job-override-else-group */}}
-{{- range $k := list "backoffLimit" "completions" "parallelism" "suspend" "podFailurePolicy" "podReplacementPolicy" "completionMode" "backoffLimitPerIndex" "successPolicy" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" -}}
+{{- range $k := list "backoffLimit" "completions" "parallelism" "suspend" "podFailurePolicy" "podReplacementPolicy" "completionMode" "backoffLimitPerIndex" "successPolicy" "ttlSecondsAfterFinished" "activeDeadlineSeconds" "restartPolicy" "completionImage" "serviceAccountName" "automountServiceAccountToken" "terminationGracePeriodSeconds" "useRootVolumes" "useRootVolumeMounts" "hashSuffix" "hashIncludePodAnnotations" "schedule" "timeZone" "concurrencyPolicy" "successfulJobsHistoryLimit" "failedJobsHistoryLimit" "startingDeadlineSeconds" "command" "args" "tasks" "topologySpreadConstraints" -}}
 {{- $jv := index $job $k -}}
 {{- $gv := index $group $k -}}
 {{- if not (kindIs "invalid" $jv) -}}

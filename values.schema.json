@@ -241,6 +241,23 @@
         "unhealthyPodEvictionPolicy": {"type": "string", "enum": ["IfHealthyBudget", "AlwaysAllow"]}
       }
     },
+    "topologySpreadConstraintShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxSkew", "topologyKey", "whenUnsatisfiable"],
+      "properties": {
+        "maxSkew": {"type": "integer", "minimum": 1},
+        "topologyKey": {"type": "string", "minLength": 1},
+        "whenUnsatisfiable": {"type": "string", "enum": ["DoNotSchedule", "ScheduleAnyway"]},
+        "minDomains": {"type": "integer", "minimum": 1},
+        "nodeAffinityPolicy": {"type": "string", "enum": ["Honor", "Ignore"]},
+        "nodeTaintsPolicy": {"type": "string", "enum": ["Honor", "Ignore"]},
+        "labelSelector": {"type": "object"},
+        "matchLabelKeys": {"type": "array", "items": {"type": "string"}}
+      },
+      "if": {"required": ["minDomains"]},
+      "then": {"properties": {"whenUnsatisfiable": {"const": "DoNotSchedule"}}}
+    },
     "vpaShape": {
       "type": "object",
       "additionalProperties": false,
@@ -750,7 +767,7 @@
         "nodeSelector": {"type": "object"},
         "affinity": {"type": "object"},
         "tolerations": {"type": "array"},
-        "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
+        "topologySpreadConstraints": {"type": "array", "items": {"$ref": "#/$defs/topologySpreadConstraintShape"}},
         "hostAliases": {"type": "array"},
         "resourceClaims": {
           "type": "array",
@@ -850,7 +867,7 @@
         "nodeSelector": {"type": "object"},
         "affinity": {"type": "object"},
         "tolerations": {"type": "array"},
-        "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
+        "topologySpreadConstraints": {"type": "array", "items": {"$ref": "#/$defs/topologySpreadConstraintShape"}},
         "hostAliases": {"type": "array"},
         "resourceClaims": {
           "type": "array",
@@ -1044,6 +1061,7 @@
         "nodeSelector": {"type": "object"},
         "affinity": {"type": "object"},
         "tolerations": {"type": "array"},
+        "topologySpreadConstraints": {"type": "array", "items": {"$ref": "#/$defs/topologySpreadConstraintShape"}},
         "metadataAnnotations": {"type": "object"},
         "podAnnotations": {"type": "object"},
         "hashSuffix": {"type": "boolean"},
@@ -1115,6 +1133,7 @@
         "nodeSelector": {"type": "object"},
         "affinity": {"type": "object"},
         "tolerations": {"type": "array"},
+        "topologySpreadConstraints": {"type": "array", "items": {"$ref": "#/$defs/topologySpreadConstraintShape"}},
         "metadataAnnotations": {"type": "object"},
         "podAnnotations": {"type": "object"},
         "hashSuffix": {"type": "boolean"},
@@ -1296,7 +1315,7 @@
       "type": "object",
       "additionalProperties": {"$ref": "#/$defs/jobGroupEntry"}
     },
-    "topologySpreadConstraints": {"type": "array", "items": {"type": "object"}},
+    "topologySpreadConstraints": {"type": "array", "items": {"$ref": "#/$defs/topologySpreadConstraintShape"}},
     "httpRoute": {"$ref": "#/$defs/httpRouteEntry"},
     "httpRoutes": {
       "type": "object",

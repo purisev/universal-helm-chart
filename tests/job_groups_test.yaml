@@ -1274,3 +1274,89 @@ tests:
     asserts:
       - isNull:
           path: spec.template.spec.tolerations
+
+  # ---------- scheduling: topologySpreadConstraints inheritance ----------
+  - it: should inherit root spread constraints when group and job declare none
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints
+          value:
+            - maxSkew: 1
+              topologyKey: topology.kubernetes.io/zone
+              whenUnsatisfiable: ScheduleAnyway
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: db-migrate
+                  app.kubernetes.io/instance: test-release-universal-helm-chart-db-migrate
+
+  - it: should use group spread constraints instead of root when group declares them
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+      jobGroups.db.topologySpreadConstraints:
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          minDomains: 2
+      jobGroups.db.jobs.migrate.command: "true"
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.topologySpreadConstraints
+          count: 1
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: kubernetes.io/hostname
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].minDomains
+          value: 2
+
+  - it: should use job spread constraints instead of the group list
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.db.topologySpreadConstraints:
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.topologySpreadConstraints:
+        - maxSkew: 3
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+    asserts:
+      - lengthEqual:
+          path: spec.template.spec.topologySpreadConstraints
+          count: 1
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].maxSkew
+          value: 3
+
+  - it: should opt a job out of group and root spread constraints with an explicit empty list
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+      jobGroups.db.topologySpreadConstraints:
+        - maxSkew: 2
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.topologySpreadConstraints: []
+    asserts:
+      - isNull:
+          path: spec.template.spec.topologySpreadConstraints

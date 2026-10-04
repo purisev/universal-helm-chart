@@ -407,3 +407,23 @@ tests:
       - equal:
           path: spec.jobTemplate.spec.successPolicy.rules[0].succeededCount
           value: 2
+
+  - it: should render group spread constraints on the CronJob pod template
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      jobGroups.reports.kind: CronJob
+      jobGroups.reports.topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+      jobGroups.reports.jobs.daily.schedule: "0 3 * * *"
+      jobGroups.reports.jobs.daily.command: "true"
+    asserts:
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.topologySpreadConstraints[0].topologyKey
+          value: topology.kubernetes.io/zone
+      - equal:
+          path: spec.jobTemplate.spec.template.spec.topologySpreadConstraints[0].nodeTaintsPolicy
+          value: Honor

@@ -734,6 +734,10 @@ deployments:
       - maxSkew: 1
         topologyKey: kubernetes.io/hostname
         whenUnsatisfiable: DoNotSchedule
+        minDomains: 2             # needs whenUnsatisfiable: DoNotSchedule
+        nodeTaintsPolicy: Honor   # skip nodes the pod does not tolerate when counting skew
+        matchLabelKeys:
+          - pod-template-hash     # spread each Deployment revision on its own
 
     strategy:
       type: RollingUpdate
