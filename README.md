@@ -46,6 +46,10 @@ Full documentation lives under [`docs/`](docs/) (not shipped in the OCI artifact
 - [`docs/04-contributing/`](docs/04-contributing/) — local dev, testing, releases.
 - [`docs/05-adr/`](docs/05-adr/) — Architecture Decision Records covering why the chart is shaped the way it is.
 
+## Release notes
+
+[`CHANGELOG.md`](CHANGELOG.md) lists what each release adds, changes and fixes. Values-file edits an upgrade may need are in the [migration guide](docs/03-reference/04-migration.md).
+
 ## Feedback and contributing
 
 Bug reports and feature requests go through [GitHub Issues](https://github.com/purisev/universal-helm-chart/issues). Security vulnerabilities go through [private vulnerability reporting](https://github.com/purisev/universal-helm-chart/security/advisories/new) instead, per [`SECURITY.md`](SECURITY.md). For contributing changes, start at [`docs/04-contributing/`](docs/04-contributing/).

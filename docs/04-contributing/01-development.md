@@ -44,6 +44,7 @@ helm template my-app . -s templates/deployment.yaml -f my-values.yaml
 
 - **Changed the values shape?** Update [`values.schema.json`](https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json) in the same commit. Schema and `values.yaml` drift is the most common reviewer comment.
 - **Added a field?** Add at least one assertion in `tests/<template>_test.yaml`. Coverage prevents silent regressions on future refactors.
+- **Changed what a user sees?** Add a line to the in-flight version's section of [`CHANGELOG.md`](https://github.com/purisev/universal-helm-chart/blob/main/CHANGELOG.md). CI fails while that section is missing or empty.
 - **Bumped the chart version?** Every Argo CD `targetRevision`, Flux `tag`, `helm install --version` and schema URL under `docs/` names it too. `check-version-pins.sh` lists the ones you missed; CI runs it on every run, the e2e suites wait on it, and the branch preview build will not publish while it is red.
 - **Changed an example?** Each example carries the same values three times: `values.yaml`, the Argo CD `Application`, and the Flux `HelmRelease`. Change one and the other two go stale. `check-examples.sh` renders all three and fails on the ones that no longer install — or that name a Service nothing renders.
 - **Writing fixtures or example values?** Use **block-style** YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.
