@@ -276,3 +276,85 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "additional properties 'remoteKeey' not allowed"
+
+  - it: should reject an unknown key on a root topologySpreadConstraints entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          minDomain: 2
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'minDomain' not allowed"
+
+  - it: should reject an unknown key on a workload topologySpreadConstraints entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintPolicy: Honor
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'nodeTaintPolicy' not allowed"
+
+  - it: should reject an unknown key on a jobGroups topologySpreadConstraints entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      jobGroups.db.jobs.migrate.command: "true"
+      jobGroups.db.jobs.migrate.topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          minDomain: 2
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'minDomain' not allowed"
+
+  - it: should reject a topologySpreadConstraints entry without whenUnsatisfiable
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+    asserts:
+      - failedTemplate:
+          errorPattern: "missing property 'whenUnsatisfiable'"
+
+  - it: should reject minDomains together with whenUnsatisfiable ScheduleAnyway
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          minDomains: 2
+    asserts:
+      - failedTemplate:
+          errorPattern: "whenUnsatisfiable': value must be 'DoNotSchedule'"
+
+  - it: should reject a nodeTaintsPolicy outside Honor and Ignore
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: honor
+    asserts:
+      - failedTemplate:
+          errorPattern: "nodeTaintsPolicy': value must be one of 'Honor', 'Ignore'"

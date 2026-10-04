@@ -796,3 +796,25 @@ tests:
     asserts:
       - isNull:
           path: spec.template.spec.containers[0].ports
+
+  - it: should render minDomains and node inclusion policies on a spread constraint
+    set:
+      image.repository: redis
+      image.tag: v1.0.0
+      statefulSets.db.topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          minDomains: 3
+          nodeAffinityPolicy: Honor
+          nodeTaintsPolicy: Honor
+    asserts:
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].minDomains
+          value: 3
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].nodeAffinityPolicy
+          value: Honor
+      - equal:
+          path: spec.template.spec.topologySpreadConstraints[0].nodeTaintsPolicy
+          value: Honor

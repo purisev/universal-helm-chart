@@ -5,7 +5,8 @@
 {{- if ne (index $wl "enabled") false }}
 {{- $pdbSpec := default $ctx.Values.podDisruptionBudget $wl.podDisruptionBudget }}
 {{- if and $pdbSpec (ne (index $pdbSpec "enabled") false) }}
-{{- if and (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
+{{- /* Root values always carry the chart default minAvailable, so only a workload block can state both. */}}
+{{- if and $wl.podDisruptionBudget (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
 {{- fail (printf "podDisruptionBudget for workload %q: cannot set both minAvailable and maxUnavailable" $wlName) }}
 {{- end }}
 ---
@@ -42,7 +43,8 @@ spec:
 {{- if ne (index $wl "enabled") false }}
 {{- $pdbSpec := default $ctx.Values.podDisruptionBudget $wl.podDisruptionBudget }}
 {{- if and $pdbSpec (ne (index $pdbSpec "enabled") false) }}
-{{- if and (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
+{{- /* Root values always carry the chart default minAvailable, so only a workload block can state both. */}}
+{{- if and $wl.podDisruptionBudget (hasKey $pdbSpec "maxUnavailable") (hasKey $pdbSpec "minAvailable") }}
 {{- fail (printf "podDisruptionBudget for workload %q: cannot set both minAvailable and maxUnavailable" $wlName) }}
 {{- end }}
 ---
