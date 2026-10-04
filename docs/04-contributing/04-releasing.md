@@ -14,7 +14,13 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
 
    It runs on every CI run, and the branch preview build in `ci.yaml` will not publish while it is red. `release.yaml` runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.
 
-2. **Tag and push** from the matching release branch:
+2. **Date the release in `CHANGELOG.md`.** Every user-visible change goes under the heading of the in-flight version as it lands, and the heading reads `## <X.Y.Z> - unreleased` until the release. Replace `unreleased` with the release date. The `version-pins` CI job fails while `CHANGELOG.md` has no notes for the version in `Chart.yaml`, and `release.yaml` refuses a tag whose section is still marked `unreleased`. Print the notes a release will carry with:
+
+   ```bash
+   bash .github/scripts/release-notes.sh
+   ```
+
+3. **Tag and push** from the matching release branch:
 
    ```bash
    git checkout release-<X.Y.Z>
@@ -22,20 +28,32 @@ The chart is published to GHCR as an OCI artifact under the maintainer's namespa
    git push origin v<X.Y.Z>
    ```
 
-3. **CI takes over.** [`release.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, checks the tag against `Chart.yaml` and the docs, packages the chart, pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`), and signs it keylessly via [Sigstore/cosign](https://docs.sigstore.dev/) — no key management, the signature is tied to this repo's GitHub Actions OIDC identity.
-4. **Verify the artifact:**
+4. **CI takes over.** [`release.yaml`](https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml) runs on `v*` tags: it lints, runs the unittest suite, checks the tag against `Chart.yaml` and the docs, reads the release notes from `CHANGELOG.md`, packages the chart, pushes the artifact to `oci://ghcr.io/<your-github-namespace>` (the workflow resolves your namespace from `${{ github.repository_owner }}`), and signs it keylessly via [Sigstore/cosign](https://docs.sigstore.dev/) — no key management, the signature is tied to this repo's GitHub Actions OIDC identity. It then publishes the GitHub Release for the tag with the notes from `CHANGELOG.md` and three assets: the packaged chart, its Sigstore signature bundle (`.sigstore.json`) and its build provenance (`.intoto.jsonl`). A release that already exists for the tag gets the notes and the assets added to it.
+5. **Verify the artifact:**
 
    ```bash
    helm pull oci://ghcr.io/purisev/universal-helm-chart --version <X.Y.Z>
    ```
 
-5. **Verify the signature** (optional, proves the artifact was actually built by this repo's `release.yaml` and not pushed by hand or from a fork):
+6. **Verify the signature** (optional, proves the artifact was actually built by this repo's `release.yaml` and not pushed by hand or from a fork):
 
    ```bash
    cosign verify \
      --certificate-identity-regexp "^https://github.com/purisev/universal-helm-chart/" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      ghcr.io/purisev/universal-helm-chart:<X.Y.Z>
+   ```
+
+   The chart attached to the GitHub Release verifies the same way against its own bundle, and its provenance with the GitHub CLI:
+
+   ```bash
+   cosign verify-blob \
+     --bundle universal-helm-chart-<X.Y.Z>.tgz.sigstore.json \
+     --certificate-identity-regexp "^https://github.com/purisev/universal-helm-chart/" \
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+     universal-helm-chart-<X.Y.Z>.tgz
+
+   gh attestation verify universal-helm-chart-<X.Y.Z>.tgz --repo purisev/universal-helm-chart
    ```
 
 ## Branch builds (PR previews)
@@ -48,7 +66,7 @@ helm template demo oci://ghcr.io/purisev/universal-helm-chart --version <X.Y.Z>-
 
 ## What gets published
 
-The OCI artifact contains only what chart consumers need: `Chart.yaml`, `templates/`, `values.yaml`, `values.yaml.example`, `values.schema.json`, `README.md`, `LICENSE`, `NOTICE`, `SECURITY.md`. Everything else (`docs/`, `tests/`, `test/`, `.github/`) is excluded via [`.helmignore`](https://github.com/purisev/universal-helm-chart/blob/main/.helmignore).
+The OCI artifact contains only what chart consumers need: `Chart.yaml`, `templates/`, `values.yaml`, `values.yaml.example`, `values.schema.json`, `README.md`, `CHANGELOG.md`, `LICENSE`, `NOTICE`, `SECURITY.md`. Everything else (`docs/`, `tests/`, `test/`, `.github/`) is excluded via [`.helmignore`](https://github.com/purisev/universal-helm-chart/blob/main/.helmignore).
 
 ## Forks
 
