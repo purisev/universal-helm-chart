@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a1e8fdae.js";
+            window.path_to_searchindex_js = "searchindex-7a3e427a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -316,7 +316,7 @@
 </code></pre>
 <p>There is no Helm “repo add” step — Helm 3.8+ pulls OCI charts directly:</p>
 <pre><code class="language-bash">helm install my-app oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.2.0 \
+  --version 3.3.0 \
   -f values.yaml
 </code></pre>
 <h2 id="optional-crds"><a class="header" href="#optional-crds">Optional CRDs</a></h2>
@@ -352,7 +352,7 @@
           port: 80
 </code></pre>
 <p>Install:</p>
-<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.2.0 -f values.yaml
+<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.3.0 -f values.yaml
 </code></pre>
 <p>A complete copy-and-deploy version of this scenario, including Argo CD and Flux manifests, lives at <a href="02-examples/01-minimal"><code>../02-examples/01-minimal/</code></a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -1223,6 +1223,7 @@ chart renders itself.
 <ul>
 <li><strong>maps</strong> (env, podAnnotations, metadataAnnotations) — replace per key; later wins.</li>
 <li><strong>lists</strong> (envSecrets, envConfigMaps, tolerations) — concat.</li>
+<li><strong>topologySpreadConstraints</strong> — the job list replaces the group list, and either replaces the root list. Kubernetes rejects two constraints with the same <code>topologyKey</code> and <code>whenUnsatisfiable</code>, so the lists are never concatenated. <code>topologySpreadConstraints: []</code> on a group or job opts out.</li>
 <li><strong>volumes / volumeMounts</strong> — replace by name (a volume can’t be partially <code>emptyDir</code> and partially <code>configMap</code>).</li>
 </ul>
 <p><code>hashSuffix: true</code> together with a delete-policy that removes the Job after success is rejected fail-fast — the Job would re-run on every sync. See <a href="#005--jobgroups-unifying-job-and-cronjob">ADR 005</a> and <a href="#012--pod-spec-hashing-for-job-idempotency-under-gitops">ADR 012</a>.</p>
@@ -1352,6 +1353,42 @@ chart renders itself.
 <p>Because nothing here is validated field by field, a typo inside <code>advanced</code> reaches the cluster and is rejected by the KEDA CRD rather than by <code>helm template</code>. Check the field names against the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> for the KEDA version you run.</p>
 <h3 id="scheduling-field-inheritance"><a class="header" href="#scheduling-field-inheritance">Scheduling field inheritance</a></h3>
 <p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
+<h3 id="topology-spread-constraint-fields"><a class="header" href="#topology-spread-constraint-fields">Topology spread constraint fields</a></h3>
+<p>Each entry of <code>topologySpreadConstraints</code> (root, <code>deployments.&lt;name&gt;</code>, <code>statefulSets.&lt;name&gt;</code>, <code>jobGroups.&lt;group&gt;</code> and <code>jobGroups.&lt;group&gt;.jobs.&lt;job&gt;</code>) accepts the Kubernetes fields below and nothing else; an unknown key fails schema validation.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Required</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>maxSkew</code></td><td>yes</td><td>Integer, 1 or more.</td></tr>
+<tr><td><code>topologyKey</code></td><td>yes</td><td>Node label key.</td></tr>
+<tr><td><code>whenUnsatisfiable</code></td><td>yes</td><td><code>DoNotSchedule</code> or <code>ScheduleAnyway</code>.</td></tr>
+<tr><td><code>labelSelector</code></td><td>no</td><td>Defaults to the workload’s selector labels when omitted or empty.</td></tr>
+<tr><td><code>matchLabelKeys</code></td><td>no</td><td>List of pod label keys, e.g. <code>pod-template-hash</code> to spread each Deployment revision on its own.</td></tr>
+<tr><td><code>minDomains</code></td><td>no</td><td>Integer, 1 or more. Kubernetes accepts it only with <code>whenUnsatisfiable: DoNotSchedule</code>, and so does the schema.</td></tr>
+<tr><td><code>nodeAffinityPolicy</code></td><td>no</td><td><code>Honor</code> or <code>Ignore</code>. Kubernetes treats an unset value as <code>Honor</code>.</td></tr>
+<tr><td><code>nodeTaintsPolicy</code></td><td>no</td><td><code>Honor</code> or <code>Ignore</code>. Kubernetes treats an unset value as <code>Ignore</code>, so domains made only of tainted nodes still count toward the skew.</td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-yaml">topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    minDomains: 3
+    nodeTaintsPolicy: Honor
+    matchLabelKeys:
+      - pod-template-hash
+</code></pre>
+<h3 id="poddisruptionbudget-minavailable-vs-maxunavailable"><a class="header" href="#poddisruptionbudget-minavailable-vs-maxunavailable">PodDisruptionBudget: <code>minAvailable</code> vs <code>maxUnavailable</code></a></h3>
+<p>A PodDisruptionBudget takes one of the two. A workload-level <code>podDisruptionBudget</code> block replaces the root block as a whole, so it carries only what it states: setting both there fails with <code>podDisruptionBudget for workload "&lt;name&gt;": cannot set both minAvailable and maxUnavailable</code>, and a block with neither renders <code>maxUnavailable: 1</code>.</p>
+<p>The root block always contains the chart default <code>minAvailable: 1</code>. A root <code>maxUnavailable</code> takes precedence over <code>minAvailable</code>, whether that is the default or a value you set:</p>
+<pre><code class="language-yaml">podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1   # rendered; minAvailable is ignored
+</code></pre>
+<p><code>maxUnavailable: 0</code> and <code>minAvailable: "100%"</code> allow no voluntary evictions: <code>kubectl drain</code> and node autoscalers wait on those pods until the budget changes. The same holds for <code>minAvailable: 1</code> on a single-replica workload.</p>
 <h3 id="init-containers-and-sidecars-share-one-container-shape"><a class="header" href="#init-containers-and-sidecars-share-one-container-shape">Init containers and sidecars share one container shape</a></h3>
 <p><code>deployments.&lt;name&gt;.initContainers</code> and <code>deployments.&lt;name&gt;.sidecars</code> (same under <code>statefulSets.&lt;name&gt;</code>) are maps keyed by container name. Both flow through the same renderer as the main container: <code>image</code>, <code>command</code>/<code>args</code>, <code>env</code>, <code>envSecrets</code>, <code>volumeMounts</code>, <code>resources</code>, <code>securityContext</code>, <code>lifecycle</code>. Both inherit the parent workload’s <code>inherit.env</code> / <code>inherit.configMaps</code> / <code>inherit.configMapMount</code> flags. Neither inherits root-level <code>volumeMounts.&lt;containerName&gt;</code> — declare local mounts inline. Render order is <code>sortAlpha</code>; for <code>initContainers</code> Kubernetes runs them sequentially in declared order, so prefix names with <code>01-</code>, <code>02-</code>, … when run order matters (same convention as <code>jobGroups[*].tasks</code>). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. <strong>Two exceptions for <code>initContainers</code>:</strong> <code>probesEnabled</code> / probe blocks (<code>readinessProbe</code>, <code>livenessProbe</code>, <code>startupProbe</code>) and <code>lifecycle</code> are rejected — Kubernetes does not allow these on standard init containers, so <code>helm template</code> fail-fasts if either is set on an init entry.</p>
 <h3 id="configmap-names"><a class="header" href="#configmap-names">ConfigMap names</a></h3>
@@ -1411,7 +1448,7 @@ deployments.web.createConfigmap and configMaps.web-config.
 <h2 id="ide-setup"><a class="header" href="#ide-setup">IDE setup</a></h2>
 <h3 id="yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><a class="header" href="#yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><code>yaml-language-server</code> / Red Hat YAML extension (VS Code, Neovim, others)</a></h3>
 <p>Add a directive at the top of any values file you author:</p>
-<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.2.0/values.schema.json
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.3.0/values.schema.json
 deployments:
   api:
     image:
@@ -1422,7 +1459,7 @@ deployments:
 <h3 id="jetbrains-ides-intellij-goland-pycharm-"><a class="header" href="#jetbrains-ides-intellij-goland-pycharm-">JetBrains IDEs (IntelliJ, GoLand, PyCharm, …)</a></h3>
 <p><code>Settings</code> → <code>Languages &amp; Frameworks</code> → <code>Schemas and DTDs</code> → <code>JSON Schema Mappings</code>:</p>
 <ul>
-<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.2.0/values.schema.json</code></li>
+<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.3.0/values.schema.json</code></li>
 <li><strong>Schema version:</strong> JSON Schema 2020-12 (the latest)</li>
 <li><strong>File path pattern:</strong> <code>*values*.yaml</code> (or per-project glob).</li>
 </ul>
@@ -1437,7 +1474,7 @@ deployments:
 </code></pre>
 <p>Use this when iterating on overlay values in a config repo where Helm isn’t installed.</p>
 <h2 id="pinning-the-schema-url"><a class="header" href="#pinning-the-schema-url">Pinning the schema URL</a></h2>
-<p>The <code>v3.2.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
+<p>The <code>v3.3.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="compatibility"><a class="header" href="#compatibility">Compatibility</a></h1>
 <p>Versions and APIs the chart targets. The intent here is to be honest about <strong>what the chart renders</strong> rather than to claim a tested SemVer matrix that rots on every operator release.</p>
@@ -1493,6 +1530,21 @@ deployments:
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="migration"><a class="header" href="#migration">Migration</a></h1>
 <p>What changes between releases that may require values-file edits when you upgrade. The chart’s value surface is intentionally large; most edits are additive, but a few iterations on the <code>release-2.0.0</code> line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the <strong>63-char enforcement</strong> (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the <code>app.kubernetes.io/instance</code> label value the chart sets on the same resource.</p>
+<h2 id="330"><a class="header" href="#330">3.3.0</a></h2>
+<p>No values-file edits are required for values that Kubernetes accepted before.</p>
+<h3 id="topologyspreadconstraints-entries-are-validated-and-rendered-in-full"><a class="header" href="#topologyspreadconstraints-entries-are-validated-and-rendered-in-full"><code>topologySpreadConstraints</code> entries are validated and rendered in full</a></h3>
+<p><code>minDomains</code>, <code>nodeAffinityPolicy</code> and <code>nodeTaintsPolicy</code> are rendered into the pod template. 3.2.0 accepted them in values and dropped them, so a release that already sets any of the three gets a changed pod template and one rollout of those pods.</p>
+<p>The schema now describes the entry, and these shapes fail validation:</p>
+<ul>
+<li>A key outside <code>maxSkew</code>, <code>topologyKey</code>, <code>whenUnsatisfiable</code>, <code>labelSelector</code>, <code>matchLabelKeys</code>, <code>minDomains</code>, <code>nodeAffinityPolicy</code>, <code>nodeTaintsPolicy</code>. 3.2.0 dropped such keys silently; remove them or fix the spelling.</li>
+<li>An entry without <code>maxSkew</code>, <code>topologyKey</code> or <code>whenUnsatisfiable</code>. 3.2.0 rendered the missing field empty, which Kubernetes rejects.</li>
+<li><code>minDomains</code> with <code>whenUnsatisfiable: ScheduleAnyway</code>, which Kubernetes rejects.</li>
+</ul>
+<p>See <a href="#topology-spread-constraint-fields">Topology spread constraint fields</a>.</p>
+<h3 id="topologyspreadconstraints-on-jobgroups"><a class="header" href="#topologyspreadconstraints-on-jobgroups"><code>topologySpreadConstraints</code> on <code>jobGroups</code></a></h3>
+<p>A group or a job can set its own list; it replaces the root list for those pods. A job that sets it gets a new <code>hashSuffix</code>, so the Job is created under a new name and runs again.</p>
+<h3 id="root-poddisruptionbudgetmaxunavailable-renders-without-clearing-minavailable"><a class="header" href="#root-poddisruptionbudgetmaxunavailable-renders-without-clearing-minavailable">Root <code>podDisruptionBudget.maxUnavailable</code> renders without clearing <code>minAvailable</code></a></h3>
+<p>3.2.0 failed on a root <code>maxUnavailable</code> unless values also set <code>minAvailable: null</code>, because the chart default <code>minAvailable: 1</code> was always merged in. The root <code>maxUnavailable</code> now takes precedence. A root block that sets both <code>minAvailable</code> and <code>maxUnavailable</code> renders <code>maxUnavailable</code> where 3.2.0 failed. Workload-level blocks are unchanged.</p>
 <h2 id="320"><a class="header" href="#320">3.2.0</a></h2>
 <p>No values-file edits are required. Two things are worth checking before the upgrade, and a few shapes that never produced an installable manifest now fail at render time.</p>
 <h3 id="finished-jobs-under-exposeservice-have-to-go-before-the-upgrade"><a class="header" href="#finished-jobs-under-exposeservice-have-to-go-before-the-upgrade">Finished Jobs under <code>exposeService</code> have to go before the upgrade</a></h3>
@@ -1656,7 +1708,7 @@ deployments:
 <li><a href="#local-development"><code>01-development.md</code></a> — prerequisites, clone-and-verify, dev loop, common pitfalls.</li>
 <li><a href="#testing"><code>02-testing.md</code></a> — <code>helm-unittest</code> cookbook: two patterns, the asserts you need, three steps to add a test.</li>
 <li><a href="#e2e-testing"><code>03-e2e-testing.md</code></a> — label-gated live-cluster suite: what each job covers, how to run one locally, how to add a scenario.</li>
-<li><a href="#releasing"><code>04-releasing.md</code></a> — tag, push, CI publishes to <code>oci://ghcr.io/purisev</code>.</li>
+<li><a href="#releasing"><code>04-releasing.md</code></a> — date the changelog, tag, push; CI publishes to <code>oci://ghcr.io/purisev</code> and to GitHub Releases.</li>
 </ul>
 <p>The chart’s design rationale lives in <a href="05-adr"><code>../05-adr/</code></a> — read those before proposing changes that affect <code>values.yaml</code> shape.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -1699,6 +1751,7 @@ helm unittest .
 <ul>
 <li><strong>Changed the values shape?</strong> Update <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json"><code>values.schema.json</code></a> in the same commit. Schema and <code>values.yaml</code> drift is the most common reviewer comment.</li>
 <li><strong>Added a field?</strong> Add at least one assertion in <code>tests/&lt;template&gt;_test.yaml</code>. Coverage prevents silent regressions on future refactors.</li>
+<li><strong>Changed what a user sees?</strong> Add a line to the in-flight version’s section of <a href="https://github.com/purisev/universal-helm-chart/blob/main/CHANGELOG.md"><code>CHANGELOG.md</code></a>. CI fails while that section is missing or empty.</li>
 <li><strong>Bumped the chart version?</strong> Every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names it too. <code>check-version-pins.sh</code> lists the ones you missed; CI runs it on every run, the e2e suites wait on it, and the branch preview build will not publish while it is red.</li>
 <li><strong>Changed an example?</strong> Each example carries the same values three times: <code>values.yaml</code>, the Argo CD <code>Application</code>, and the Flux <code>HelmRelease</code>. Change one and the other two go stale. <code>check-examples.sh</code> renders all three and fails on the ones that no longer install — or that name a Service nothing renders.</li>
 <li><strong>Writing fixtures or example values?</strong> Use <strong>block-style</strong> YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.</li>
@@ -1851,6 +1904,11 @@ chainsaw test test/e2e/chainsaw/&lt;job&gt; --config test/e2e/chainsaw/&lt;job&g
 <p>It runs on every CI run, and the branch preview build in <code>ci.yaml</code> will not publish while it is red. <code>release.yaml</code> runs it again on the tag itself, where the ref is the version the artifact is about to carry, so a chart cannot reach GHCR under a version that is not the one inside it. The migration guide and the ADRs are skipped, since naming older versions is what they are for.</p>
 </li>
 <li>
+<p><strong>Date the release in <code>CHANGELOG.md</code>.</strong> Every user-visible change goes under the heading of the in-flight version as it lands, and the heading reads <code>## &lt;X.Y.Z&gt; - unreleased</code> until the release. Replace <code>unreleased</code> with the release date. The <code>version-pins</code> CI job fails while <code>CHANGELOG.md</code> has no notes for the version in <code>Chart.yaml</code>, and <code>release.yaml</code> refuses a tag whose section is still marked <code>unreleased</code>. Print the notes a release will carry with:</p>
+<pre><code class="language-bash">bash .github/scripts/release-notes.sh
+</code></pre>
+</li>
+<li>
 <p><strong>Tag and push</strong> from the matching release branch:</p>
 <pre><code class="language-bash">git checkout release-&lt;X.Y.Z&gt;
 git tag v&lt;X.Y.Z&gt;
@@ -1858,7 +1916,7 @@ git push origin v&lt;X.Y.Z&gt;
 </code></pre>
 </li>
 <li>
-<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, checks the tag against <code>Chart.yaml</code> and the docs, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity.</p>
+<p><strong>CI takes over.</strong> <a href="https://github.com/purisev/universal-helm-chart/blob/main/.github/workflows/release.yaml"><code>release.yaml</code></a> runs on <code>v*</code> tags: it lints, runs the unittest suite, checks the tag against <code>Chart.yaml</code> and the docs, reads the release notes from <code>CHANGELOG.md</code>, packages the chart, pushes the artifact to <code>oci://ghcr.io/&lt;your-github-namespace&gt;</code> (the workflow resolves your namespace from <code>${{ github.repository_owner }}</code>), and signs it keylessly via <a href="https://docs.sigstore.dev/">Sigstore/cosign</a> — no key management, the signature is tied to this repo’s GitHub Actions OIDC identity. It then publishes the GitHub Release for the tag with the notes from <code>CHANGELOG.md</code> and three assets: the packaged chart, its Sigstore signature bundle (<code>.sigstore.json</code>) and its build provenance (<code>.intoto.jsonl</code>). A release that already exists for the tag gets the notes and the assets added to it.</p>
 </li>
 <li>
 <p><strong>Verify the artifact:</strong></p>
@@ -1872,6 +1930,15 @@ git push origin v&lt;X.Y.Z&gt;
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   ghcr.io/purisev/universal-helm-chart:&lt;X.Y.Z&gt;
 </code></pre>
+<p>The chart attached to the GitHub Release verifies the same way against its own bundle, and its provenance with the GitHub CLI:</p>
+<pre><code class="language-bash">cosign verify-blob \
+  --bundle universal-helm-chart-&lt;X.Y.Z&gt;.tgz.sigstore.json \
+  --certificate-identity-regexp "^https://github.com/purisev/universal-helm-chart/" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  universal-helm-chart-&lt;X.Y.Z&gt;.tgz
+
+gh attestation verify universal-helm-chart-&lt;X.Y.Z&gt;.tgz --repo purisev/universal-helm-chart
+</code></pre>
 </li>
 </ol>
 <h2 id="branch-builds-pr-previews"><a class="header" href="#branch-builds-pr-previews">Branch builds (PR previews)</a></h2>
@@ -1879,7 +1946,7 @@ git push origin v&lt;X.Y.Z&gt;
 <pre><code class="language-bash">helm template demo oci://ghcr.io/purisev/universal-helm-chart --version &lt;X.Y.Z&gt;-feat-xyz -f my-values.yaml
 </code></pre>
 <h2 id="what-gets-published"><a class="header" href="#what-gets-published">What gets published</a></h2>
-<p>The OCI artifact contains only what chart consumers need: <code>Chart.yaml</code>, <code>templates/</code>, <code>values.yaml</code>, <code>values.yaml.example</code>, <code>values.schema.json</code>, <code>README.md</code>, <code>LICENSE</code>, <code>NOTICE</code>, <code>SECURITY.md</code>. Everything else (<code>docs/</code>, <code>tests/</code>, <code>test/</code>, <code>.github/</code>) is excluded via <a href="https://github.com/purisev/universal-helm-chart/blob/main/.helmignore"><code>.helmignore</code></a>.</p>
+<p>The OCI artifact contains only what chart consumers need: <code>Chart.yaml</code>, <code>templates/</code>, <code>values.yaml</code>, <code>values.yaml.example</code>, <code>values.schema.json</code>, <code>README.md</code>, <code>CHANGELOG.md</code>, <code>LICENSE</code>, <code>NOTICE</code>, <code>SECURITY.md</code>. Everything else (<code>docs/</code>, <code>tests/</code>, <code>test/</code>, <code>.github/</code>) is excluded via <a href="https://github.com/purisev/universal-helm-chart/blob/main/.helmignore"><code>.helmignore</code></a>.</p>
 <h2 id="forks"><a class="header" href="#forks">Forks</a></h2>
 <p>Both workflows resolve the GHCR namespace from <code>${{ github.repository_owner }}</code>, so a fork publishes to <code>oci://ghcr.io/&lt;your-github-user&gt;/universal-helm-chart</code> automatically — no workflow edits required. Tag a release on your fork’s <code>release-&lt;X.Y.Z&gt;</code> branch the same way and <code>release.yaml</code> runs against your own GHCR namespace using your repo’s <code>GITHUB_TOKEN</code>.</p>
 <div style="break-before: page; page-break-before: always;"></div>

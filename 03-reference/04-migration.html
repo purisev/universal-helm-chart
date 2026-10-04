@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a1e8fdae.js";
+            window.path_to_searchindex_js = "../searchindex-7a3e427a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -182,6 +182,21 @@
                     <main>
                         <h1 id="migration"><a class="header" href="#migration">Migration</a></h1>
 <p>What changes between releases that may require values-file edits when you upgrade. The chart’s value surface is intentionally large; most edits are additive, but a few iterations on the <code>release-2.0.0</code> line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the <strong>63-char enforcement</strong> (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the <code>app.kubernetes.io/instance</code> label value the chart sets on the same resource.</p>
+<h2 id="330"><a class="header" href="#330">3.3.0</a></h2>
+<p>No values-file edits are required for values that Kubernetes accepted before.</p>
+<h3 id="topologyspreadconstraints-entries-are-validated-and-rendered-in-full"><a class="header" href="#topologyspreadconstraints-entries-are-validated-and-rendered-in-full"><code>topologySpreadConstraints</code> entries are validated and rendered in full</a></h3>
+<p><code>minDomains</code>, <code>nodeAffinityPolicy</code> and <code>nodeTaintsPolicy</code> are rendered into the pod template. 3.2.0 accepted them in values and dropped them, so a release that already sets any of the three gets a changed pod template and one rollout of those pods.</p>
+<p>The schema now describes the entry, and these shapes fail validation:</p>
+<ul>
+<li>A key outside <code>maxSkew</code>, <code>topologyKey</code>, <code>whenUnsatisfiable</code>, <code>labelSelector</code>, <code>matchLabelKeys</code>, <code>minDomains</code>, <code>nodeAffinityPolicy</code>, <code>nodeTaintsPolicy</code>. 3.2.0 dropped such keys silently; remove them or fix the spelling.</li>
+<li>An entry without <code>maxSkew</code>, <code>topologyKey</code> or <code>whenUnsatisfiable</code>. 3.2.0 rendered the missing field empty, which Kubernetes rejects.</li>
+<li><code>minDomains</code> with <code>whenUnsatisfiable: ScheduleAnyway</code>, which Kubernetes rejects.</li>
+</ul>
+<p>See <a href="01-values.html#topology-spread-constraint-fields">Topology spread constraint fields</a>.</p>
+<h3 id="topologyspreadconstraints-on-jobgroups"><a class="header" href="#topologyspreadconstraints-on-jobgroups"><code>topologySpreadConstraints</code> on <code>jobGroups</code></a></h3>
+<p>A group or a job can set its own list; it replaces the root list for those pods. A job that sets it gets a new <code>hashSuffix</code>, so the Job is created under a new name and runs again.</p>
+<h3 id="root-poddisruptionbudgetmaxunavailable-renders-without-clearing-minavailable"><a class="header" href="#root-poddisruptionbudgetmaxunavailable-renders-without-clearing-minavailable">Root <code>podDisruptionBudget.maxUnavailable</code> renders without clearing <code>minAvailable</code></a></h3>
+<p>3.2.0 failed on a root <code>maxUnavailable</code> unless values also set <code>minAvailable: null</code>, because the chart default <code>minAvailable: 1</code> was always merged in. The root <code>maxUnavailable</code> now takes precedence. A root block that sets both <code>minAvailable</code> and <code>maxUnavailable</code> renders <code>maxUnavailable</code> where 3.2.0 failed. Workload-level blocks are unchanged.</p>
 <h2 id="320"><a class="header" href="#320">3.2.0</a></h2>
 <p>No values-file edits are required. Two things are worth checking before the upgrade, and a few shapes that never produced an installable manifest now fail at render time.</p>
 <h3 id="finished-jobs-under-exposeservice-have-to-go-before-the-upgrade"><a class="header" href="#finished-jobs-under-exposeservice-have-to-go-before-the-upgrade">Finished Jobs under <code>exposeService</code> have to go before the upgrade</a></h3>

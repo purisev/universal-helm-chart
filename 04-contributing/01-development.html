@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a1e8fdae.js";
+            window.path_to_searchindex_js = "../searchindex-7a3e427a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -219,6 +219,7 @@ helm unittest .
 <ul>
 <li><strong>Changed the values shape?</strong> Update <a href="https://github.com/purisev/universal-helm-chart/blob/main/values.schema.json"><code>values.schema.json</code></a> in the same commit. Schema and <code>values.yaml</code> drift is the most common reviewer comment.</li>
 <li><strong>Added a field?</strong> Add at least one assertion in <code>tests/&lt;template&gt;_test.yaml</code>. Coverage prevents silent regressions on future refactors.</li>
+<li><strong>Changed what a user sees?</strong> Add a line to the in-flight version’s section of <a href="https://github.com/purisev/universal-helm-chart/blob/main/CHANGELOG.md"><code>CHANGELOG.md</code></a>. CI fails while that section is missing or empty.</li>
 <li><strong>Bumped the chart version?</strong> Every Argo CD <code>targetRevision</code>, Flux <code>tag</code>, <code>helm install --version</code> and schema URL under <code>docs/</code> names it too. <code>check-version-pins.sh</code> lists the ones you missed; CI runs it on every run, the e2e suites wait on it, and the branch preview build will not publish while it is red.</li>
 <li><strong>Changed an example?</strong> Each example carries the same values three times: <code>values.yaml</code>, the Argo CD <code>Application</code>, and the Flux <code>HelmRelease</code>. Change one and the other two go stale. <code>check-examples.sh</code> renders all three and fails on the ones that no longer install — or that name a Service nothing renders.</li>
 <li><strong>Writing fixtures or example values?</strong> Use <strong>block-style</strong> YAML throughout — multi-line indented maps and lists, never the inline curly-brace / square-bracket form. The chart docs are authored as reference material; keeping the style consistent matters.</li>

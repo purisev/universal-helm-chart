@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a1e8fdae.js";
+            window.path_to_searchindex_js = "../searchindex-7a3e427a.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -351,6 +351,7 @@ chart renders itself.
 <ul>
 <li><strong>maps</strong> (env, podAnnotations, metadataAnnotations) — replace per key; later wins.</li>
 <li><strong>lists</strong> (envSecrets, envConfigMaps, tolerations) — concat.</li>
+<li><strong>topologySpreadConstraints</strong> — the job list replaces the group list, and either replaces the root list. Kubernetes rejects two constraints with the same <code>topologyKey</code> and <code>whenUnsatisfiable</code>, so the lists are never concatenated. <code>topologySpreadConstraints: []</code> on a group or job opts out.</li>
 <li><strong>volumes / volumeMounts</strong> — replace by name (a volume can’t be partially <code>emptyDir</code> and partially <code>configMap</code>).</li>
 </ul>
 <p><code>hashSuffix: true</code> together with a delete-policy that removes the Job after success is rejected fail-fast — the Job would re-run on every sync. See <a href="../05-adr/005-jobgroups-unification.html">ADR 005</a> and <a href="../05-adr/012-job-spec-hashing-for-idempotency.html">ADR 012</a>.</p>
@@ -480,6 +481,42 @@ chart renders itself.
 <p>Because nothing here is validated field by field, a typo inside <code>advanced</code> reaches the cluster and is rejected by the KEDA CRD rather than by <code>helm template</code>. Check the field names against the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> for the KEDA version you run.</p>
 <h3 id="scheduling-field-inheritance"><a class="header" href="#scheduling-field-inheritance">Scheduling field inheritance</a></h3>
 <p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
+<h3 id="topology-spread-constraint-fields"><a class="header" href="#topology-spread-constraint-fields">Topology spread constraint fields</a></h3>
+<p>Each entry of <code>topologySpreadConstraints</code> (root, <code>deployments.&lt;name&gt;</code>, <code>statefulSets.&lt;name&gt;</code>, <code>jobGroups.&lt;group&gt;</code> and <code>jobGroups.&lt;group&gt;.jobs.&lt;job&gt;</code>) accepts the Kubernetes fields below and nothing else; an unknown key fails schema validation.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Required</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>maxSkew</code></td><td>yes</td><td>Integer, 1 or more.</td></tr>
+<tr><td><code>topologyKey</code></td><td>yes</td><td>Node label key.</td></tr>
+<tr><td><code>whenUnsatisfiable</code></td><td>yes</td><td><code>DoNotSchedule</code> or <code>ScheduleAnyway</code>.</td></tr>
+<tr><td><code>labelSelector</code></td><td>no</td><td>Defaults to the workload’s selector labels when omitted or empty.</td></tr>
+<tr><td><code>matchLabelKeys</code></td><td>no</td><td>List of pod label keys, e.g. <code>pod-template-hash</code> to spread each Deployment revision on its own.</td></tr>
+<tr><td><code>minDomains</code></td><td>no</td><td>Integer, 1 or more. Kubernetes accepts it only with <code>whenUnsatisfiable: DoNotSchedule</code>, and so does the schema.</td></tr>
+<tr><td><code>nodeAffinityPolicy</code></td><td>no</td><td><code>Honor</code> or <code>Ignore</code>. Kubernetes treats an unset value as <code>Honor</code>.</td></tr>
+<tr><td><code>nodeTaintsPolicy</code></td><td>no</td><td><code>Honor</code> or <code>Ignore</code>. Kubernetes treats an unset value as <code>Ignore</code>, so domains made only of tainted nodes still count toward the skew.</td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-yaml">topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    minDomains: 3
+    nodeTaintsPolicy: Honor
+    matchLabelKeys:
+      - pod-template-hash
+</code></pre>
+<h3 id="poddisruptionbudget-minavailable-vs-maxunavailable"><a class="header" href="#poddisruptionbudget-minavailable-vs-maxunavailable">PodDisruptionBudget: <code>minAvailable</code> vs <code>maxUnavailable</code></a></h3>
+<p>A PodDisruptionBudget takes one of the two. A workload-level <code>podDisruptionBudget</code> block replaces the root block as a whole, so it carries only what it states: setting both there fails with <code>podDisruptionBudget for workload "&lt;name&gt;": cannot set both minAvailable and maxUnavailable</code>, and a block with neither renders <code>maxUnavailable: 1</code>.</p>
+<p>The root block always contains the chart default <code>minAvailable: 1</code>. A root <code>maxUnavailable</code> takes precedence over <code>minAvailable</code>, whether that is the default or a value you set:</p>
+<pre><code class="language-yaml">podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1   # rendered; minAvailable is ignored
+</code></pre>
+<p><code>maxUnavailable: 0</code> and <code>minAvailable: "100%"</code> allow no voluntary evictions: <code>kubectl drain</code> and node autoscalers wait on those pods until the budget changes. The same holds for <code>minAvailable: 1</code> on a single-replica workload.</p>
 <h3 id="init-containers-and-sidecars-share-one-container-shape"><a class="header" href="#init-containers-and-sidecars-share-one-container-shape">Init containers and sidecars share one container shape</a></h3>
 <p><code>deployments.&lt;name&gt;.initContainers</code> and <code>deployments.&lt;name&gt;.sidecars</code> (same under <code>statefulSets.&lt;name&gt;</code>) are maps keyed by container name. Both flow through the same renderer as the main container: <code>image</code>, <code>command</code>/<code>args</code>, <code>env</code>, <code>envSecrets</code>, <code>volumeMounts</code>, <code>resources</code>, <code>securityContext</code>, <code>lifecycle</code>. Both inherit the parent workload’s <code>inherit.env</code> / <code>inherit.configMaps</code> / <code>inherit.configMapMount</code> flags. Neither inherits root-level <code>volumeMounts.&lt;containerName&gt;</code> — declare local mounts inline. Render order is <code>sortAlpha</code>; for <code>initContainers</code> Kubernetes runs them sequentially in declared order, so prefix names with <code>01-</code>, <code>02-</code>, … when run order matters (same convention as <code>jobGroups[*].tasks</code>). Reloader does not re-trigger init containers — they run only on Pod creation, so a config change rolls the workload and a fresh init pass runs. <strong>Two exceptions for <code>initContainers</code>:</strong> <code>probesEnabled</code> / probe blocks (<code>readinessProbe</code>, <code>livenessProbe</code>, <code>startupProbe</code>) and <code>lifecycle</code> are rejected — Kubernetes does not allow these on standard init containers, so <code>helm template</code> fail-fasts if either is set on an init entry.</p>
 <h3 id="configmap-names"><a class="header" href="#configmap-names">ConfigMap names</a></h3>
