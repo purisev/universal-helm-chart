@@ -1,0 +1,114 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: monitoring
+  namespace: monitoring
+spec:
+  interval: 5m
+  releaseName: monitoring
+  chartRef:
+    kind: OCIRepository
+    name: universal-helm-chart
+    namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    integrations:
+      monitoring:
+        defaults:
+          enabled: true
+          provider: prometheus
+          discovery: crd
+          type: service
+          port: metrics
+          path: /metrics
+          interval: 30s
+          scrapeTimeout: 10s
+          exposeService:
+            enabled: true
+            port: 9090
+            targetPort: 9090
+    deployments:
+      api:
+        enabled: true
+        replicaCount: 2
+        image:
+          repository: ghcr.io/example/api
+          tag: v1.4.2
+        service:
+          enabled: true
+          ports:
+            http:
+              port: 80
+              targetPort: 8080
+        metrics:
+          enabled: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+      worker:
+        enabled: true
+        replicaCount: 3
+        image:
+          repository: ghcr.io/example/worker
+          tag: v0.9.0
+        service:
+          enabled: false
+        metrics:
+          enabled: true
+          type: pod
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            memory: 512Mi
+      legacy:
+        enabled: true
+        replicaCount: 1
+        image:
+          repository: ghcr.io/example/legacy
+          tag: v2.1.0
+        service:
+          enabled: true
+          ports:
+            http:
+              port: 80
+              targetPort: 8080
+            metrics:
+              port: 9091
+              targetPort: 9091
+        metrics:
+          enabled: true
+          discovery: annotations
+          port: 9091
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi
+      vm-flavoured:
+        enabled: true
+        replicaCount: 1
+        image:
+          repository: ghcr.io/example/vm-app
+          tag: v1.0.0
+        service:
+          enabled: true
+          ports:
+            http:
+              port: 80
+              targetPort: 8080
+        metrics:
+          enabled: true
+          provider: victoriametrics
+        resources:
+          requests:
+            cpu: 50m
+            memory: 128Mi
+          limits:
+            memory: 256Mi

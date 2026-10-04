@@ -1,0 +1,29 @@
+# Flux HelmRelease consuming the OCIRepository declared in ocirepository.yaml.
+# Values are inlined here for self-containment. In a real setup, prefer ConfigMap-backed
+# values via valuesFrom (file-watched, no HelmRelease re-deploy on values change):
+#
+#   spec:
+#     valuesFrom:
+#       - kind: ConfigMap
+#         name: kitchen-sink-values
+#
+# Replace the inline `values:` below with the contents of ../values.yaml.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kitchen-sink
+  namespace: kitchen-sink
+spec:
+  interval: 5m
+  releaseName: kitchen-sink
+  chartRef:
+    kind: OCIRepository
+    name: universal-helm-chart
+    namespace: flux-system
+  install:
+    createNamespace: true
+  values:
+    # Replace this section with the contents of ../values.yaml.
+    # Kept as a comment-only placeholder so the HelmRelease itself is reviewable
+    # without scrolling through ~250 lines of values inline.
+    deployments: {}

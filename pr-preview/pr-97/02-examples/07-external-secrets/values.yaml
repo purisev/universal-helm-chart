@@ -1,0 +1,87 @@
+# 07-external-secrets — ESO + Reloader rotation flow.
+
+integrations:
+  eso:
+    enabled: true
+    secretStores:
+      vault:                          # → SecretStore named <release>-vault
+        enabled: true
+        kind: SecretStore
+        provider:
+          vault:
+            server: https://vault.example.com
+            path: secret              # KV v2 mount
+            version: v2
+            auth:
+              jwt:
+                mountPath: jwt
+                role: eso-app
+                # serviceAccountRef defaults to the chart's ServiceAccount when empty
+                audiences:
+                  - vault
+                expirationSeconds: 600
+
+    externalSecrets:
+      # Granular: per-key extraction with remote key + property
+      app-secrets:
+        enabled: true
+        secretStore: vault            # references secretStores.vault
+        storeKind: SecretStore
+        refreshInterval: 1h
+        targetName: app-secrets       # → K8s Secret named app-secrets
+        type: Opaque
+        data:
+          DB_PASSWORD:
+            remoteKey: app/db
+            property: password
+          API_TOKEN:
+            remoteKey: app/api
+            property: token
+
+      # Bulk: extract the full remote secret in one go
+      bulk-config:
+        enabled: true
+        secretStore: vault
+        storeKind: SecretStore
+        refreshInterval: 1h
+        targetName: bulk-config
+        type: Opaque
+        dataFrom:
+          - remoteKey: app/feature-flags
+            conversionStrategy: Default
+            decodingStrategy: None
+
+  # When ESO writes the K8s Secret, Reloader bounces the Deployment.
+  stakater:
+    reloader:
+      enabled: true                   # default annotation: reloader.stakater.com/auto: "true"
+
+# Required for Vault JWT auth — the projected SA token is what Vault validates.
+serviceAccount:
+  create: true
+  name: eso-app
+
+deployments:
+  web:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: ghcr.io/example/web
+      tag: v1.4.2
+    service:
+      enabled: true
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+
+    envSecrets:
+      - app-secrets                   # ESO-generated K8s Secret
+      - bulk-config                   # ESO-generated K8s Secret
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
