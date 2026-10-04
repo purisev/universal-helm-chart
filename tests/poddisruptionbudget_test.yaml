@@ -189,3 +189,69 @@ tests:
       - equal:
           path: spec.unhealthyPodEvictionPolicy
           value: AlwaysAllow
+
+  - it: should render root maxUnavailable over the chart default minAvailable
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.maxUnavailable: 0
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 0
+      - isNull:
+          path: spec.minAvailable
+
+  - it: should render root maxUnavailable for a StatefulSet
+    set:
+      image.repository: redis
+      image.tag: v1.0.0
+      statefulSets.db.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.maxUnavailable: "25%"
+    asserts:
+      - equal:
+          path: spec.maxUnavailable
+          value: 25%
+      - isNull:
+          path: spec.minAvailable
+
+  - it: should keep the chart default minAvailable when root sets only enabled
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 1
+      - isNull:
+          path: spec.maxUnavailable
+
+  - it: should use workload minAvailable when root sets maxUnavailable
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.enabled: true
+      podDisruptionBudget.enabled: true
+      podDisruptionBudget.maxUnavailable: 0
+      deployments.web.podDisruptionBudget.minAvailable: 2
+    asserts:
+      - equal:
+          path: spec.minAvailable
+          value: 2
+      - isNull:
+          path: spec.maxUnavailable
+
+  - it: should fail when a StatefulSet block sets both minAvailable and maxUnavailable
+    set:
+      image.repository: redis
+      image.tag: v1.0.0
+      statefulSets.db.podDisruptionBudget.minAvailable: 1
+      statefulSets.db.podDisruptionBudget.maxUnavailable: 1
+    asserts:
+      - failedTemplate:
+          errorMessage: "podDisruptionBudget for workload \"db\": cannot set both minAvailable and maxUnavailable"

@@ -238,6 +238,7 @@ For each per-job field:
 
 - **maps** (env, podAnnotations, metadataAnnotations) — replace per key; later wins.
 - **lists** (envSecrets, envConfigMaps, tolerations) — concat.
+- **topologySpreadConstraints** — the job list replaces the group list, and either replaces the root list. Kubernetes rejects two constraints with the same `topologyKey` and `whenUnsatisfiable`, so the lists are never concatenated. `topologySpreadConstraints: []` on a group or job opts out.
 - **volumes / volumeMounts** — replace by name (a volume can't be partially `emptyDir` and partially `configMap`).
 
 `hashSuffix: true` together with a delete-policy that removes the Job after success is rejected fail-fast — the Job would re-run on every sync. See [ADR 005](../05-adr/005-jobgroups-unification.md) and [ADR 012](../05-adr/012-job-spec-hashing-for-idempotency.md).
@@ -359,6 +360,46 @@ Because nothing here is validated field by field, a typo inside `advanced` reach
 ### Scheduling field inheritance
 
 `tolerations`, `affinity`, `nodeSelector` and `topologySpreadConstraints` all follow the same rule: if the workload defines the field, it **replaces** the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (`tolerations: []`, `affinity: {}`, `topologySpreadConstraints: []`).
+
+### Topology spread constraint fields
+
+Each entry of `topologySpreadConstraints` (root, `deployments.<name>`, `statefulSets.<name>`, `jobGroups.<group>` and `jobGroups.<group>.jobs.<job>`) accepts the Kubernetes fields below and nothing else; an unknown key fails schema validation.
+
+| Field | Required | Notes |
+|-------|----------|-------|
+| `maxSkew` | yes | Integer, 1 or more. |
+| `topologyKey` | yes | Node label key. |
+| `whenUnsatisfiable` | yes | `DoNotSchedule` or `ScheduleAnyway`. |
+| `labelSelector` | no | Defaults to the workload's selector labels when omitted or empty. |
+| `matchLabelKeys` | no | List of pod label keys, e.g. `pod-template-hash` to spread each Deployment revision on its own. |
+| `minDomains` | no | Integer, 1 or more. Kubernetes accepts it only with `whenUnsatisfiable: DoNotSchedule`, and so does the schema. |
+| `nodeAffinityPolicy` | no | `Honor` or `Ignore`. Kubernetes treats an unset value as `Honor`. |
+| `nodeTaintsPolicy` | no | `Honor` or `Ignore`. Kubernetes treats an unset value as `Ignore`, so domains made only of tainted nodes still count toward the skew. |
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    minDomains: 3
+    nodeTaintsPolicy: Honor
+    matchLabelKeys:
+      - pod-template-hash
+```
+
+### PodDisruptionBudget: `minAvailable` vs `maxUnavailable`
+
+A PodDisruptionBudget takes one of the two. A workload-level `podDisruptionBudget` block replaces the root block as a whole, so it carries only what it states: setting both there fails with `podDisruptionBudget for workload "<name>": cannot set both minAvailable and maxUnavailable`, and a block with neither renders `maxUnavailable: 1`.
+
+The root block always contains the chart default `minAvailable: 1`. A root `maxUnavailable` takes precedence over `minAvailable`, whether that is the default or a value you set:
+
+```yaml
+podDisruptionBudget:
+  enabled: true
+  maxUnavailable: 1   # rendered; minAvailable is ignored
+```
+
+`maxUnavailable: 0` and `minAvailable: "100%"` allow no voluntary evictions: `kubectl drain` and node autoscalers wait on those pods until the budget changes. The same holds for `minAvailable: 1` on a single-replica workload.
 
 ### Init containers and sidecars share one container shape
 

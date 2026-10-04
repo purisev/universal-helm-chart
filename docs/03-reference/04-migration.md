@@ -2,6 +2,30 @@
 
 What changes between releases that may require values-file edits when you upgrade. The chart's value surface is intentionally large; most edits are additive, but a few iterations on the `release-2.0.0` line tightened the schema in ways that turn previously-silent no-ops into render-time errors. Most of the changes below reject values that never had any rendered effect; the **63-char enforcement** (last section) is the exception — it can additionally reject values that previously rendered a working manifest whose constructed name was too long to be reused as the `app.kubernetes.io/instance` label value the chart sets on the same resource.
 
+## 3.3.0
+
+No values-file edits are required for values that Kubernetes accepted before.
+
+### `topologySpreadConstraints` entries are validated and rendered in full
+
+`minDomains`, `nodeAffinityPolicy` and `nodeTaintsPolicy` are rendered into the pod template. 3.2.0 accepted them in values and dropped them, so a release that already sets any of the three gets a changed pod template and one rollout of those pods.
+
+The schema now describes the entry, and these shapes fail validation:
+
+- A key outside `maxSkew`, `topologyKey`, `whenUnsatisfiable`, `labelSelector`, `matchLabelKeys`, `minDomains`, `nodeAffinityPolicy`, `nodeTaintsPolicy`. 3.2.0 dropped such keys silently; remove them or fix the spelling.
+- An entry without `maxSkew`, `topologyKey` or `whenUnsatisfiable`. 3.2.0 rendered the missing field empty, which Kubernetes rejects.
+- `minDomains` with `whenUnsatisfiable: ScheduleAnyway`, which Kubernetes rejects.
+
+See [Topology spread constraint fields](01-values.md#topology-spread-constraint-fields).
+
+### `topologySpreadConstraints` on `jobGroups`
+
+A group or a job can set its own list; it replaces the root list for those pods. A job that sets it gets a new `hashSuffix`, so the Job is created under a new name and runs again.
+
+### Root `podDisruptionBudget.maxUnavailable` renders without clearing `minAvailable`
+
+3.2.0 failed on a root `maxUnavailable` unless values also set `minAvailable: null`, because the chart default `minAvailable: 1` was always merged in. The root `maxUnavailable` now takes precedence. A root block that sets both `minAvailable` and `maxUnavailable` renders `maxUnavailable` where 3.2.0 failed. Workload-level blocks are unchanged.
+
 ## 3.2.0
 
 No values-file edits are required. Two things are worth checking before the upgrade, and a few shapes that never produced an installable manifest now fail at render time.

@@ -72,6 +72,9 @@ jobs:
           TARGET_REFS: ${{ github.base_ref }} ${{ github.head_ref }} ${{ github.ref_name }}
         run: bash .github/scripts/check-version-pins.sh
 
+      - name: Check CHANGELOG.md has notes for the chart version
+        run: bash .github/scripts/release-notes.sh > /dev/null
+
   examples:
     name: Check examples render
     # Not label-gated, for the same reason as version-pins: it is a handful of

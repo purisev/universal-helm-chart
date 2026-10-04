@@ -18,7 +18,7 @@ Published as an OCI artifact at `oci://ghcr.io/purisev/universal-helm-chart`.
 ```bash
 helm upgrade --install my-app \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.2.0 \
+  --version 3.3.0 \
   -f values.yaml
 ```
 
@@ -45,6 +45,10 @@ Full documentation lives under [`docs/`](docs/) (not shipped in the OCI artifact
 - [`docs/03-reference/`](docs/03-reference/) — `values.yaml` reference, schema notes, version compatibility.
 - [`docs/04-contributing/`](docs/04-contributing/) — local dev, testing, releases.
 - [`docs/05-adr/`](docs/05-adr/) — Architecture Decision Records covering why the chart is shaped the way it is.
+
+## Release notes
+
+[`CHANGELOG.md`](CHANGELOG.md) lists what each release adds, changes and fixes. Values-file edits an upgrade may need are in the [migration guide](docs/03-reference/04-migration.md).
 
 ## Feedback and contributing
 

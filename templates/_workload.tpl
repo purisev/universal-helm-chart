@@ -386,6 +386,15 @@ topologySpreadConstraints:
   - maxSkew: {{ .maxSkew }}
     topologyKey: {{ .topologyKey }}
     whenUnsatisfiable: {{ .whenUnsatisfiable }}
+    {{- if hasKey . "minDomains" }}
+    minDomains: {{ .minDomains }}
+    {{- end }}
+    {{- with .nodeAffinityPolicy }}
+    nodeAffinityPolicy: {{ . }}
+    {{- end }}
+    {{- with .nodeTaintsPolicy }}
+    nodeTaintsPolicy: {{ . }}
+    {{- end }}
     labelSelector:
       {{- if .labelSelector }}
       {{- toYaml .labelSelector | nindent 6 }}
