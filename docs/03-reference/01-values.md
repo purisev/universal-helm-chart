@@ -452,7 +452,7 @@ Every port of `<svc>` resolves to the interceptor, which serves one HTTP port. W
 
 - Ingress backends reach the interceptor through the ExternalName, so the Ingress controller has to support ExternalName Services (ingress-nginx does; Traefik needs `allowExternalNameServices`).
 - Only the workload's own `httpRoute` rules are redirected. A rule in the root `httpRoute.rules` or in `httpRoutes` that names `<svc>` keeps pointing at the ExternalName, which most Gateway implementations reject; point those at the interceptor Service explicitly.
-- Turning `keda.http` on or off changes the live `<svc>` between `ClusterIP` and `ExternalName`. The cluster IP is released on the way to ExternalName and a new one is allocated on the way back.
+- Turning `keda.http` on or off changes the live `<svc>` between `ClusterIP` and `ExternalName`. The cluster IP is released on the way to ExternalName and a new one is allocated on the way back. Until cached DNS answers expire, callers keep reaching the previous target: after `keda.http` is turned off, a request that still resolves to the interceptor finds no route and is held until it times out.
 - `syncWaves.interceptorRoute` (default `20`) applies to the InterceptorRoute and to the ExternalName Service, so callers are switched over together with the route and before the ScaledObject (`21`).
 
 ### Scheduling field inheritance

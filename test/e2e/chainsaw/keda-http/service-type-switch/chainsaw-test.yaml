@@ -73,7 +73,17 @@ spec:
               echo "origin=[$(kubectl get svc e2e-sw-app-origin -n "$NAMESPACE" -o name --ignore-not-found)]"
               echo "route=[$(kubectl get interceptorroute e2e-sw-app -n "$NAMESPACE" -o name --ignore-not-found)]"
               echo "replicas=$(kubectl get deployment e2e-sw-app -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')"
-              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-sw-app/"
+              # Callers that still hold the ExternalName answer from DNS reach the
+              # interceptor, which no longer has a route, until their cache expires.
+              for i in $(seq 1 18); do
+                if OUT=$(kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=5 "http://e2e-sw-app/" 2>&1); then
+                  echo "served after attempt ${i}"
+                  echo "$OUT"
+                  break
+                fi
+                kubectl exec prober -n "$NAMESPACE" -- nslookup e2e-sw-app 2>&1 | grep -E "Name|Address|canonical" || true
+                sleep 5
+              done
             check:
               ($error): ~
               (contains($stdout, 'type=ClusterIP')): true
