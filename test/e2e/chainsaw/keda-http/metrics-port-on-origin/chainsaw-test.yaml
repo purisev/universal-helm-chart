@@ -23,6 +23,24 @@ spec:
             check:
               ($error): ~
               (contains($stdout, 'Welcome to nginx')): true
+    - name: the prometheus.io annotations sit on the origin Service only
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web-origin
+                annotations:
+                  prometheus.io/scrape: "true"
+                  prometheus.io/port: "9090"
+        - script:
+            timeout: 30s
+            content: |
+              kubectl get svc e2e-web -n "$NAMESPACE" -o jsonpath='scrape=[{.metadata.annotations.prometheus\.io/scrape}]{"\n"}'
+            check:
+              ($error): ~
+              (contains($stdout, 'scrape=[]')): true
     - name: scrape targets come from the origin Service and the ExternalName has none
       try:
         - script:

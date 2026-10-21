@@ -59,9 +59,11 @@ deployments:
         cpu: 20m
         memory: 32Mi
 
-    # nginx serves no metrics; the port is declared only so the scenario can
-    # check which Service's EndpointSlice carries it.
+    # nginx serves no metrics; the port and the prometheus.io/* annotations
+    # exist only so the scenario can check which Service carries them.
+    # Annotation discovery needs no monitoring CRDs in this cluster.
     metrics:
+      discovery: annotations
       exposeService:
         enabled: true
 
