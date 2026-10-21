@@ -358,3 +358,30 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "nodeTaintsPolicy': value must be one of 'Honor', 'Ignore'"
+
+  - it: should reject an unknown key under keda.http
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.keda.http.host: web.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'host' not allowed"
+
+  - it: should reject an unknown key under integrations.keda.httpAddon
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.keda.httpAddon.interceptorPort: 80
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'interceptorPort' not allowed"
+
+  - it: should reject a non-integer integrations.keda.httpAddon.port
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      integrations.keda.httpAddon.port: "80"
+    asserts:
+      - failedTemplate:
+          errorPattern: "httpAddon/port': got string, want integer"

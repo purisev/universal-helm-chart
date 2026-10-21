@@ -1,0 +1,46 @@
+{{- $ctx := . }}
+{{- range $kind := list "deployments" "statefulSets" }}
+{{- $specs := index $ctx.Values $kind | default dict }}
+{{- range $wlName := keys $specs | sortAlpha }}
+{{- $wl := index $specs $wlName }}
+{{- if eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
+{{- /* A cluster that serves KEDA but not the add-on's API would accept the ScaledObject
+     and reject this route. Offline rendering knows neither API and is let through. */ -}}
+{{- if and ($ctx.Capabilities.APIVersions.Has "keda.sh/v1alpha1") (not ($ctx.Capabilities.APIVersions.Has "http.keda.sh/v1beta1")) }}
+{{- fail (printf "%s.%s.keda.http needs the KEDA HTTP add-on v0.14.0 or later, but the cluster serves keda.sh/v1alpha1 without http.keda.sh/v1beta1 (InterceptorRoute)." $kind $wlName) }}
+{{- end }}
+{{- include "uhc.assertKedaHttp" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) }}
+{{- $http := $wl.keda.http }}
+---
+apiVersion: http.keda.sh/v1beta1
+kind: InterceptorRoute
+metadata:
+  name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  target:
+    service: {{ include "uhc.kedaHttpOriginServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+    portName: http
+  rules:
+    - hosts:
+        {{- range include "uhc.kedaHttpHosts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) | fromJsonArray }}
+        - {{ . | quote }}
+        {{- end }}
+  scalingMetric:
+    {{- toYaml ($http.scalingMetric | default (dict "concurrency" (dict "targetValue" 100))) | nindent 4 }}
+  {{- with $http.coldStart }}
+  coldStart:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $http.timeouts }}
+  timeouts:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,87 @@
+fullnameOverride: e2e
+
+# The platform side of the add-on (see fixtures/keda-http-platform.yaml) adds a
+# Service that serves the interceptor on port 80, so clients keep calling the
+# workload Service on 80 once it resolves to the interceptor.
+integrations:
+  keda:
+    httpAddon:
+      interceptorService: keda-add-ons-http-interceptor-proxy-80
+      port: 80
+
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  web:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
+httpRoute:
+  parentRefs:
+    - name: e2e-gateway
+  hostnames:
+    - httproute.keda-http.e2e.local
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    ingress.keda-http.e2e.local:
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: e2e-web
+          servicePort: 80
+
+deployments:
+  web:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+
+    service:
+      ports:
+        http:
+          targetPort: 8080
+
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi
+
+    # nginx serves no metrics; the port is declared only so the scenario can
+    # check which Service's EndpointSlice carries it.
+    metrics:
+      exposeService:
+        enabled: true
+
+    # No ingress rule of its own: only the interceptor rule the chart adds
+    # under keda.http lets traffic reach the pods.
+    networkPolicy:
+      enabled: true
+
+    httpRoute:
+      rules:
+        - {}
+
+    keda:
+      maxReplicas: 3
+      pollingInterval: 5
+      cooldownPeriod: 30
+      http:
+        scalingMetric:
+          requestRate:
+            targetValue: 2
+            window: 10s
+        timeouts:
+          readiness: 120s

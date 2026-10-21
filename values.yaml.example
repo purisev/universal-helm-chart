@@ -131,6 +131,13 @@ integrations:
             conversionStrategy: Default
             decodingStrategy: None
 
+  # Where the KEDA HTTP add-on runs, for workloads with keda.http.
+  keda:
+    httpAddon:
+      namespace: keda
+      interceptorService: keda-add-ons-http-interceptor-proxy
+      port: 8080                         # also the http port of every keda.http workload Service
+
   monitoring:
     defaults:
       enabled: true

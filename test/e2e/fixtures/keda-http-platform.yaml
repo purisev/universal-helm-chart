@@ -1,0 +1,31 @@
+# What the platform installs next to the KEDA HTTP add-on, once per cluster:
+# a Service that serves the interceptor on port 80, and the ReferenceGrant
+# that lets HTTPRoutes in the application namespace use it as a backend.
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-add-ons-http-interceptor-proxy-80
+  namespace: keda
+spec:
+  selector:
+    app.kubernetes.io/component: interceptor
+    app.kubernetes.io/name: http-add-on
+  ports:
+    - name: proxy
+      port: 80
+      targetPort: proxy
+---
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: e2e-keda-http-to-interceptor
+  namespace: keda
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: e2e-keda-http
+  to:
+    - group: ""
+      kind: Service
+      name: keda-add-ons-http-interceptor-proxy-80

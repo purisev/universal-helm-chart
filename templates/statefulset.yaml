@@ -34,14 +34,12 @@ spec:
   ordinals:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- if not (and $wl.keda $wl.keda.enabled) }}
-  {{- if not (and $wl.hpa $wl.hpa.enabled) }}
+  {{- if not (or (and $wl.keda (ne (index $wl.keda "enabled") false)) (and $wl.hpa (ne (index $wl.hpa "enabled") false))) }}
   {{- $replicas := 1 }}
   {{- if hasKey $wl "replicaCount" }}
   {{- $replicas = $wl.replicaCount }}
   {{- end }}
   replicas: {{ $replicas }}
-  {{- end }}
   {{- end }}
   revisionHistoryLimit: {{ default 10 $ctx.Values.revisionHistoryLimit }}
   {{- $minReady := int ($wl.minReadySeconds | default $ctx.Values.minReadySeconds | default 0) }}

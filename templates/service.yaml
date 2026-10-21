@@ -7,7 +7,7 @@
 {{- $placement := include "uhc.metricsPortPlacement" (dict "ctx" $ctx "wl" $wl "kind" "deployments") | fromJson -}}
 {{- if ne (index $wl "enabled") false }}
 {{- if and $wl.service (ne (index $wl.service "enabled") false) }}
-{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $placement.injectService "exposeJson" $exposeJson) }}
+{{- include "uhc.workloadServices" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $placement.injectService "exposeJson" $exposeJson) }}
 {{- end }}
 {{- /* Standalone metrics-only Service for a workload that renders no Service of its own.
      uhc.metricsOnlyServiceName asserts the name it builds, so a disabled workload
@@ -35,7 +35,7 @@
 {{- include "uhc.headlessService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $placement.injectHeadless "exposeJson" $exposeJson) }}
 {{- end }}
 {{- if and (ne (index $wl "enabled") false) $svcEnabled }}
-{{- include "uhc.plainService" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $placement.injectService "exposeJson" $exposeJson) }}
+{{- include "uhc.workloadServices" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "injectMetricsPort" $placement.injectService "exposeJson" $exposeJson) }}
 {{- end }}
 {{- /* Neither Service renders, so nothing carries the exposed metrics port and the
      ServiceMonitor would select an object that does not exist. */ -}}

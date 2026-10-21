@@ -1,0 +1,89 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: service-type-switch
+spec:
+  steps:
+    - name: a release without keda.http serves through a plain ClusterIP Service
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              helm upgrade --install e2e-sw "$GITHUB_WORKSPACE" -n "$NAMESPACE" \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/keda-http-switch.yaml" --wait --timeout 3m
+              kubectl get svc e2e-sw-app -n "$NAMESPACE" -o jsonpath='type={.spec.type}{"\n"}'
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-sw-app/"
+            check:
+              ($error): ~
+              (contains($stdout, 'type=ClusterIP')): true
+              (contains($stdout, 'Welcome to nginx')): true
+    - name: turning keda.http on converts the live Service to an ExternalName and requests cold-start through the interceptor
+      try:
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              helm upgrade e2e-sw "$GITHUB_WORKSPACE" -n "$NAMESPACE" \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/keda-http-switch.yaml" \
+                --set-json 'deployments.app.keda={"maxReplicas":1,"pollingInterval":5,"cooldownPeriod":30,"http":{"enabled":true,"timeouts":{"readiness":"120s"}}}' \
+                --wait --timeout 3m
+              kubectl get svc e2e-sw-app -n "$NAMESPACE" -o jsonpath='type={.spec.type} externalName={.spec.externalName} clusterIP=[{.spec.clusterIP}]{"\n"}'
+              kubectl wait --for=condition=Ready interceptorroute/e2e-sw-app -n "$NAMESPACE" --timeout=60s
+            check:
+              ($error): ~
+              (contains($stdout, 'type=ExternalName externalName=keda-add-ons-http-interceptor-proxy-80.keda.svc.cluster.local clusterIP=[]')): true
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-sw-app 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true
+        - script:
+            timeout: 3m
+            content: |
+              kubectl exec prober -n "$NAMESPACE" -- wget -S -O- --timeout=150 "http://e2e-sw-app/" 2>&1
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+              "(contains(to_lower($stdout), 'x-keda-http-cold-start: true'))": true
+    - name: turning keda.http off restores a ClusterIP Service with replicas and removes the add-on objects
+      try:
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              helm upgrade e2e-sw "$GITHUB_WORKSPACE" -n "$NAMESPACE" \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/keda-http-switch.yaml" --wait --timeout 3m
+              TYPE=$(kubectl get svc e2e-sw-app -n "$NAMESPACE" -o jsonpath='{.spec.type}')
+              IP=$(kubectl get svc e2e-sw-app -n "$NAMESPACE" -o jsonpath='{.spec.clusterIP}')
+              echo "type=${TYPE}"
+              if [ -n "$IP" ] && [ "$IP" != "None" ]; then echo "cluster-ip=assigned"; fi
+              echo "origin=[$(kubectl get svc e2e-sw-app-origin -n "$NAMESPACE" -o name --ignore-not-found)]"
+              echo "route=[$(kubectl get interceptorroute e2e-sw-app -n "$NAMESPACE" -o name --ignore-not-found)]"
+              echo "replicas=$(kubectl get deployment e2e-sw-app -n "$NAMESPACE" -o jsonpath='{.spec.replicas}')"
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-sw-app/"
+            check:
+              ($error): ~
+              (contains($stdout, 'type=ClusterIP')): true
+              (contains($stdout, 'cluster-ip=assigned')): true
+              (contains($stdout, 'origin=[]')): true
+              (contains($stdout, 'route=[]')): true
+              (contains($stdout, 'replicas=1')): true
+              (contains($stdout, 'Welcome to nginx')): true
+      finally:
+        - script:
+            timeout: 2m
+            content: |
+              helm uninstall e2e-sw -n "$NAMESPACE" --wait || true

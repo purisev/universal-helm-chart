@@ -129,3 +129,71 @@ tests:
     asserts:
       - hasDocuments:
           count: 2
+
+  - it: should admit the interceptor next to the declared ingress rules under keda.http
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.networkPolicy.ingress:
+        - from: [{podSelector: {matchLabels: {role: client}}}]
+    asserts:
+      - equal:
+          path: spec.ingress
+          value:
+            - from: [{podSelector: {matchLabels: {role: client}}}]
+            - from:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: keda
+                  podSelector:
+                    matchLabels:
+                      app.kubernetes.io/component: interceptor
+                      app.kubernetes.io/name: http-add-on
+
+  - it: should admit the interceptor from httpAddon.namespace when no ingress rule is declared
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon.namespace: autoscaling
+      deployments.web.networkPolicy.enabled: true
+    asserts:
+      - lengthEqual:
+          path: spec.ingress
+          count: 1
+      - equal:
+          path: spec.ingress[0].from[0].namespaceSelector.matchLabels
+          value:
+            kubernetes.io/metadata.name: autoscaling
+
+  - it: should not add an ingress rule to an egress-only policy
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.networkPolicy:
+        policyTypes: [Egress]
+        egress: [{to: [{podSelector: {}}]}]
+    asserts:
+      - notExists:
+          path: spec.ingress
+
+  - it: should admit the interceptor for a StatefulSet
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.networkPolicy.enabled: true
+    asserts:
+      - equal:
+          path: spec.ingress[0].from[0].podSelector.matchLabels
+          value:
+            app.kubernetes.io/component: interceptor
+            app.kubernetes.io/name: http-add-on
+
+  - it: should not admit the interceptor when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.enabled: false
+      deployments.web.networkPolicy.enabled: true
+    asserts:
+      - notExists:
+          path: spec.ingress

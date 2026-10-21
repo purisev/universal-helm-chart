@@ -1,0 +1,12 @@
+fullnameOverride: app
+image:
+  repository: nginx
+  tag: v1.0.0
+statefulSets:
+  cache:
+    service:
+      targetPort: 3000
+    keda:
+      maxReplicas: 3
+      http:
+        enabled: true

@@ -1,0 +1,56 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-through-interceptor
+spec:
+  steps:
+    - name: the workload's HTTPRoute rule points at the interceptor in the add-on namespace and is accepted
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: e2e
+              spec:
+                rules:
+                  - backendRefs:
+                      - name: keda-add-ons-http-interceptor-proxy-80
+                        namespace: keda
+                        port: 80
+              status:
+                (parents[0].conditions[?type == 'ResolvedRefs']):
+                  - status: "True"
+    - name: a request through the Gateway wakes the Deployment from zero and is answered
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-web 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true
+        - script:
+            timeout: 3m
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -S -O- --timeout=150 --header="Host: httproute.keda-http.e2e.local" \
+                "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/" 2>&1
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+              "(contains(to_lower($stdout), 'x-keda-http-cold-start: true'))": true

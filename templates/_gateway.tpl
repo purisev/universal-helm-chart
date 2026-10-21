@@ -162,6 +162,8 @@ Input dict:
   rule             — the rule entry (map)
   defaultBackend   — fallback backend name (string, used when rule.backendRefs is empty)
   defaultPort      — fallback backend port (int)
+  defaultNamespace — (optional) namespace of defaultBackend; applies only while
+                     rule.serviceName leaves the name to defaultBackend
 
 Output is the joined rule fields as multi-line YAML with no leading or trailing
 newline. The caller wraps it under a list-item dash via the standard
@@ -195,7 +197,11 @@ the dash (e.g. `- name: foo` rather than an orphan dash on its own line).
 {{- include "uhc.assertGatewayApiSupportsSessionPersistence" $ctx -}}
 {{- $blocks = append $blocks (printf "sessionPersistence:\n%s" (toYaml $rule.sessionPersistence | indent 2 | trimSuffix "\n")) -}}
 {{- end -}}
-{{- $backendRefs := $rule.backendRefs | default (list (dict "name" ($rule.serviceName | default $defaultBackend) "port" ($rule.servicePort | default $defaultPort))) -}}
+{{- $defaultRef := dict "name" ($rule.serviceName | default $defaultBackend) "port" ($rule.servicePort | default $defaultPort) -}}
+{{- if and .defaultNamespace (not $rule.serviceName) -}}
+{{- $_ := set $defaultRef "namespace" .defaultNamespace -}}
+{{- end -}}
+{{- $backendRefs := $rule.backendRefs | default (list $defaultRef) -}}
 {{- $blocks = append $blocks (printf "backendRefs:\n%s" (include "uhc.gatewayBackendRefs" $backendRefs | indent 2 | trimSuffix "\n")) -}}
 {{- join "\n" $blocks -}}
 {{- end }}

@@ -1,0 +1,47 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: metrics-port-on-origin
+spec:
+  steps:
+    - name: the pods are running, so their EndpointSlice is populated
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 3m
+            content: |
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=150 "http://e2e-web/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+    - name: scrape targets come from the origin Service and the ExternalName has none
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              # ServiceMonitor and annotation discovery both read EndpointSlices.
+              for i in $(seq 1 20); do
+                ADDR=$(kubectl get endpointslices -n "$NAMESPACE" -l kubernetes.io/service-name=e2e-web-origin \
+                  -o jsonpath='{.items[*].endpoints[*].addresses[0]}')
+                [ -n "$ADDR" ] && break
+                sleep 3
+              done
+              PORTS=$(kubectl get endpointslices -n "$NAMESPACE" -l kubernetes.io/service-name=e2e-web-origin \
+                -o jsonpath='{.items[*].ports[*].name}')
+              PROXY=$(kubectl get endpointslices -n "$NAMESPACE" -l kubernetes.io/service-name=e2e-web -o name | wc -l)
+              echo "origin-addresses=${ADDR:-none} origin-ports=${PORTS} proxy-slices=${PROXY}"
+            check:
+              ($error): ~
+              (contains($stdout, 'origin-addresses=none')): false
+              (contains($stdout, 'metrics')): true
+              (contains($stdout, 'proxy-slices=0')): true

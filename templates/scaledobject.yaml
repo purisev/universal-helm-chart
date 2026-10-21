@@ -22,14 +22,23 @@ spec:
     name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
     kind: Deployment
     envSourceContainerName: {{ $wlName }}
-  {{- $minReplicas := 1 }}
+  {{- $http := eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
+  {{- /* Scale to zero is what the HTTP add-on is for: the interceptor holds the first
+     request while KEDA starts a pod, so keda.http lowers the default floor to 0. */ -}}
+  {{- $minReplicas := ternary 0 1 $http }}
   {{- if hasKey $wl.keda "minReplicas" }}
   {{- $minReplicas = $wl.keda.minReplicas }}
   {{- end }}
   minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "deployments.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
+    {{- if $http }}
+    {{- $addon := include "uhc.kedaHttpAddon" $ctx | fromJson }}
+    {{- $httpTrigger := dict "type" "external-push" "metadata" (dict "scalerAddress" $addon.scalerAddress "interceptorRoute" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName))) }}
+    {{- toYaml (prepend ($wl.keda.triggers | default list) $httpTrigger) | nindent 4 }}
+    {{- else }}
     {{- toYaml $wl.keda.triggers | nindent 4 }}
+    {{- end }}
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
@@ -72,14 +81,23 @@ spec:
     name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
     kind: StatefulSet
     envSourceContainerName: {{ $wlName }}
-  {{- $minReplicas := 1 }}
+  {{- $http := eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
+  {{- /* Scale to zero is what the HTTP add-on is for: the interceptor holds the first
+     request while KEDA starts a pod, so keda.http lowers the default floor to 0. */ -}}
+  {{- $minReplicas := ternary 0 1 $http }}
   {{- if hasKey $wl.keda "minReplicas" }}
   {{- $minReplicas = $wl.keda.minReplicas }}
   {{- end }}
   minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "statefulSets.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
+    {{- if $http }}
+    {{- $addon := include "uhc.kedaHttpAddon" $ctx | fromJson }}
+    {{- $httpTrigger := dict "type" "external-push" "metadata" (dict "scalerAddress" $addon.scalerAddress "interceptorRoute" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName))) }}
+    {{- toYaml (prepend ($wl.keda.triggers | default list) $httpTrigger) | nindent 4 }}
+    {{- else }}
     {{- toYaml $wl.keda.triggers | nindent 4 }}
+    {{- end }}
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
