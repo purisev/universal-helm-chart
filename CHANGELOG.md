@@ -2,7 +2,7 @@
 
 What each release adds, changes and fixes. Values-file edits an upgrade may need are in the [migration guide](docs/03-reference/04-migration.md).
 
-## Unreleased
+## 3.4.0 - unreleased
 
 ### Added
 
