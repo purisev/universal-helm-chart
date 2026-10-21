@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 helm upgrade --install init-containers \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.3.0 \
+  --version 3.4.0 \
   --namespace init-containers \
   --create-namespace \
   -f values.yaml
