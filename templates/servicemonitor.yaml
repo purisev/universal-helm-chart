@@ -23,10 +23,9 @@ kind: ServiceMonitor
 {{- end }}
 metadata:
   name: {{ $smName }}
-  {{- $meta := include "uhc.customMetadata" (dict "ctx" $ctx "integration" "monitoring") | fromJson }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" $meta.labels) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "serviceMonitor" "extra" $meta.annotations) }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($metrics.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "serviceMonitor" "extra" ($metrics.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

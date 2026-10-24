@@ -380,16 +380,16 @@ tests:
       - hasDocuments:
           count: 0
 
-  # --- integrations.monitoring.customize ---
+  # --- metrics.labels and metrics.annotations ---
 
-  - it: should render integrations.monitoring.customize labels and annotations
+  - it: should render the workload's metrics labels and annotations on its PodMonitor
     set:
       image.repository: nginx
       image.tag: alpine
       deployments.worker.metrics.enabled: true
       deployments.worker.metrics.type: pod
-      integrations.monitoring.customize.labels.release: kube-prometheus-stack
-      integrations.monitoring.customize.annotations.owner: observability
+      deployments.worker.metrics.labels.release: kube-prometheus-stack
+      deployments.worker.metrics.annotations.owner: observability
     asserts:
       - equal:
           path: metadata.labels.release

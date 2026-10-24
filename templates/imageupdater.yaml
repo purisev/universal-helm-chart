@@ -9,13 +9,12 @@ kind: ImageUpdater
 metadata:
   name: {{ .Values.integrations.argocd.imageUpdater.name | default (include "uhc.fullname" .) }}
   namespace: {{ .Values.integrations.argocd.imageUpdater.namespace | default .Release.Namespace }}
-  {{- $meta := include "uhc.customMetadata" (dict "ctx" . "integration" "argocd" "entry" .Values.integrations.argocd.imageUpdater) | fromJson }}
-  {{- $lbls := include "uhc.labelsWithExtra" (dict "ctx" . "extra" $meta.labels) }}
+  {{- $lbls := include "uhc.labelsWithExtra" (dict "ctx" . "extra" (.Values.integrations.argocd.imageUpdater.labels | default dict)) }}
   {{- if $lbls }}
   labels:
     {{- $lbls | nindent 4 }}
   {{- end }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "imageUpdater" "extra" $meta.annotations) }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" . "kind" "imageUpdater" "extra" (.Values.integrations.argocd.imageUpdater.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

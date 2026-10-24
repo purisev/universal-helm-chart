@@ -249,26 +249,17 @@ tests:
       - failedTemplate:
           errorPattern: "manual mode .* and shorthand mode .* are mutually exclusive"
 
-  # --- integrations.argocd.customize and imageUpdater labels ---
+  # --- labels ---
 
-  - it: should render integrations.argocd.customize and imageUpdater labels and annotations, imageUpdater first
+  - it: should render imageUpdater labels over commonLabels
     set:
+      commonLabels.team: platform
       integrations.argocd.imageUpdater.enabled: true
-      integrations.argocd.customize.labels.team: delivery
-      integrations.argocd.customize.labels.scope: argocd
-      integrations.argocd.customize.annotations.owner: delivery-team
       integrations.argocd.imageUpdater.labels.team: images
-      integrations.argocd.imageUpdater.annotations.owner: images-team
     asserts:
       - equal:
           path: metadata.labels.team
           value: images
-      - equal:
-          path: metadata.labels.scope
-          value: argocd
-      - equal:
-          path: metadata.annotations.owner
-          value: images-team
 
   - it: should keep chart-managed labels over imageUpdater labels
     set:

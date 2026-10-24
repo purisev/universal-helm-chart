@@ -11,10 +11,9 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
-  {{- $meta := include "uhc.customMetadata" (dict "ctx" $ctx "integration" "keda") | fromJson }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" $meta.labels) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject" "extra" $meta.annotations) }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($wl.keda.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject" "extra" ($wl.keda.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}
@@ -71,10 +70,9 @@ apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
   name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
-  {{- $meta := include "uhc.customMetadata" (dict "ctx" $ctx "integration" "keda") | fromJson }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" $meta.labels) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject" "extra" $meta.annotations) }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($wl.keda.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject" "extra" ($wl.keda.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

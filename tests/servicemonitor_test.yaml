@@ -600,24 +600,61 @@ tests:
       - isKind:
           of: ServiceMonitor
 
-  # --- integrations.monitoring.customize ---
+  # --- metrics.labels and metrics.annotations ---
 
-  - it: should render integrations.monitoring.customize labels and annotations
+  - it: should render the workload's metrics labels and annotations on its ServiceMonitor only
     set:
       image.repository: nginx
       image.tag: alpine
       deployments.web.service.enabled: true
       deployments.web.service.port: 80
       deployments.web.metrics.enabled: true
-      integrations.monitoring.customize.labels.release: kube-prometheus-stack
-      integrations.monitoring.customize.annotations.owner: observability
+      deployments.web.metrics.labels.release: kube-prometheus-stack
+      deployments.web.metrics.annotations.owner: observability
+      deployments.api.service.enabled: true
+      deployments.api.service.port: 80
+      deployments.api.metrics.enabled: true
     asserts:
       - equal:
           path: metadata.labels.release
           value: kube-prometheus-stack
+        documentSelector:
+          path: metadata.name
+          value: test-release-universal-helm-chart-web-metrics
       - equal:
           path: metadata.annotations.owner
           value: observability
+        documentSelector:
+          path: metadata.name
+          value: test-release-universal-helm-chart-web-metrics
+      - notExists:
+          path: metadata.labels.release
+        documentSelector:
+          path: metadata.name
+          value: test-release-universal-helm-chart-api-metrics
+
+  - it: should keep chart-managed labels over metrics labels
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.metrics.enabled: true
+      deployments.web.metrics.labels.app\.kubernetes\.io/instance: hijack
+    asserts:
       - equal:
           path: metadata.labels["app.kubernetes.io/instance"]
           value: test-release-universal-helm-chart-web
+
+  - it: should render metrics labels on a StatefulSet's ServiceMonitor
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      statefulSets.db.service.enabled: true
+      statefulSets.db.service.port: 5432
+      statefulSets.db.metrics.enabled: true
+      statefulSets.db.metrics.labels.release: kube-prometheus-stack
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack

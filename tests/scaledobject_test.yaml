@@ -378,14 +378,14 @@ tests:
               metricType: Utilization
               metadata: {value: "60"}
 
-  # --- integrations.keda.customize ---
+  # --- keda.labels and keda.annotations ---
 
-  - it: should render integrations.keda.customize labels and annotations
+  - it: should render the workload's keda labels and annotations on its ScaledObject
     values:
       - fixtures/keda-deployment.yaml
     set:
-      integrations.keda.customize.labels.team: autoscaling
-      integrations.keda.customize.annotations.owner: autoscaling-team
+      deployments.worker.keda.labels.team: autoscaling
+      deployments.worker.keda.annotations.owner: autoscaling-team
     asserts:
       - equal:
           path: metadata.labels.team
@@ -393,3 +393,13 @@ tests:
       - equal:
           path: metadata.annotations.owner
           value: autoscaling-team
+
+  - it: should render keda labels on a StatefulSet's ScaledObject
+    values:
+      - fixtures/keda-statefulset.yaml
+    set:
+      statefulSets.cache.keda.labels.team: autoscaling
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling

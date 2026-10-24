@@ -491,14 +491,14 @@ tests:
       - failedTemplate:
           errorPattern: "origin Service for workload \"web\""
 
-  # --- integrations.keda.customize ---
+  # --- keda.labels and keda.annotations ---
 
-  - it: should render integrations.keda.customize labels and annotations
+  - it: should render the workload's keda labels and annotations on its InterceptorRoute
     values:
       - fixtures/keda-http.yaml
     set:
-      integrations.keda.customize.labels.team: autoscaling
-      integrations.keda.customize.annotations.owner: autoscaling-team
+      deployments.web.keda.labels.team: autoscaling
+      deployments.web.keda.annotations.owner: autoscaling-team
     asserts:
       - equal:
           path: metadata.labels.team
