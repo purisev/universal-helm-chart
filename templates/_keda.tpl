@@ -91,7 +91,7 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
 {{- end -}}
 {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) -}}
   {{- range $i, $rule := $wl.httpRoute.rules | default list -}}
-    {{- if and (not $rule.backendRefs) (not $rule.serviceName) $rule.servicePort (ne (int $rule.servicePort) $addonPort) -}}
+    {{- if and (not $rule.backendRefs) (not $rule.serviceName) $rule.servicePort (ne (int $rule.servicePort) $addonPort) (ne (include "uhc.httpRouteRuleRedirects" $rule) "true") -}}
       {{- fail (printf "%s.httpRoute.rules[%d].servicePort is %d, but with keda.http the rule goes to the interceptor, which listens on port %d. Remove servicePort or set it to %d." $path $i (int $rule.servicePort) $addonPort $addonPort) -}}
     {{- end -}}
   {{- end -}}

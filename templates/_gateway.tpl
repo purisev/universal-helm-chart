@@ -152,6 +152,22 @@ Input dict:
 {{- end }}
 
 {{/*
+uhc.httpRouteRuleRedirects
+Returns "true" when an HTTPRoute rule carries a RequestRedirect filter. Gateway API
+rejects such a rule when it has any backendRefs, so it renders with none.
+Params: the rule entry (map)
+*/}}
+{{- define "uhc.httpRouteRuleRedirects" -}}
+{{- $redirects := false -}}
+{{- range $f := .filters | default list -}}
+{{- if and (kindIs "map" $f) (or (eq (toString $f.type) "RequestRedirect") (hasKey $f "requestRedirect")) -}}
+{{- $redirects = true -}}
+{{- end -}}
+{{- end -}}
+{{- if $redirects -}}true{{- end -}}
+{{- end }}
+
+{{/*
 Renders a single HTTPRoute rule body (without the leading `-`). Centralises the
 field order — name, matches, filters, timeouts, retry, sessionPersistence,
 backendRefs — across the three render sites in httproute.yaml (root rules,
@@ -164,6 +180,10 @@ Input dict:
   defaultPort      — fallback backend port (int)
   defaultNamespace — (optional) namespace of defaultBackend; applies only while
                      rule.serviceName leaves the name to defaultBackend
+  path             — values path of the rule, for error messages
+
+A rule with a RequestRedirect filter renders without backendRefs and fails when it
+names a backend itself (backendRefs, serviceName or servicePort).
 
 Output is the joined rule fields as multi-line YAML with no leading or trailing
 newline. The caller wraps it under a list-item dash via the standard
@@ -197,12 +217,18 @@ the dash (e.g. `- name: foo` rather than an orphan dash on its own line).
 {{- include "uhc.assertGatewayApiSupportsSessionPersistence" $ctx -}}
 {{- $blocks = append $blocks (printf "sessionPersistence:\n%s" (toYaml $rule.sessionPersistence | indent 2 | trimSuffix "\n")) -}}
 {{- end -}}
+{{- if eq (include "uhc.httpRouteRuleRedirects" $rule) "true" -}}
+{{- if or $rule.backendRefs $rule.serviceName $rule.servicePort -}}
+{{- fail (printf "%s: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule." .path) -}}
+{{- end -}}
+{{- else -}}
 {{- $defaultRef := dict "name" ($rule.serviceName | default $defaultBackend) "port" ($rule.servicePort | default $defaultPort) -}}
 {{- if and .defaultNamespace (not $rule.serviceName) -}}
 {{- $_ := set $defaultRef "namespace" .defaultNamespace -}}
 {{- end -}}
 {{- $backendRefs := $rule.backendRefs | default (list $defaultRef) -}}
 {{- $blocks = append $blocks (printf "backendRefs:\n%s" (include "uhc.gatewayBackendRefs" $backendRefs | indent 2 | trimSuffix "\n")) -}}
+{{- end -}}
 {{- join "\n" $blocks -}}
 {{- end }}
 
