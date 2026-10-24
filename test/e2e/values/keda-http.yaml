@@ -5,6 +5,11 @@ fullnameOverride: e2e
 # workload Service on 80 once it resolves to the interceptor.
 integrations:
   keda:
+    customize:
+      labels:
+        e2e/scaler: keda
+      annotations:
+        e2e/owner: keda-http
     httpAddon:
       interceptorService: keda-add-ons-http-interceptor-proxy-80
       port: 80

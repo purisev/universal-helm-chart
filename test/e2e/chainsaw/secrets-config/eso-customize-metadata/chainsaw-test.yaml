@@ -1,0 +1,37 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: eso-customize-metadata
+spec:
+  steps:
+    - name: integrations.eso.customize lands on the SecretStore, which ESO still marks Ready
+      try:
+        - assert:
+            resource:
+              apiVersion: external-secrets.io/v1
+              kind: SecretStore
+              metadata:
+                name: e2e-vault-store
+                labels:
+                  e2e/source: vault
+                  app.kubernetes.io/instance: e2e-vault-store
+                annotations:
+                  e2e/owner: secrets-config
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"
+    - name: an externalSecrets entry's label wins over customize, and the secret still syncs
+      try:
+        - assert:
+            resource:
+              apiVersion: external-secrets.io/v1
+              kind: ExternalSecret
+              metadata:
+                name: e2e-app-secrets
+                labels:
+                  e2e/source: vault-app
+                annotations:
+                  e2e/owner: secrets-config
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"

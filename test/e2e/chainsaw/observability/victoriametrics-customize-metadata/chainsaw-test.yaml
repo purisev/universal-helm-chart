@@ -1,0 +1,34 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: victoriametrics-customize-metadata
+spec:
+  steps:
+    # The scraper selects on e2e-scrape=selected (see the e2e workflow and
+    # test/e2e/values/observability.yaml), so victoriametrics-targets-up and
+    # victoriametrics-podmonitor-scrape passing proves the label is what got the objects
+    # discovered. This step pins the label and annotation on the objects.
+    - name: integrations.monitoring.customize lands on the scrape objects
+      try:
+        - assert:
+            resource:
+              apiVersion: operator.victoriametrics.com/v1beta1
+              kind: VMServiceScrape
+              metadata:
+                name: e2e-api-metrics
+                labels:
+                  e2e-scrape: selected
+                  app.kubernetes.io/instance: e2e-api
+                annotations:
+                  e2e/owner: observability
+        - assert:
+            resource:
+              apiVersion: operator.victoriametrics.com/v1beta1
+              kind: VMPodScrape
+              metadata:
+                name: e2e-api-pod-metrics
+                labels:
+                  e2e-scrape: selected
+                  app.kubernetes.io/instance: e2e-api-pod
+                annotations:
+                  e2e/owner: observability

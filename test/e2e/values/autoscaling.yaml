@@ -1,5 +1,13 @@
 fullnameOverride: e2e
 
+integrations:
+  keda:
+    customize:
+      labels:
+        e2e/scaler: keda
+      annotations:
+        e2e/owner: autoscaling
+
 deployments:
   hpa-demo:
     image:

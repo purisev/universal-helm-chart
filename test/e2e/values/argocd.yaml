@@ -63,8 +63,13 @@ deployments:
 
 integrations:
   argocd:
+    customize:
+      labels:
+        e2e/delivery: argocd
     imageUpdater:
       enabled: true
+      annotations:
+        e2e/owner: argocd
       # argocd-image-updater only matches Applications living in the same
       # namespace as the ImageUpdater CR itself; our Application (applied
       # as a fixture, not rendered by this chart) lives in argocd, not in

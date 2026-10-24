@@ -1,0 +1,35 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: customize-metadata
+spec:
+  steps:
+    - name: integrations.keda.customize lands on the InterceptorRoute and the ExternalName Service, not on the origin Service
+      try:
+        - assert:
+            resource:
+              apiVersion: http.keda.sh/v1beta1
+              kind: InterceptorRoute
+              metadata:
+                name: e2e-web
+                labels:
+                  e2e/scaler: keda
+                annotations:
+                  e2e/owner: keda-http
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web
+                labels:
+                  e2e/scaler: keda
+              spec:
+                type: ExternalName
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web-origin
+                (labels."e2e/scaler" == null): true

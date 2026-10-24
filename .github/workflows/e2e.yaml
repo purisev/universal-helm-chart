@@ -648,8 +648,8 @@ jobs:
             --set alertmanager.enabled=false \
             --set nodeExporter.enabled=false \
             --set kubeStateMetrics.enabled=false \
-            --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
-            --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+            --set prometheus.prometheusSpec.serviceMonitorSelector.matchLabels.e2e-scrape=selected \
+            --set prometheus.prometheusSpec.podMonitorSelector.matchLabels.e2e-scrape=selected \
             --wait --timeout 3m
 
           # --wait above only waits for the operator Deployment itself; the

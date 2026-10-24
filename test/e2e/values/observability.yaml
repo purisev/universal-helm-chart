@@ -2,6 +2,13 @@ fullnameOverride: e2e
 
 integrations:
   monitoring:
+    # Prometheus and VMAgent select scrape objects by this label, so every
+    # *-targets-up / *-podmonitor-scrape scenario depends on it reaching them.
+    customize:
+      labels:
+        e2e-scrape: selected
+      annotations:
+        e2e/owner: observability
     defaults:
       enabled: true
       # Overridden with --set for the VictoriaMetrics leg of the matrix.
