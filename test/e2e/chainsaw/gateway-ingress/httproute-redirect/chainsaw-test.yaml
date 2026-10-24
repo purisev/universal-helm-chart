@@ -23,13 +23,24 @@ spec:
     - name: agentgateway answers with the redirect itself
       try:
         - apply:
-            file: ../_shared/prober-pod.yaml
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: redirect-prober
+              spec:
+                restartPolicy: Never
+                terminationGracePeriodSeconds: 1
+                containers:
+                  - name: curl
+                    image: curlimages/curl:8.11.0
+                    command: ["sleep", "3600"]
         - assert:
             resource:
               apiVersion: v1
               kind: Pod
               metadata:
-                name: prober
+                name: redirect-prober
               status:
                 phase: Running
         - script:
@@ -39,14 +50,19 @@ spec:
               GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
                 -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
                 -o jsonpath='{.items[0].metadata.name}')
-              # Raw request through nc: busybox wget would follow the redirect.
+              # curl does not follow redirects unless told to, so -i shows the
+              # gateway's own 301. Retried while the route reaches the data plane.
+              for i in $(seq 1 15); do
+                RESP=$(kubectl exec redirect-prober -n "$NAMESPACE" -- \
+                  curl -sSi --max-time 5 -H "Host: redirect.e2e.local" \
+                  "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/path" 2>&1 || true)
+                echo "$RESP" | grep -q ' 301' && break
+                sleep 2
+              done
               # Lowercased, since header-name case differs between gateways.
-              kubectl exec prober -n "$NAMESPACE" -- sh -c \
-                "printf 'GET /path HTTP/1.1\r\nHost: redirect.e2e.local\r\nConnection: close\r\n\r\n' \
-                | nc -w 5 ${GW_SVC}.${NAMESPACE}.svc.cluster.local 80" \
-                | tr '[:upper:]' '[:lower:]'
+              echo "$RESP" | tr '[:upper:]' '[:lower:]'
             check:
               ($error): ~
-              (contains($stdout, ' 301 ')): true
+              (contains($stdout, ' 301')): true
               "(contains($stdout, 'location: http://httproute.e2e.local'))": true
               (contains($stdout, '/path')): true
