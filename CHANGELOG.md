@@ -12,6 +12,7 @@ What each release adds, changes and fixes. Values-file edits an upgrade may need
 
 ### Fixed
 
+- An HTTPRoute rule with a `RequestRedirect` filter renders without `backendRefs`, which Gateway API requires; a redirect rule that names a backend fails the render.
 - A `keda` or `hpa` block without `enabled: true` drops `spec.replicas` from the Deployment or StatefulSet, as it already rendered the ScaledObject or HPA.
 
 ## 3.3.0 - 2026-10-04

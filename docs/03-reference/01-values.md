@@ -295,6 +295,30 @@ All four field groups are optional and independently combinable — you can set 
 
 > **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only the fields above plus `matches`, `filters`, `backendRefs`, `serviceName`, and `servicePort`. Unknown keys (typos, deprecated fields, or Gateway API fields not yet wired into the chart) fail at `helm template` time with a clear validation error rather than being silently dropped. If you depend on a Gateway API HTTPRouteRule field not in this list, open an issue or submit a PR — see [ADR 009](../05-adr/009-dual-networking-stack.md).
 
+#### Redirect rules
+
+Gateway API rejects a rule that has a `RequestRedirect` filter and any `backendRefs`. Such a rule renders without `backendRefs`: the default backend is not filled in, and `backendRefs: []` stays empty. A redirect rule that names a backend itself, through `backendRefs`, `serviceName` or `servicePort`, fails the render:
+
+```
+httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule.
+```
+
+```yaml
+httpRoutes:
+  http-to-https:
+    parentRefs:
+      - name: public-gw
+        sectionName: http
+    rules:
+      - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+```
+
+GRPCRoute has no redirect filter and TLSRoute no filters, so their rules always get a backend.
+
 #### Gateway API channel and version requirements
 
 The chart's CRD-channel detection runs at template time when `gateway.networking.k8s.io/v1` is present in `Capabilities.APIVersions` and emits a fail-fast error if the field's required CRD channel is missing. Detection is skipped when rendering offline (`helm template` without `--api-versions`).
