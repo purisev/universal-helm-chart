@@ -1257,6 +1257,47 @@ tests:
           value:
             - {group: "", kind: Service, name: other, port: 81, weight: 1}
 
+  - it: should send a keda.http rule on a direct port to that port's own Service
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: PathPrefix, value: /events}}]
+          servicePort: 9000
+        - matches: [{path: {type: PathPrefix, value: /}}]
+        - {serviceName: elsewhere, servicePort: 9000}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web-events, port: 9000, weight: 1}
+      - equal:
+          path: spec.rules[1].backendRefs
+          value:
+            - {group: "", kind: Service, name: keda-add-ons-http-interceptor-proxy, namespace: keda, port: 8080, weight: 1}
+      - equal:
+          path: spec.rules[2].backendRefs
+          value:
+            - {group: "", kind: Service, name: elsewhere, port: 9000, weight: 1}
+
+  - it: should keep a direct port's rule on the workload Service when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.enabled: false
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web, port: 9000, weight: 1}
+
   - it: should keep the workload Service as backend when keda.http is disabled
     values:
       - fixtures/keda-http.yaml

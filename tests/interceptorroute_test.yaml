@@ -345,7 +345,7 @@ tests:
       deployments.web.service.ports.admin: {port: 8081}
     asserts:
       - failedTemplate:
-          errorMessage: "deployments.web.keda.http: service.ports.admin, service.ports.grpc would resolve to the interceptor too, which serves only the http port. Keep http and metrics on this Service and remove the others."
+          errorMessage: "deployments.web.keda.http: service.ports.admin, service.ports.grpc would resolve to the interceptor too, which serves only the http port. List them in keda.http.directPorts to serve them from a Service of their own, past the interceptor, or remove them."
 
   - it: should accept a metrics port next to http
     values:
@@ -355,6 +355,86 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
+
+  - it: should accept ports listed in keda.http.directPorts
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.service.ports.metrics: {port: 9090}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when service.ports carries a port that directPorts does not list
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.service.ports.admin: {port: 8081}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http: service.ports.admin would resolve to the interceptor too, which serves only the http port. List them in keda.http.directPorts to serve them from a Service of their own, past the interceptor, or remove them."
+
+  - it: should fail when directPorts lists http
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.directPorts: [http]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists http, which stays on the workload Service: http goes through the interceptor and metrics is scraped from pod IPs. Remove it from directPorts."
+
+  - it: should fail when directPorts lists metrics
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.metrics: {port: 9090}
+      deployments.web.keda.http.directPorts: [metrics]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists metrics, which stays on the workload Service: http goes through the interceptor and metrics is scraped from pod IPs. Remove it from directPorts."
+
+  - it: should fail when directPorts lists a port service.ports does not declare
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists events, but service.ports has no events entry. Declare the port under service.ports or remove it from directPorts."
+
+  - it: should fail when directPorts is set on a single-port Service
+    set:
+      fullnameOverride: app
+      image: {repository: nginx, tag: v1.0.0}
+      deployments.web.service: {targetPort: 3000}
+      deployments.web.keda: {maxReplicas: 5, http: {directPorts: [events]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists events, but service.ports has no events entry. Declare the port under service.ports or remove it from directPorts."
+
+  - it: should fail when a direct port uses the interceptor port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 8080}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts: service.ports.events uses port 8080, the interceptor port, so a route or Ingress path on that port could mean either. Give it another port."
+
+  - it: should take a direct port's number from targetPort when port is unset
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {targetPort: 8080}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts: service.ports.events uses port 8080, the interceptor port, so a route or Ingress path on that port could mean either. Give it another port."
 
   - it: should fail when service.ports.http.port differs from the interceptor port
     values:
@@ -428,7 +508,7 @@ tests:
       deployments.web.httpRoute.rules: [{servicePort: 80}]
     asserts:
       - failedTemplate:
-          errorMessage: "deployments.web.httpRoute.rules[0].servicePort is 80, but with keda.http the rule goes to the interceptor, which listens on port 8080. Remove servicePort or set it to 8080."
+          errorMessage: "deployments.web.httpRoute.rules[0].servicePort is 80, but with keda.http the rule goes to the interceptor, which listens on port 8080. Remove servicePort or set it to 8080; the port of a service.ports entry listed in keda.http.directPorts goes to that entry's own Service."
 
   - it: should accept an httpRoute rule that names its own backend
     values:
@@ -442,6 +522,58 @@ tests:
     asserts:
       - hasDocuments:
           count: 1
+
+  - it: should accept an httpRoute rule on a direct port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when an Ingress path reaches a direct port through the Service name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /events, serviceName: app-web, servicePort: 9000}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingress.hosts.web.example.com.paths[0] sends traffic to Service \"app-web\" on port 9000, but deployments.web.keda.http serves that port from Service \"app-web-events\". Set serviceName to \"app-web-events\"."
+
+  - it: should leave an Ingress path to a direct port's own Service out of the hosts
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      ingress.enabled: true
+      ingress.hosts:
+        events.example.com:
+          paths: [{path: /, serviceName: app-web-events, servicePort: 9000}]
+    asserts:
+      - notContains:
+          path: spec.rules[0].hosts
+          content: events.example.com
+
+  - it: should fail when a direct port's Service name exceeds 63 characters
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.nameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      deployments.web.service.ports.notifications: {port: 9000}
+      deployments.web.keda.http.directPorts: [notifications]
+    asserts:
+      - failedTemplate:
+          errorPattern: "Service for keda.http.directPorts entry \"notifications\""
 
   - it: should fail when an Ingress path reaches the Service on another port
     values:
