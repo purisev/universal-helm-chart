@@ -892,6 +892,36 @@ deployments:
       limits:
         memory: 128Mi
 
+  # --- dashboard: scales to zero on HTTP through the KEDA HTTP add-on ---
+  # Features: keda.http, a second Service port served past the interceptor
+  dashboard:
+    image:
+      repository: ghcr.io/example/dashboard
+      tag: v1.4.0
+
+    service:
+      ports:
+        http:
+          targetPort: 3000              # port defaults to integrations.keda.httpAddon.port
+        events:
+          port: 9000
+
+    keda:
+      maxReplicas: 5
+      http:
+        enabled: true
+        # events gets a Service of its own, <svc>-events, selecting the pods
+        # directly. Its traffic is not counted and does not wake the workload
+        # from zero.
+        directPorts: [events]
+
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
 # ---------------------------------------------------------------------------
 # StatefulSets
 # ---------------------------------------------------------------------------
