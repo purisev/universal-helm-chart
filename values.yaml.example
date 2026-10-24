@@ -893,7 +893,8 @@ deployments:
         memory: 128Mi
 
   # --- dashboard: scales to zero on HTTP through the KEDA HTTP add-on ---
-  # Features: keda.http, a second Service port served past the interceptor
+  # Features: keda.http, a Service port served past the interceptor and one
+  #           reached through it by path
   dashboard:
     image:
       repository: ghcr.io/example/dashboard
@@ -905,6 +906,8 @@ deployments:
           targetPort: 3000              # port defaults to integrations.keda.httpAddon.port
         events:
           port: 9000
+        live:
+          port: 9100
 
     keda:
       maxReplicas: 5
@@ -914,6 +917,15 @@ deployments:
         # directly. Its traffic is not counted and does not wake the workload
         # from zero.
         directPorts: [events]
+        # Requests to /live go through the interceptor to port 9100 under an
+        # InterceptorRoute of their own, which wakes the workload and scales it
+        # on its own metric. Each open connection counts while it lasts.
+        routes:
+          live:
+            paths: [/live]
+            scalingMetric:
+              concurrency:
+                targetValue: 1000
 
     resources:
       requests:
