@@ -29,6 +29,12 @@ deployments:
         cpu: 50m
         memory: 32Mi
 
+    metrics:
+      labels:
+        e2e/scrape: api
+      annotations:
+        e2e/owner: observability
+
   # Same target, but discovered via prometheus.io/* Service annotations
   # instead of a ServiceMonitor/VMServiceScrape CRD object.
   api-annotations:
@@ -76,3 +82,7 @@ deployments:
     metrics:
       enabled: true
       type: pod
+      labels:
+        e2e/scrape: api-pod
+      annotations:
+        e2e/owner: observability

@@ -80,6 +80,8 @@ integrations:
       api-secrets:
         enabled: true
         secretStore: vault
+        labels:
+          team: api
         refreshInterval: 1h
         targetName: api-secrets
         data:
@@ -198,6 +200,10 @@ configMaps:
   app-config:
     enabled: true
     mountPath: /etc/app
+    labels:
+      config-kind: logging
+    annotations:
+      owner: api-team
     data:
       logging.yaml: |
         level: info

@@ -818,3 +818,46 @@ tests:
       - equal:
           path: spec.template.spec.topologySpreadConstraints[0].nodeTaintsPolicy
           value: Honor
+
+  - it: should not render replicas when a keda block is defined without an enabled flag
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.replicaCount: 3
+      statefulSets.redis.keda.maxReplicas: 5
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: should not render replicas when an hpa block is defined without an enabled flag
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.replicaCount: 3
+      statefulSets.redis.hpa.maxReplicas: 5
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: should render replicas when keda and hpa are both disabled
+    set:
+      image.repository: redis
+      image.tag: alpine
+      statefulSets.redis.replicaCount: 3
+      statefulSets.redis.keda: {enabled: false, maxReplicas: 5}
+      statefulSets.redis.hpa: {enabled: false, maxReplicas: 5}
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should keep the container port of a keda.http.directPorts entry
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, events: {port: 9000, targetPort: 9001}}}
+      statefulSets.cache.keda.http.directPorts: [events]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content: {name: events, containerPort: 9001, protocol: TCP}

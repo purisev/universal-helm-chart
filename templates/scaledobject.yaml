@@ -12,8 +12,8 @@ kind: ScaledObject
 metadata:
   name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject") }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($wl.keda.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject" "extra" ($wl.keda.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}
@@ -22,14 +22,21 @@ spec:
     name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
     kind: Deployment
     envSourceContainerName: {{ $wlName }}
-  {{- $minReplicas := 1 }}
+  {{- $http := eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
+  {{- /* Scale to zero is what the HTTP add-on is for: the interceptor holds the first
+     request while KEDA starts a pod, so keda.http lowers the default floor to 0. */ -}}
+  {{- $minReplicas := ternary 0 1 $http }}
   {{- if hasKey $wl.keda "minReplicas" }}
   {{- $minReplicas = $wl.keda.minReplicas }}
   {{- end }}
   minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "deployments.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
+    {{- if $http }}
+    {{- include "uhc.kedaHttpTriggers" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | nindent 4 }}
+    {{- else }}
     {{- toYaml $wl.keda.triggers | nindent 4 }}
+    {{- end }}
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}
@@ -62,8 +69,8 @@ kind: ScaledObject
 metadata:
   name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject") }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($wl.keda.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "scaledObject" "extra" ($wl.keda.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}
@@ -72,14 +79,21 @@ spec:
     name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
     kind: StatefulSet
     envSourceContainerName: {{ $wlName }}
-  {{- $minReplicas := 1 }}
+  {{- $http := eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
+  {{- /* Scale to zero is what the HTTP add-on is for: the interceptor holds the first
+     request while KEDA starts a pod, so keda.http lowers the default floor to 0. */ -}}
+  {{- $minReplicas := ternary 0 1 $http }}
   {{- if hasKey $wl.keda "minReplicas" }}
   {{- $minReplicas = $wl.keda.minReplicas }}
   {{- end }}
   minReplicaCount: {{ $minReplicas }}
   maxReplicaCount: {{ required (printf "statefulSets.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
+    {{- if $http }}
+    {{- include "uhc.kedaHttpTriggers" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | nindent 4 }}
+    {{- else }}
     {{- toYaml $wl.keda.triggers | nindent 4 }}
+    {{- end }}
   {{- if $wl.keda.pollingInterval }}
   pollingInterval: {{ $wl.keda.pollingInterval }}
   {{- end }}

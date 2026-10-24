@@ -1,0 +1,19 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: keda-metadata
+spec:
+  steps:
+    - name: the workload's keda labels and annotations land on its ScaledObject
+      try:
+        - assert:
+            resource:
+              apiVersion: keda.sh/v1alpha1
+              kind: ScaledObject
+              metadata:
+                name: e2e-keda-demo
+                labels:
+                  e2e/scaler: keda
+                  app.kubernetes.io/instance: e2e-keda-demo
+                annotations:
+                  e2e/owner: autoscaling

@@ -1,0 +1,68 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-redirect
+spec:
+  steps:
+    - name: the API and the Gateway accept a redirect rule without backendRefs
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: e2e-redirect
+              spec:
+                rules:
+                  - (backendRefs == null): true
+                    filters:
+                      - type: RequestRedirect
+              status:
+                (parents[0].conditions[?type == 'Accepted']):
+                  - status: "True"
+    - name: agentgateway answers with the redirect itself
+      try:
+        - apply:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: redirect-prober
+              spec:
+                restartPolicy: Never
+                terminationGracePeriodSeconds: 1
+                containers:
+                  - name: curl
+                    image: curlimages/curl:8.11.0
+                    command: ["sleep", "3600"]
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: redirect-prober
+              status:
+                phase: Running
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              # curl does not follow redirects unless told to, so -i shows the
+              # gateway's own 301. Retried while the route reaches the data plane.
+              for i in $(seq 1 15); do
+                RESP=$(kubectl exec redirect-prober -n "$NAMESPACE" -- \
+                  curl -sSi --max-time 5 -H "Host: redirect.e2e.local" \
+                  "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/path" 2>&1 || true)
+                echo "$RESP" | grep -q ' 301' && break
+                sleep 2
+              done
+              # Lowercased, since header-name case differs between gateways.
+              echo "$RESP" | tr '[:upper:]' '[:lower:]'
+            check:
+              ($error): ~
+              (contains($stdout, ' 301')): true
+              "(contains($stdout, 'location: http://httproute.e2e.local'))": true
+              (contains($stdout, '/path')): true

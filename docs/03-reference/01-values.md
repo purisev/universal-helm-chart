@@ -16,7 +16,7 @@ For the schema's machine-checkable shape, see [`02-schema.md`](02-schema.md). Fo
 | Job groups | `jobGroups` | [ADR 005](../05-adr/005-jobgroups-unification.md) · [ADR 012](../05-adr/012-job-spec-hashing-for-idempotency.md) · [`02-examples/05-cronjobs/`](../02-examples/05-cronjobs/) |
 | Networking — Ingress | `ingress` (`hosts`, `tls` as native k8s list, `defaultBackend`), `ingresses` | [ADR 009](../05-adr/009-dual-networking-stack.md) · [`02-examples/02-web-app-ingress/`](../02-examples/02-web-app-ingress/) |
 | Networking — Gateway API | `httpRoute`, `httpRoutes`, `grpcRoute`, `grpcRoutes`, `tlsRoute`, `tlsRoutes`, `referenceGrant`, `referenceGrants` | [ADR 009](../05-adr/009-dual-networking-stack.md) · [`02-examples/04-gateway-api/`](../02-examples/04-gateway-api/) |
-| Autoscaling | per-workload `hpa`, `keda`, `verticalPodAutoscaler` | [ADR 007](../05-adr/007-autoscaler-mutual-exclusion.md) · [`02-examples/08-keda-event-driven/`](../02-examples/08-keda-event-driven/) |
+| Autoscaling | per-workload `hpa`, `keda` (incl. `keda.http`), `verticalPodAutoscaler`, `integrations.keda.httpAddon` | [ADR 007](../05-adr/007-autoscaler-mutual-exclusion.md) · [`02-examples/08-keda-event-driven/`](../02-examples/08-keda-event-driven/) |
 | Monitoring | `integrations.monitoring.defaults`, per-workload `metrics`, auto-exposed metrics port | [ADR 008](../05-adr/008-multi-provider-monitoring.md) · [ADR 016](../05-adr/016-metrics-port-auto-exposure.md) · [`02-examples/06-monitoring/`](../02-examples/06-monitoring/) |
 | Secrets (ESO) | `integrations.eso.enabled`, `integrations.eso.secretStores`, `integrations.eso.externalSecrets` | [ADR 015](../05-adr/015-eso-data-vs-datafrom.md) · [`02-examples/07-external-secrets/`](../02-examples/07-external-secrets/) |
 | Identity & RBAC | `serviceAccount` (`create` defaults to `true`), `rbac` (`enabled`, `clusterScoped`, `rules`), `automountServiceAccountToken` | [`02-examples/07-external-secrets/`](../02-examples/07-external-secrets/) |
@@ -48,6 +48,36 @@ Per-workload opt-out: `inherit.env.{global,root}: false` (skip env layers), `inh
 - `labels.standard.{partOf,version,managedBy,enabled}` toggles affect singletons (ServiceAccount, Ingress, Routes, etc.) but not workload selectors.
 
 See [ADR 011](../05-adr/011-standard-wins-labels-and-invariant-selectors.md).
+
+### Labels and annotations on generated resources
+
+These keys take `labels` and `annotations` for the resources rendered from them:
+
+| Key | Resources |
+|---|---|
+| `configMaps.<key>` | its ConfigMap |
+| `integrations.eso.secretStores.<key>` | its SecretStore / ClusterSecretStore |
+| `integrations.eso.externalSecrets.<key>` | its ExternalSecret |
+| `integrations.argocd.imageUpdater` | the ImageUpdater (`annotations` and `labels`) |
+| `deployments.<name>.metrics`, `statefulSets.<name>.metrics` | the workload's ServiceMonitor, PodMonitor, VMServiceScrape or VMPodScrape |
+| `deployments.<name>.keda`, `statefulSets.<name>.keda` | the workload's ScaledObject and, with `keda.http`, its InterceptorRoute |
+
+Labels resolve as `commonLabels` → the key's `labels` → chart-managed `app.kubernetes.io/*`, last wins, so a chart-managed key cannot be shadowed. Annotations resolve as `commonAnnotations` → Reloader → sync-wave → the key's `annotations`, last wins.
+
+`metrics.labels` and `keda.labels` are fields of their blocks like any other: writing either one defines the block, which turns metrics or KEDA on for that workload unless the block also sets `enabled: false`.
+
+```yaml
+deployments:
+  web:
+    metrics:
+      labels:
+        release: kube-prometheus-stack
+configMaps:
+  app-config:
+    labels:
+      config-kind: logging
+    data: { ... }
+```
 
 ### Port ordering inside Service / pod template
 
@@ -265,6 +295,30 @@ All four field groups are optional and independently combinable — you can set 
 
 > **Schema strictness.** Each rule entry is validated against a strict schema (`additionalProperties: false`) listing only the fields above plus `matches`, `filters`, `backendRefs`, `serviceName`, and `servicePort`. Unknown keys (typos, deprecated fields, or Gateway API fields not yet wired into the chart) fail at `helm template` time with a clear validation error rather than being silently dropped. If you depend on a Gateway API HTTPRouteRule field not in this list, open an issue or submit a PR — see [ADR 009](../05-adr/009-dual-networking-stack.md).
 
+#### Redirect rules
+
+Gateway API rejects a rule that has a `RequestRedirect` filter and any `backendRefs`. Such a rule renders without `backendRefs`: the default backend is not filled in, and `backendRefs: []` stays empty. A redirect rule that names a backend itself, through `backendRefs`, `serviceName` or `servicePort`, fails the render:
+
+```
+httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule.
+```
+
+```yaml
+httpRoutes:
+  http-to-https:
+    parentRefs:
+      - name: public-gw
+        sectionName: http
+    rules:
+      - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+```
+
+GRPCRoute has no redirect filter and TLSRoute no filters, so their rules always get a backend.
+
 #### Gateway API channel and version requirements
 
 The chart's CRD-channel detection runs at template time when `gateway.networking.k8s.io/v1` is present in `Capabilities.APIVersions` and emits a fail-fast error if the field's required CRD channel is missing. Detection is skipped when rendering offline (`helm template` without `--api-versions`).
@@ -356,6 +410,167 @@ deployments:
 `behavior` is the Kubernetes HPA scaling-behavior shape, applied to the HPA that KEDA creates. It is worth setting on a lag-driven trigger: the HPA default doubles the replica count every 15 seconds, which overshoots on a queue that drains quickly. The example above adds one pod a minute instead.
 
 Because nothing here is validated field by field, a typo inside `advanced` reaches the cluster and is rejected by the KEDA CRD rather than by `helm template`. Check the field names against the [ScaledObject spec](https://keda.sh/docs/latest/reference/scaledobject-spec/) for the KEDA version you run.
+
+### KEDA HTTP add-on (`keda.http`)
+
+`keda.http` scales a Deployment or StatefulSet on HTTP traffic, down to zero, through the [KEDA HTTP add-on](https://keda.sh/http-add-on/latest/) (v0.14.0 or later, which serves `InterceptorRoute`). The add-on runs an interceptor in front of the workload: it counts requests, holds the first one while KEDA starts a pod, and forwards to the pod once it is ready.
+
+```yaml
+deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+    keda:
+      maxReplicas: 10
+      http:
+        enabled: true
+```
+
+Callers keep using the workload's Service name. The chart renders:
+
+| Object | Shape |
+|--------|-------|
+| Service `<svc>` | `ExternalName` for the interceptor Service, so in-cluster callers and Ingress backends reach the interceptor under the name they already use. |
+| Service `<svc>-origin` | The Service built from `service`, selecting the pods. The interceptor forwards here, and the metrics port and `prometheus.io/*` annotations stay here. |
+| Service `<svc>-<portName>` | One `ClusterIP` Service for each port listed in `keda.http.directPorts`, selecting the pods. See [Ports past the interceptor](#ports-past-the-interceptor). |
+| `InterceptorRoute` `<fullname>-<workload>` | `target` is the origin Service's `http` port. `hosts` hold `<svc>`, `<svc>.<ns>`, `<svc>.<ns>.svc`, `<svc>.<ns>.svc.<clusterDomain>`, the root `httpRoute.hostnames` when the workload has an `httpRoute`, the hosts of every Ingress path that names `<svc>`, and `keda.http.hosts`. |
+| `InterceptorRoute` `<fullname>-<workload>-<portName>` | One for each `keda.http.routes` entry: the same `hosts`, the entry's `paths`, and the origin Service's port of that name as `target`. See [Ports through the interceptor](#ports-through-the-interceptor). |
+| `ScaledObject` | An `external-push` trigger for the workload's route goes first in `triggers`, then one for each `routes` entry in name order; declared triggers follow. `minReplicaCount` defaults to `0`. |
+| HTTPRoute rules of the workload | Rules without `serviceName` or `backendRefs` point at the interceptor Service in the add-on namespace, or at `<svc>-<portName>` when their `servicePort` is the port of a `directPorts` entry. A rule whose `servicePort` is the port of a `routes` entry also points at the interceptor, on the interceptor port. |
+| NetworkPolicy of the workload | An ingress rule admitting the interceptor pods (`app.kubernetes.io/component: interceptor`, `app.kubernetes.io/name: http-add-on`) from the add-on namespace, whenever the policy covers `Ingress`. |
+
+`keda.http` takes these optional fields:
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `hosts` | `[]` | Extra host names for the route, evaluated through `tpl`. |
+| `directPorts` | `[]` | Names of `service.ports` entries served past the interceptor, each from a Service of its own. |
+| `routes` | `{}` | `service.ports` entries reached through the interceptor by path, keyed by port name. Each takes `paths` (required), and `scalingMetric`, `coldStart` and `timeouts` like the fields above. |
+| `scalingMetric` | `{concurrency: {targetValue: 100}}` | `InterceptorRoute.spec.scalingMetric`: `concurrency` and/or `requestRate`. |
+| `coldStart` | — | `InterceptorRoute.spec.coldStart`, passed through. |
+| `timeouts` | — | `InterceptorRoute.spec.timeouts`, passed through. |
+
+Where the add-on runs is set once per release under `integrations.keda.httpAddon`:
+
+| Field | Default | Meaning |
+|-------|---------|---------|
+| `namespace` | `keda` | Namespace of the add-on. |
+| `interceptorService` | `keda-add-ons-http-interceptor-proxy` | Interceptor Service the ExternalName and HTTPRoute rules point at. |
+| `port` | `8080` | Port of that Service. It is also the port of the workload Service's `http` entry. |
+| `scalerAddress` | `keda-add-ons-http-external-scaler.<namespace>:9090` | `scalerAddress` of the `external-push` trigger. |
+| `clusterDomain` | `cluster.local` | Domain of the fully qualified host and of the ExternalName target. |
+
+#### The client port
+
+An ExternalName is a DNS alias and cannot remap ports, so callers connect to the interceptor Service on the port they use for `<svc>`. The `http` port of a `keda.http` workload is therefore `integrations.keda.httpAddon.port`: left unset, it takes that value; set to anything else, the render fails. The interceptor itself listens on the port its own chart sets (`interceptor.proxy.port`, `8080`). For callers that stay on port 80, the platform adds a Service in the add-on namespace that serves the interceptor pods on 80, and the release points at it:
+
+```yaml
+# Platform, once per cluster, in the add-on namespace
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-add-ons-http-interceptor-proxy-80
+  namespace: keda
+spec:
+  selector:
+    app.kubernetes.io/component: interceptor
+    app.kubernetes.io/name: http-add-on
+  ports:
+    - name: proxy
+      port: 80
+      targetPort: proxy
+```
+
+```yaml
+# Release
+integrations:
+  keda:
+    httpAddon:
+      interceptorService: keda-add-ons-http-interceptor-proxy-80
+      port: 80
+```
+
+An HTTPRoute in the application namespace references the interceptor Service across namespaces, which needs a `ReferenceGrant` in the add-on namespace. The chart does not render it; the platform owns it.
+
+#### Ports past the interceptor
+
+The interceptor serves one HTTP port, so a workload with other ports on its Service lists them in `directPorts`. Each one leaves `<svc>` and gets a `ClusterIP` Service `<svc>-<portName>` that selects the pods directly:
+
+```yaml
+deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        events:
+          port: 9000
+    keda:
+      http:
+        enabled: true
+        directPorts: [events]
+```
+
+renders `<svc>` (ExternalName, `http`), `<svc>-origin` (`http`) and `<svc>-events` (`events`, port `9000`). Callers of the port, Ingress paths included, use `<svc>-events`. A workload `httpRoute` rule with `servicePort: 9000` and no backend of its own is sent there by the chart. With `keda.http` off, `directPorts` is ignored and the port stays on `<svc>`.
+
+The Service of a direct port carries the port's `protocol` and `appProtocol` and none of the `service` annotations or other `service` fields. `metrics` cannot be listed; it stays on `<svc>-origin` and is never added to a route.
+
+Traffic on a direct port does not pass the interceptor: it is not counted toward `scalingMetric`, and it does not start a workload scaled to zero. A port whose callers arrive only while the HTTP side keeps a pod running fits; a port that has to wake the workload by itself does not, unless `keda.minReplicas` is at least `1`. The workload's NetworkPolicy admits the interceptor only, so a policy that covers `Ingress` needs its own rule for the callers of a direct port.
+
+#### Ports through the interceptor
+
+A port listed under `routes` stays on `<svc>-origin` and gets an InterceptorRoute of its own. The interceptor listens on one port and picks a route by host and longest matching path across all routes, so requests to the entry's `paths` go to that port, and everything else to `http`:
+
+```yaml
+deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        stream:
+          port: 9100
+    keda:
+      http:
+        enabled: true
+        routes:
+          stream:
+            paths: [/stream]
+            scalingMetric:
+              concurrency:
+                targetValue: 1000
+```
+
+Callers keep using `<svc>` on the interceptor port: `http://<svc>/stream/...` reaches port `9100` of the pods, and `http://<svc>/` reaches `http`. Ingress paths do the same with `servicePort` set to the interceptor port. A workload `httpRoute` rule may say `servicePort: 9100`; the chart points it at the interceptor, and every path it matches has to lie under the entry's `paths`.
+
+Each route adds its own `external-push` trigger, so a request on a routed path counts toward scaling and starts a workload scaled to zero. The interceptor counts a request from its start to its end, and a WebSocket or long-poll request stays open for minutes: give its route a `scalingMetric` sized for open connections, or a few hundred idle clients look like a burst of load. While any such connection is open, the workload does not scale to zero. A long-poll route may also need `timeouts.responseHeader` above its poll interval.
+
+With `keda.http` off, `routes` is ignored and the port stays on `<svc>`.
+
+#### What the render rejects
+
+Every port of `<svc>` resolves to the interceptor, which serves one HTTP port. With `keda.http` on, the render fails when:
+
+- the workload renders no Service, or its `service.type` is not `ClusterIP`, or `service.clusterIP` is `None`;
+- `service.ports` has no `http` entry, or has entries other than `http`, `metrics` and those listed in `directPorts` or `routes`;
+- `directPorts` lists `http`, `metrics` or a name `service.ports` does not declare, or a listed port uses the interceptor port;
+- `routes` names `http`, `metrics`, a `directPorts` entry or a name `service.ports` does not declare, lists one path under two entries, or names a port that uses the interceptor port;
+- a workload HTTPRoute rule on the port of a `routes` entry matches a path outside that entry's `paths`, or by regular expression;
+- an InterceptorRoute name of a `routes` entry is also the route name of another workload;
+- the `http` port is set and differs from `integrations.keda.httpAddon.port`;
+- the workload has a `grpcRoute` or `tlsRoute`;
+- one of the workload's HTTPRoute rules sends to the interceptor with a `servicePort` other than the interceptor port;
+- an Ingress path names `<svc>` with a `servicePort` other than the interceptor port; for the port of a `directPorts` entry, the message names the Service to use instead, and for the port of a `routes` entry, the interceptor port;
+- the cluster serves `keda.sh/v1alpha1` without `http.keda.sh/v1beta1`.
+
+#### Limits
+
+- Ingress backends reach the interceptor through the ExternalName, so the Ingress controller has to support ExternalName Services (ingress-nginx does; Traefik needs `allowExternalNameServices`).
+- Only the workload's own `httpRoute` rules are redirected. A rule in the root `httpRoute.rules` or in `httpRoutes` that names `<svc>` keeps pointing at the ExternalName, which most Gateway implementations reject; point those at the interceptor Service explicitly.
+- Turning `keda.http` on or off changes the live `<svc>` between `ClusterIP` and `ExternalName`. The cluster IP is released on the way to ExternalName and a new one is allocated on the way back. Until cached DNS answers expire, callers keep reaching the previous target: after `keda.http` is turned off, a request that still resolves to the interceptor finds no route and is held until it times out.
+- `syncWaves.interceptorRoute` (default `20`) applies to the InterceptorRoute and to the ExternalName Service, so callers are switched over together with the route and before the ScaledObject (`21`).
 
 ### Scheduling field inheritance
 

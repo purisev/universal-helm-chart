@@ -248,3 +248,24 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "manual mode .* and shorthand mode .* are mutually exclusive"
+
+  # --- labels ---
+
+  - it: should render imageUpdater labels over commonLabels
+    set:
+      commonLabels.team: platform
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.labels.team: images
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: images
+
+  - it: should keep chart-managed labels over imageUpdater labels
+    set:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.labels.app\.kubernetes\.io/managed-by: someone-else
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm

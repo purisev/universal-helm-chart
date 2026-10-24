@@ -9,7 +9,7 @@ kind: ImageUpdater
 metadata:
   name: {{ .Values.integrations.argocd.imageUpdater.name | default (include "uhc.fullname" .) }}
   namespace: {{ .Values.integrations.argocd.imageUpdater.namespace | default .Release.Namespace }}
-  {{- $lbls := include "uhc.labels" . }}
+  {{- $lbls := include "uhc.labelsWithExtra" (dict "ctx" . "extra" (.Values.integrations.argocd.imageUpdater.labels | default dict)) }}
   {{- if $lbls }}
   labels:
     {{- $lbls | nindent 4 }}

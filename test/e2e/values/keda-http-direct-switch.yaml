@@ -1,0 +1,69 @@
+# A third release that starts without keda.http and carries a second Service
+# port. The direct-port-switch scenario upgrades it with keda.http and
+# directPorts on and back off, so the port moves between <svc> and
+# <svc>-events on the live cluster.
+fullnameOverride: e2e-dp
+
+integrations:
+  keda:
+    httpAddon:
+      interceptorService: keda-add-ons-http-interceptor-proxy-80
+      port: 80
+
+# Serves the stock page on 8080 and a page of its own on 8081.
+configMaps:
+  nginx-conf:
+    enabled: true
+    mountPath: /etc/nginx/conf.d
+    data:
+      default.conf: |
+        server {
+          listen 8080;
+          location / {
+            root /usr/share/nginx/html;
+            index index.html;
+          }
+        }
+      events.conf: |
+        server {
+          listen 8081;
+          location / {
+            default_type text/plain;
+            return 200 "events port\n";
+          }
+        }
+
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  app:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
+deployments:
+  app:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+    service:
+      ports:
+        http:
+          port: 80
+          targetPort: 8080
+        events:
+          port: 9000
+          targetPort: 8081
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi

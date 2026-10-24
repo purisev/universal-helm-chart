@@ -13,7 +13,7 @@ Two label requirements apply to every Kubernetes workload:
 Two label *sources* converge on each resource the chart renders:
 
 - **Chart-managed labels** — the `app.kubernetes.io/*` set the chart computes (`name`, `instance`, `version`, `managed-by`, `part-of`, `component`).
-- **User-supplied labels** — `commonLabels` plus per-feature annotation/label customisation under `integrations.<name>.customize.labels`.
+- **User-supplied labels** — `commonLabels` plus the `labels` a values entry sets for the resources rendered from it.
 
 Without explicit rules, two failure modes are easy to hit:
 
