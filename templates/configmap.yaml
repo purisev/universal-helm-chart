@@ -68,12 +68,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $cmFullName }}
-  {{- $lbls := include "uhc.labels" $ctx }}
+  {{- $lbls := include "uhc.labelsWithExtra" (dict "ctx" $ctx "extra" ($cm.labels | default dict)) }}
   {{- if $lbls }}
   labels:
     {{- $lbls | nindent 4 }}
   {{- end }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true) }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "configMap" "includeReloader" true "extra" ($cm.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

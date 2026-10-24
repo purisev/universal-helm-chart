@@ -1,0 +1,19 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: configmap-metadata
+spec:
+  steps:
+    - name: a configMaps entry's labels and annotations land on its ConfigMap
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: e2e-app-config
+                labels:
+                  e2e/config: app
+                  app.kubernetes.io/managed-by: Helm
+                annotations:
+                  e2e/owner: core-workloads

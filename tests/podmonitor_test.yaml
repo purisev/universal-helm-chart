@@ -379,3 +379,21 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  # --- metrics.labels and metrics.annotations ---
+
+  - it: should render the workload's metrics labels and annotations on its PodMonitor
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      deployments.worker.metrics.labels.release: kube-prometheus-stack
+      deployments.worker.metrics.annotations.owner: observability
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+      - equal:
+          path: metadata.annotations.owner
+          value: observability

@@ -385,3 +385,13 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "httpAddon/port': got string, want integer"
+
+  - it: should reject metrics.label (missing 's') under deployments.<name>
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      deployments.web.metrics.label.release: kps
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'label' not allowed"

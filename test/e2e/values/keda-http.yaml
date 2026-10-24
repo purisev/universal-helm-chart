@@ -79,6 +79,10 @@ deployments:
     keda:
       maxReplicas: 3
       pollingInterval: 5
+      labels:
+        e2e/scaler: keda
+      annotations:
+        e2e/owner: keda-http
       cooldownPeriod: 30
       http:
         scalingMetric:

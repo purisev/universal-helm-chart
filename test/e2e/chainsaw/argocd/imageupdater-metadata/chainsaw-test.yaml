@@ -1,0 +1,19 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: imageupdater-metadata
+spec:
+  steps:
+    - name: imageUpdater labels and annotations land on the ImageUpdater
+      try:
+        - assert:
+            resource:
+              apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+              kind: ImageUpdater
+              metadata:
+                name: e2e
+                namespace: argocd
+                labels:
+                  e2e/delivery: argocd
+                annotations:
+                  e2e/owner: argocd

@@ -184,3 +184,56 @@ tests:
       - equal:
           path: metadata.name
           value: test-release-universal-helm-chart-web-config
+
+  # --- per-entry labels and annotations ---
+
+  - it: should render a configMaps entry's labels over commonLabels
+    set:
+      commonLabels.team: platform
+      commonLabels.tier: shared
+      configMaps.app-config.data.key: value
+      configMaps.app-config.labels.tier: config
+    asserts:
+      - equal:
+          path: metadata.labels.tier
+          value: config
+      - equal:
+          path: metadata.labels.team
+          value: platform
+
+  - it: should keep chart-managed labels over a configMaps entry's labels
+    set:
+      configMaps.app-config.data.key: value
+      configMaps.app-config.labels.app\.kubernetes\.io/managed-by: someone-else
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm
+
+  - it: should render a configMaps entry's annotations over commonAnnotations
+    set:
+      commonAnnotations.owner: platform
+      configMaps.app-config.data.key: value
+      configMaps.app-config.annotations.owner: config-team
+      configMaps.app-config.annotations.note: hand-written
+    asserts:
+      - equal:
+          path: metadata.annotations.owner
+          value: config-team
+      - equal:
+          path: metadata.annotations.note
+          value: hand-written
+
+  - it: should keep a configMaps entry's labels off the other entries
+    set:
+      configMaps.a.data.key: value
+      configMaps.a.labels.only: a
+      configMaps.b.data.key: value
+    asserts:
+      - equal:
+          path: metadata.labels.only
+          value: a
+        documentIndex: 0
+      - notExists:
+          path: metadata.labels.only
+        documentIndex: 1

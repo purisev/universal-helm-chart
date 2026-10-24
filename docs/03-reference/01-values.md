@@ -49,6 +49,36 @@ Per-workload opt-out: `inherit.env.{global,root}: false` (skip env layers), `inh
 
 See [ADR 011](../05-adr/011-standard-wins-labels-and-invariant-selectors.md).
 
+### Labels and annotations on generated resources
+
+These keys take `labels` and `annotations` for the resources rendered from them:
+
+| Key | Resources |
+|---|---|
+| `configMaps.<key>` | its ConfigMap |
+| `integrations.eso.secretStores.<key>` | its SecretStore / ClusterSecretStore |
+| `integrations.eso.externalSecrets.<key>` | its ExternalSecret |
+| `integrations.argocd.imageUpdater` | the ImageUpdater (`annotations` and `labels`) |
+| `deployments.<name>.metrics`, `statefulSets.<name>.metrics` | the workload's ServiceMonitor, PodMonitor, VMServiceScrape or VMPodScrape |
+| `deployments.<name>.keda`, `statefulSets.<name>.keda` | the workload's ScaledObject and, with `keda.http`, its InterceptorRoute |
+
+Labels resolve as `commonLabels` → the key's `labels` → chart-managed `app.kubernetes.io/*`, last wins, so a chart-managed key cannot be shadowed. Annotations resolve as `commonAnnotations` → Reloader → sync-wave → the key's `annotations`, last wins.
+
+`metrics.labels` and `keda.labels` are fields of their blocks like any other: writing either one defines the block, which turns metrics or KEDA on for that workload unless the block also sets `enabled: false`.
+
+```yaml
+deployments:
+  web:
+    metrics:
+      labels:
+        release: kube-prometheus-stack
+configMaps:
+  app-config:
+    labels:
+      config-kind: logging
+    data: { ... }
+```
+
 ### Port ordering inside Service / pod template
 
 When a workload's `service.ports` (or per-container `ports`) is iterated:

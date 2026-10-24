@@ -17,8 +17,8 @@ kind: InterceptorRoute
 metadata:
   name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute") }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($wl.keda.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute" "extra" ($wl.keda.annotations | default dict)) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

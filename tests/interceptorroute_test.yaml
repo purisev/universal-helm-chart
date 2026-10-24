@@ -490,3 +490,19 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "origin Service for workload \"web\""
+
+  # --- keda.labels and keda.annotations ---
+
+  - it: should render the workload's keda labels and annotations on its InterceptorRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.labels.team: autoscaling
+      deployments.web.keda.annotations.owner: autoscaling-team
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling
+      - equal:
+          path: metadata.annotations.owner
+          value: autoscaling-team

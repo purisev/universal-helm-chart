@@ -49,6 +49,7 @@ integrations:
 
       name: ""
       namespace: ""
+      labels: {}
       annotations: {}
 
 

@@ -8,6 +8,7 @@ What each release adds, changes and fixes. Values-file edits an upgrade may need
 
 - `keda.http` scales a Deployment or StatefulSet on HTTP traffic, down to zero, through the KEDA HTTP add-on: an `InterceptorRoute`, an `external-push` trigger, an ExternalName in place of the workload Service with the original Service renamed `<svc>-origin`, HTTPRoute rules sent to the interceptor, and a NetworkPolicy rule admitting it. `integrations.keda.httpAddon` says where the add-on runs.
 - `integrations.argocd.syncWaves.interceptorRoute`.
+- `labels` and `annotations` on a values entry go onto the resources rendered from it. The [values reference](docs/03-reference/01-values.md#labels-and-annotations-on-generated-resources) lists the entries that take them.
 
 ### Fixed
 
