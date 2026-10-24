@@ -32,7 +32,7 @@ integrations:
       enabled: false                      # see ADR 008 / ADR 016
 ```
 
-The `customize.labels` and `customize.annotations` sub-blocks under each integration's resources allow users to inject extra metadata onto the resources that integration owns (e.g. add a Reloader strategy annotation onto a ConfigMap). This is the same shape across integrations.
+Labels and annotations for a resource the chart renders are set on the values entry that resource comes from, not in a separate per-integration block.
 
 ## Consequences
 
