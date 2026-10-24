@@ -377,6 +377,33 @@ tests:
       - failedTemplate:
           errorPattern: "directPorts': items at 0 and 1 are equal"
 
+  - it: should reject the root path in keda.http.routes
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.keda.http.routes: {stream: {paths: [/]}}
+    asserts:
+      - failedTemplate:
+          errorPattern: "'/' does not match pattern"
+
+  - it: should reject a keda.http.routes entry without paths
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.keda.http.routes: {stream: {scalingMetric: {}}}
+    asserts:
+      - failedTemplate:
+          errorPattern: "missing property 'paths'"
+
+  - it: should reject an unknown key under a keda.http.routes entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.keda.http.routes: {stream: {paths: [/stream], path: /x}}
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'path' not allowed"
+
   - it: should reject an unknown key under integrations.keda.httpAddon
     set:
       image.repository: nginx
