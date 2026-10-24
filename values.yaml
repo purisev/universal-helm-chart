@@ -19,6 +19,10 @@ integrations:
 
   argocd:
 
+    customize:
+      labels: {}
+      annotations: {}
+
     syncWaves:
       enabled: true
       serviceAccount: -30
@@ -49,6 +53,7 @@ integrations:
 
       name: ""
       namespace: ""
+      labels: {}
       annotations: {}
 
 
@@ -71,11 +76,19 @@ integrations:
   eso:
     enabled: true
 
+    customize:
+      labels: {}
+      annotations: {}
+
     secretStores: {}
 
     externalSecrets: {}
 
   keda:
+    customize:
+      labels: {}
+      annotations: {}
+
     httpAddon:
       namespace: keda
       interceptorService: keda-add-ons-http-interceptor-proxy
@@ -84,6 +97,10 @@ integrations:
       clusterDomain: cluster.local
 
   monitoring:
+    customize:
+      labels: {}
+      annotations: {}
+
     defaults:
       provider: prometheus
       discovery: crd

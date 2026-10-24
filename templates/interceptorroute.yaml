@@ -16,9 +16,10 @@ apiVersion: http.keda.sh/v1beta1
 kind: InterceptorRoute
 metadata:
   name: {{ include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName) }}
+  {{- $meta := include "uhc.customMetadata" (dict "ctx" $ctx "integration" "keda") | fromJson }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute") }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" $meta.labels) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute" "extra" $meta.annotations) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

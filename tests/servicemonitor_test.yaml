@@ -599,3 +599,25 @@ tests:
           count: 1
       - isKind:
           of: ServiceMonitor
+
+  # --- integrations.monitoring.customize ---
+
+  - it: should render integrations.monitoring.customize labels and annotations
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.metrics.enabled: true
+      integrations.monitoring.customize.labels.release: kube-prometheus-stack
+      integrations.monitoring.customize.annotations.owner: observability
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+      - equal:
+          path: metadata.annotations.owner
+          value: observability
+      - equal:
+          path: metadata.labels["app.kubernetes.io/instance"]
+          value: test-release-universal-helm-chart-web

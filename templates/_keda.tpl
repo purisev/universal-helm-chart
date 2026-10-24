@@ -174,9 +174,10 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "uhc.serviceName" . }}
+  {{- $meta := include "uhc.customMetadata" (dict "ctx" $ctx "integration" "keda") | fromJson }}
   labels:
-    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" .wlName) | nindent 4 }}
-  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute") }}
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" .wlName "extra" $meta.labels) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute" "extra" $meta.annotations) }}
   {{- if $annots }}
   {{- $annots | nindent 2 }}
   {{- end }}

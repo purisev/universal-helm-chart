@@ -248,3 +248,33 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "manual mode .* and shorthand mode .* are mutually exclusive"
+
+  # --- integrations.argocd.customize and imageUpdater labels ---
+
+  - it: should render integrations.argocd.customize and imageUpdater labels and annotations, imageUpdater first
+    set:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.customize.labels.team: delivery
+      integrations.argocd.customize.labels.scope: argocd
+      integrations.argocd.customize.annotations.owner: delivery-team
+      integrations.argocd.imageUpdater.labels.team: images
+      integrations.argocd.imageUpdater.annotations.owner: images-team
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: images
+      - equal:
+          path: metadata.labels.scope
+          value: argocd
+      - equal:
+          path: metadata.annotations.owner
+          value: images-team
+
+  - it: should keep chart-managed labels over imageUpdater labels
+    set:
+      integrations.argocd.imageUpdater.enabled: true
+      integrations.argocd.imageUpdater.labels.app\.kubernetes\.io/managed-by: someone-else
+    asserts:
+      - equal:
+          path: metadata.labels["app.kubernetes.io/managed-by"]
+          value: Helm

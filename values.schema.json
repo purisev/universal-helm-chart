@@ -474,11 +474,21 @@
         }
       }
     },
+    "customizeShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "labels": {"type": "object"},
+        "annotations": {"type": "object"}
+      }
+    },
     "esoSecretStoreEntry": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "labels": {"type": "object"},
+        "annotations": {"type": "object"},
         "kind": {"type": "string", "enum": ["SecretStore", "ClusterSecretStore"]},
         "provider": {
           "type": "object",
@@ -577,6 +587,8 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {"type": "boolean"},
+        "labels": {"type": "object"},
+        "annotations": {"type": "object"},
         "secretStore": {"type": "string"},
         "storeKind": {"type": "string", "enum": ["SecretStore", "ClusterSecretStore"]},
         "refreshInterval": {"type": "string"},
@@ -919,6 +931,8 @@
         "mountPath": {"type": "string"},
         "readOnly": {"type": "boolean"},
         "defaultMode": {"type": ["integer", "string"]},
+        "labels": {"type": "object"},
+        "annotations": {"type": "object"},
         "data": {"type": "object"}
       }
     },
@@ -1380,6 +1394,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "customize": {"$ref": "#/$defs/customizeShape"},
             "syncWaves": {
               "type": "object",
               "additionalProperties": false,
@@ -1416,6 +1431,7 @@
                 "enabled": { "type": "boolean" },
                 "name": { "type": "string" },
                 "namespace": { "type": "string" },
+                "labels": { "type": "object" },
                 "annotations": { "type": "object" },
                 "appNamePattern": { "type": "string" },
                 "commonUpdateSettings": { "type": "object" },
@@ -1448,6 +1464,7 @@
           "additionalProperties": false,
           "properties": {
             "enabled": { "type": "boolean" },
+            "customize": {"$ref": "#/$defs/customizeShape"},
             "secretStores": {
               "type": "object",
               "additionalProperties": {"$ref": "#/$defs/esoSecretStoreEntry"}
@@ -1462,6 +1479,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "customize": {"$ref": "#/$defs/customizeShape"},
             "httpAddon": {
               "type": "object",
               "additionalProperties": false,
@@ -1479,6 +1497,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
+            "customize": {"$ref": "#/$defs/customizeShape"},
             "defaults": {
               "type": "object",
               "additionalProperties": false,

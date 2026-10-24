@@ -1557,3 +1557,21 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: "Service name \"app-web-origin\" is claimed by both deployments.api.service and deployments.web.keda.http. Two Services cannot share a name in one namespace; give one of them a different service.nameOverride / headlessService.nameOverride."
+
+  - it: should render integrations.keda.customize on the keda.http ExternalName Service and not on the origin Service
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.customize.labels.team: autoscaling
+    asserts:
+      - notExists:
+          path: metadata.labels.team
+        documentIndex: 0
+      - equal:
+          path: spec.type
+          value: ExternalName
+        documentIndex: 1
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling
+        documentIndex: 1

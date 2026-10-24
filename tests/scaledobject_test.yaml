@@ -377,3 +377,19 @@ tests:
             - type: cpu
               metricType: Utilization
               metadata: {value: "60"}
+
+  # --- integrations.keda.customize ---
+
+  - it: should render integrations.keda.customize labels and annotations
+    values:
+      - fixtures/keda-deployment.yaml
+    set:
+      integrations.keda.customize.labels.team: autoscaling
+      integrations.keda.customize.annotations.owner: autoscaling-team
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling
+      - equal:
+          path: metadata.annotations.owner
+          value: autoscaling-team

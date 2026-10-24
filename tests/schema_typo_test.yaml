@@ -385,3 +385,13 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "httpAddon/port': got string, want integer"
+
+  - it: should reject customize.label (missing 's') under integrations.monitoring
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.enabled: true
+      integrations.monitoring.customize.label.release: kps
+    asserts:
+      - failedTemplate:
+          errorPattern: "additional properties 'label' not allowed"

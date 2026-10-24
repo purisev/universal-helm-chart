@@ -379,3 +379,21 @@ tests:
     asserts:
       - hasDocuments:
           count: 0
+
+  # --- integrations.monitoring.customize ---
+
+  - it: should render integrations.monitoring.customize labels and annotations
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.worker.metrics.enabled: true
+      deployments.worker.metrics.type: pod
+      integrations.monitoring.customize.labels.release: kube-prometheus-stack
+      integrations.monitoring.customize.annotations.owner: observability
+    asserts:
+      - equal:
+          path: metadata.labels.release
+          value: kube-prometheus-stack
+      - equal:
+          path: metadata.annotations.owner
+          value: observability
