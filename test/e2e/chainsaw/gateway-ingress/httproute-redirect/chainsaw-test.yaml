@@ -1,0 +1,52 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: httproute-redirect
+spec:
+  steps:
+    - name: the API and the Gateway accept a redirect rule without backendRefs
+      try:
+        - assert:
+            resource:
+              apiVersion: gateway.networking.k8s.io/v1
+              kind: HTTPRoute
+              metadata:
+                name: e2e-redirect
+              spec:
+                rules:
+                  - (backendRefs == null): true
+                    filters:
+                      - type: RequestRedirect
+              status:
+                (parents[0].conditions[?type == 'Accepted']):
+                  - status: "True"
+    - name: agentgateway answers with the redirect itself
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 60s
+            content: |
+              set -e
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              # Raw request through nc: busybox wget would follow the redirect.
+              # Lowercased, since header-name case differs between gateways.
+              kubectl exec prober -n "$NAMESPACE" -- sh -c \
+                "printf 'GET /path HTTP/1.1\r\nHost: redirect.e2e.local\r\nConnection: close\r\n\r\n' \
+                | nc -w 5 ${GW_SVC}.${NAMESPACE}.svc.cluster.local 80" \
+                | tr '[:upper:]' '[:lower:]'
+            check:
+              ($error): ~
+              (contains($stdout, ' 301 ')): true
+              "(contains($stdout, 'location: http://httproute.e2e.local'))": true
+              (contains($stdout, '/path')): true

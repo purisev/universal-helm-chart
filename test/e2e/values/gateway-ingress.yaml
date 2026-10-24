@@ -222,6 +222,20 @@ tlsRoute:
 # resolve this backend until the chart's own ReferenceGrant template is
 # applied in the e2e-gateway-ingress-backend namespace.
 httpRoutes:
+  # A redirect-only route: the rule renders without backendRefs, which
+  # Gateway API requires next to a RequestRedirect filter.
+  redirect:
+    parentRefs:
+      - name: "{{ .Release.Name }}-gateway"
+    hostnames:
+      - "{{ printf \"redirect.%s.local\" .Release.Name }}"
+    rules:
+      - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              hostname: httproute.e2e.local
+              statusCode: 301
+
   referencegrant-cross-ns:
     parentRefs:
       - name: "{{ .Release.Name }}-gateway"
