@@ -211,8 +211,6 @@ tests:
               requestRedirect:
                 scheme: https
                 statusCode: 301
-          serviceName: my-svc
-          servicePort: 80
     asserts:
       - equal:
           path: spec.rules[0].filters[0].type
@@ -220,6 +218,189 @@ tests:
       - equal:
           path: spec.rules[0].filters[0].requestRedirect.scheme
           value: https
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  # --- rules: RequestRedirect takes no backend ---
+
+  - it: should render a redirect rule with an empty backendRefs list without backendRefs
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          backendRefs: []
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should treat a filter of type RequestRedirect as a redirect
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should treat a filter carrying requestRedirect as a redirect
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should keep the default backend on a rule whose filter is not a redirect
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: URLRewrite, urlRewrite: {hostname: example.com}}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: test-release-universal-helm-chart
+
+  - it: should render only the redirect rule without backendRefs when rules mix
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+        - matches:
+            - path: {type: PathPrefix, value: /}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+      - equal:
+          path: spec.rules[1].backendRefs[0].name
+          value: test-release-universal-helm-chart
+
+  - it: should fail fast when a redirect rule sets serviceName
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorMessage: "httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule."
+
+  - it: should fail fast when a redirect rule sets servicePort
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          servicePort: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: 'httpRoute.rules\[0\]: a RequestRedirect filter cannot be combined'
+
+  - it: should fail fast when a workload redirect rule sets backendRefs
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          backendRefs:
+            - {name: other, port: 80}
+    asserts:
+      - failedTemplate:
+          errorPattern: 'deployments.web.httpRoute.rules\[0\]: a RequestRedirect filter cannot be combined'
+
+  - it: should render a workload redirect rule without backendRefs
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should name the plural-map rule when a redirect rule sets a backend
+    set:
+      httpRoutes.public.parentRefs:
+        - {name: my-gw}
+      httpRoutes.public.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: 'httpRoutes.public.rules\[0\]: a RequestRedirect filter cannot be combined'
+
+  - it: should render a plural-map redirect rule without backendRefs
+    set:
+      httpRoutes.public.parentRefs:
+        - {name: my-gw}
+      httpRoutes.public.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should render a keda.http redirect rule without the interceptor backend
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should report the redirect, not the interceptor port, for a keda.http redirect rule with servicePort
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          servicePort: 9000
+    asserts:
+      - failedTemplate:
+          errorPattern: 'deployments.web.httpRoute.rules\[0\]: a RequestRedirect filter cannot be combined'
 
   # --- Per-workload rules ---
 
