@@ -1,0 +1,107 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: direct-port-switch
+spec:
+  steps:
+    - name: a release without keda.http serves both ports from one ClusterIP Service
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              helm upgrade --install e2e-dp "$GITHUB_WORKSPACE" -n "$NAMESPACE" \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/keda-http-direct-switch.yaml" --wait --timeout 3m
+              kubectl get svc e2e-dp-app -n "$NAMESPACE" -o jsonpath='type={.spec.type} ports={.spec.ports[*].name}{"\n"}'
+              echo "direct=[$(kubectl get svc e2e-dp-app-events -n "$NAMESPACE" -o name --ignore-not-found)]"
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-dp-app/"
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-dp-app:9000/"
+            check:
+              ($error): ~
+              (contains($stdout, 'type=ClusterIP ports=http events')): true
+              (contains($stdout, 'direct=[]')): true
+              (contains($stdout, 'Welcome to nginx')): true
+              (contains($stdout, 'events port')): true
+    - name: turning keda.http on moves the direct port to a Service of its own and http to the interceptor
+      try:
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              helm upgrade e2e-dp "$GITHUB_WORKSPACE" -n "$NAMESPACE" \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/keda-http-direct-switch.yaml" \
+                --set-json 'deployments.app.keda={"minReplicas":1,"maxReplicas":1,"pollingInterval":5,"cooldownPeriod":30,"http":{"enabled":true,"directPorts":["events"],"timeouts":{"readiness":"120s"}}}' \
+                --wait --timeout 3m
+              kubectl wait --for=condition=Ready interceptorroute/e2e-dp-app -n "$NAMESPACE" --timeout=60s
+              kubectl get svc e2e-dp-app -n "$NAMESPACE" -o jsonpath='proxy type={.spec.type} ports={.spec.ports[*].name}{"\n"}'
+              kubectl get svc e2e-dp-app-events -n "$NAMESPACE" -o jsonpath='direct type={.spec.type} ports={.spec.ports[*].port}{"\n"}'
+              kubectl get svc e2e-dp-app-origin -n "$NAMESPACE" -o jsonpath='origin ports={.spec.ports[*].name}{"\n"}'
+            check:
+              ($error): ~
+              (contains($stdout, 'proxy type=ExternalName ports=http')): true
+              (contains($stdout, 'direct type=ClusterIP ports=9000')): true
+              (contains($stdout, 'origin ports=http')): true
+              (contains($stdout, 'origin ports=http events')): false
+        - script:
+            timeout: 3m
+            content: |
+              set -e
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-dp-app-events:9000/"
+              # Until cached DNS answers for the old ClusterIP expire, a request can
+              # still reach the pods directly; the interceptor marks its own answers.
+              for i in $(seq 1 18); do
+                OUT=$(kubectl exec prober -n "$NAMESPACE" -- wget -S -O- --timeout=30 "http://e2e-dp-app/" 2>&1 || true)
+                if echo "$OUT" | grep -qi 'x-keda-http-cold-start'; then
+                  echo "http through the interceptor after attempt ${i}"
+                  echo "$OUT"
+                  break
+                fi
+                sleep 5
+              done
+            check:
+              ($error): ~
+              (contains($stdout, 'events port')): true
+              (contains($stdout, 'http through the interceptor')): true
+              (contains($stdout, 'Welcome to nginx')): true
+    - name: turning keda.http off brings the direct port back onto the workload Service
+      try:
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              helm upgrade e2e-dp "$GITHUB_WORKSPACE" -n "$NAMESPACE" \
+                -f "$GITHUB_WORKSPACE/test/e2e/values/keda-http-direct-switch.yaml" --wait --timeout 3m
+              kubectl get svc e2e-dp-app -n "$NAMESPACE" -o jsonpath='type={.spec.type} ports={.spec.ports[*].name}{"\n"}'
+              echo "direct=[$(kubectl get svc e2e-dp-app-events -n "$NAMESPACE" -o name --ignore-not-found)]"
+              echo "origin=[$(kubectl get svc e2e-dp-app-origin -n "$NAMESPACE" -o name --ignore-not-found)]"
+              # Callers that still hold the ExternalName answer from DNS reach the
+              # interceptor, which does not serve the port, until their cache expires.
+              for i in $(seq 1 18); do
+                if OUT=$(kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=5 "http://e2e-dp-app:9000/" 2>&1); then
+                  echo "served after attempt ${i}"
+                  echo "$OUT"
+                  break
+                fi
+                sleep 5
+              done
+            check:
+              ($error): ~
+              (contains($stdout, 'type=ClusterIP ports=http events')): true
+              (contains($stdout, 'direct=[]')): true
+              (contains($stdout, 'origin=[]')): true
+              (contains($stdout, 'events port')): true
+      finally:
+        - script:
+            timeout: 2m
+            content: |
+              helm uninstall e2e-dp -n "$NAMESPACE" --wait || true
