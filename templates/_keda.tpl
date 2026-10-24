@@ -45,11 +45,77 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
 {{- end }}
 
 {{/*
+Services that carry keda.http.directPorts past the interceptor, keyed by Service port.
+Each listed service.ports entry gets its own ClusterIP Service <svc>-<portName> that
+selects the workload's pods. Names absent from service.ports, http and metrics are
+skipped here and rejected by uhc.assertKedaHttp.
+Returns JSON: {"<port>": {"portName": ..., "service": ...}}.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
+*/}}
+{{- define "uhc.kedaHttpDirectServices" -}}
+{{- $out := dict -}}
+{{- $ports := (.wl.service | default dict).ports | default dict -}}
+{{- $svcName := include "uhc.serviceName" . -}}
+{{- range $pName := .wl.keda.http.directPorts | default list -}}
+  {{- $p := index $ports $pName -}}
+  {{- if and $p (not (has $pName (list "http" "metrics"))) -}}
+    {{- $name := printf "%s-%s" $svcName $pName -}}
+    {{- include "uhc.assertNameLength" (dict "name" $name "kind" (printf "Service for keda.http.directPorts entry %q" $pName)) -}}
+    {{- $_ := set $out (toString (int ($p.port | default $p.targetPort))) (dict "portName" $pName "service" $name) -}}
+  {{- end -}}
+{{- end -}}
+{{- $out | toJson -}}
+{{- end }}
+
+{{/*
+Renders the Services of keda.http.directPorts, one per port. They carry no
+prometheus.io/* annotations: scraping stays on the origin Service.
+Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName
+Emits the leading "---" document separator itself.
+*/}}
+{{- define "uhc.kedaHttpDirectServicesRender" -}}
+{{- $ctx := .ctx }}
+{{- $wl := .wl }}
+{{- $wlName := .wlName }}
+{{- $ports := $wl.service.ports }}
+{{- $direct := include "uhc.kedaHttpDirectServices" . | fromJson }}
+{{- range $portKey := keys $direct | sortAlpha }}
+{{- $d := index $direct $portKey }}
+{{- $p := index $ports $d.portName }}
+{{- include "uhc.assertServicePortsDeclared" (dict "ports" (dict $d.portName $p) "source" (printf "service.ports for workload %q" $wlName)) }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $d.service }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "service") }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: {{ $d.portName }}
+      port: {{ $p.port | default $p.targetPort }}
+      targetPort: {{ $p.targetPort | default $p.port }}
+      protocol: {{ $p.protocol | default "TCP" }}
+      {{- with $p.appProtocol }}
+      appProtocol: {{ . }}
+      {{- end }}
+  selector:
+    {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 4 }}
+{{- end }}
+{{- end }}
+
+{{/*
 Rejects a workload whose Service cannot be put behind the interceptor. Once keda.http
 is on, every port of the client-facing Service resolves to the interceptor, which
 serves one HTTP port, so the Service may carry only the http port plus metrics (scraped
-from pod IPs, never through the Service name). Ingress paths that reach the Service
-by name must use the interceptor's port, because an ExternalName cannot remap it.
+from pod IPs, never through the Service name). Other ports leave it through
+keda.http.directPorts. Ingress paths and HTTPRoute rules that reach the Service by name
+must use the interceptor's port, because an ExternalName cannot remap it.
 Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statefulSets"
 */}}
 {{- define "uhc.assertKedaHttp" -}}
@@ -69,18 +135,31 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
 {{- if eq ($svc.clusterIP | default "") "None" -}}
   {{- fail (printf "%s.keda.http needs a Service with a cluster IP, but service.clusterIP is None. Remove service.clusterIP." $path) -}}
 {{- end -}}
+{{- $directPorts := $wl.keda.http.directPorts | default list -}}
+{{- range $pName := $directPorts -}}
+  {{- if has $pName (list "http" "metrics") -}}
+    {{- fail (printf "%s.keda.http.directPorts lists %s, which stays on the workload Service: http goes through the interceptor and metrics is scraped from pod IPs. Remove it from directPorts." $path $pName) -}}
+  {{- end -}}
+  {{- if not (hasKey ($svc.ports | default dict) $pName) -}}
+    {{- fail (printf "%s.keda.http.directPorts lists %s, but service.ports has no %s entry. Declare the port under service.ports or remove it from directPorts." $path $pName $pName) -}}
+  {{- end -}}
+{{- end -}}
 {{- if $svc.ports -}}
   {{- if not (hasKey $svc.ports "http") -}}
     {{- fail (printf "%s.keda.http sends the Service port named http through the interceptor, but service.ports has no http entry." $path) -}}
   {{- end -}}
   {{- $extra := list -}}
   {{- range $pName := keys $svc.ports | sortAlpha -}}
-    {{- if not (has $pName (list "http" "metrics")) -}}
+    {{- if not (has $pName (concat (list "http" "metrics") $directPorts)) -}}
       {{- $extra = append $extra $pName -}}
     {{- end -}}
   {{- end -}}
   {{- if $extra -}}
-    {{- fail (printf "%s.keda.http: service.ports.%s would resolve to the interceptor too, which serves only the http port. Keep http and metrics on this Service and remove the others." $path (join ", service.ports." $extra)) -}}
+    {{- fail (printf "%s.keda.http: service.ports.%s would resolve to the interceptor too, which serves only the http port. List them in keda.http.directPorts to serve them from a Service of their own, past the interceptor, or remove them." $path (join ", service.ports." $extra)) -}}
+  {{- end -}}
+  {{- $direct := include "uhc.kedaHttpDirectServices" (dict "ctx" $ctx "wl" $wl "wlName" .wlName) | fromJson -}}
+  {{- with index $direct (toString $addonPort) -}}
+    {{- fail (printf "%s.keda.http.directPorts: service.ports.%s uses port %d, the interceptor port, so a route or Ingress path on that port could mean either. Give it another port." $path .portName $addonPort) -}}
   {{- end -}}
   {{- $httpPort := (index $svc.ports "http" | default dict).port -}}
   {{- if and $httpPort (ne (int $httpPort) $addonPort) -}}
@@ -90,9 +169,10 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
   {{- fail (printf "%s.keda.http: service.port is %d, but clients reach the interceptor on port %d (integrations.keda.httpAddon.port). Omit service.port to take %d, or make the two equal." $path (int $svc.port) $addonPort $addonPort) -}}
 {{- end -}}
 {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) -}}
+  {{- $direct := include "uhc.kedaHttpDirectServices" (dict "ctx" $ctx "wl" $wl "wlName" .wlName) | fromJson -}}
   {{- range $i, $rule := $wl.httpRoute.rules | default list -}}
-    {{- if and (not $rule.backendRefs) (not $rule.serviceName) $rule.servicePort (ne (int $rule.servicePort) $addonPort) (ne (include "uhc.httpRouteRuleRedirects" $rule) "true") -}}
-      {{- fail (printf "%s.httpRoute.rules[%d].servicePort is %d, but with keda.http the rule goes to the interceptor, which listens on port %d. Remove servicePort or set it to %d." $path $i (int $rule.servicePort) $addonPort $addonPort) -}}
+    {{- if and (not $rule.backendRefs) (not $rule.serviceName) $rule.servicePort (ne (int $rule.servicePort) $addonPort) (not (hasKey $direct (toString (int $rule.servicePort)))) (ne (include "uhc.httpRouteRuleRedirects" $rule) "true") -}}
+      {{- fail (printf "%s.httpRoute.rules[%d].servicePort is %d, but with keda.http the rule goes to the interceptor, which listens on port %d. Remove servicePort or set it to %d; the port of a service.ports entry listed in keda.http.directPorts goes to that entry's own Service." $path $i (int $rule.servicePort) $addonPort $addonPort) -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}
@@ -123,6 +203,7 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
 {{- $ns := $ctx.Release.Namespace -}}
 {{- $releaseName := include "uhc.fullname" $ctx -}}
 {{- $hosts := list $svcName (printf "%s.%s" $svcName $ns) (printf "%s.%s.svc" $svcName $ns) (printf "%s.%s.svc.%s" $svcName $ns $addon.clusterDomain) -}}
+{{- $direct := include "uhc.kedaHttpDirectServices" (dict "ctx" $ctx "wl" $wl "wlName" .wlName) | fromJson -}}
 {{- if and $wl.httpRoute (ne (index $wl.httpRoute "enabled") false) -}}
   {{- range ($ctx.Values.httpRoute.hostnames | default list) -}}
     {{- $hosts = append $hosts (tpl . $ctx | trim) -}}
@@ -145,6 +226,9 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
     {{- range $i, $p := (index $ingHosts $host).paths | default list -}}
       {{- if eq ($p.serviceName | default $releaseName) $svcName -}}
         {{- $port := int ($p.servicePort | default 80) -}}
+        {{- with index $direct (toString $port) -}}
+          {{- fail (printf "%s.hosts.%s.paths[%d] sends traffic to Service %q on port %d, but %s.keda.http serves that port from Service %q. Set serviceName to %q." $where $host $i $svcName $port $path .service .service) -}}
+        {{- end -}}
         {{- if ne $port $addonPort -}}
           {{- fail (printf "%s.hosts.%s.paths[%d] sends traffic to Service %q on port %d, but %s.keda.http turns that Service into an ExternalName for the interceptor, which listens on port %d. Set servicePort to %d." $where $host $i $svcName $port $path $addonPort $addonPort) -}}
         {{- end -}}

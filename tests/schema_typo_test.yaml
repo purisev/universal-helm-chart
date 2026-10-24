@@ -368,6 +368,15 @@ tests:
       - failedTemplate:
           errorPattern: "additional properties 'host' not allowed"
 
+  - it: should reject a repeated keda.http.directPorts entry
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      deployments.web.keda.http.directPorts: [events, events]
+    asserts:
+      - failedTemplate:
+          errorPattern: "directPorts': items at 0 and 1 are equal"
+
   - it: should reject an unknown key under integrations.keda.httpAddon
     set:
       image.repository: nginx

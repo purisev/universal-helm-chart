@@ -231,6 +231,7 @@
       "properties": {
         "enabled": {"type": "boolean"},
         "hosts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "directPorts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
         "scalingMetric": {"type": "object"},
         "coldStart": {"type": "object"},
         "timeouts": {"type": "object"}

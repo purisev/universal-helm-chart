@@ -9,6 +9,30 @@ integrations:
       interceptorService: keda-add-ons-http-interceptor-proxy-80
       port: 80
 
+# Serves the stock page on 8080 and a page of its own on 8081 for the port
+# that keda.http.directPorts keeps off the interceptor.
+configMaps:
+  nginx-conf:
+    enabled: true
+    mountPath: /etc/nginx/conf.d
+    data:
+      default.conf: |
+        server {
+          listen 8080;
+          location / {
+            root /usr/share/nginx/html;
+            index index.html;
+          }
+        }
+      events.conf: |
+        server {
+          listen 8081;
+          location / {
+            default_type text/plain;
+            return 200 "served past the interceptor\n";
+          }
+        }
+
 volumes:
   nginx-cache:
     emptyDir: {}
@@ -53,6 +77,9 @@ deployments:
       ports:
         http:
           targetPort: 8080
+        events:
+          port: 9000
+          targetPort: 8081
 
     resources:
       requests:
@@ -67,10 +94,18 @@ deployments:
       exposeService:
         enabled: true
 
-    # No ingress rule of its own: only the interceptor rule the chart adds
-    # under keda.http lets traffic reach the pods.
+    # The http port has no ingress rule of its own: only the interceptor rule
+    # the chart adds under keda.http lets traffic reach it. The direct port
+    # admits its own prober.
     networkPolicy:
       enabled: true
+      ingress:
+        - from:
+            - podSelector:
+                matchLabels:
+                  e2e/role: direct-prober
+          ports:
+            - port: 8081
 
     httpRoute:
       rules:
@@ -85,6 +120,7 @@ deployments:
         e2e/owner: keda-http
       cooldownPeriod: 30
       http:
+        directPorts: [events]
         scalingMetric:
           requestRate:
             targetValue: 2

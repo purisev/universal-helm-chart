@@ -51,14 +51,15 @@ Params: dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" "deployments" / "statef
 {{- end }}
 
 {{/*
-Fail fast when two workloads resolve to the same Service name. Defaults never collide,
-so a duplicate always comes from service.nameOverride or headlessService.nameOverride
-(or the older serviceName spelling) — and it renders two Service documents under one
+Fail fast when two workloads resolve to the same Service name. A duplicate comes from
+service.nameOverride or headlessService.nameOverride (or the older serviceName
+spelling), or from a keda.http.directPorts Service <svc>-<portName> landing on another
+name — and it renders two Service documents under one
 name, which Kubernetes rejects on apply and a server-side-apply controller turns into
 two owners fighting over one object's selector.
 
 Covers every Service name the chart puts on the cluster: each workload's own Service
-(and its origin Service under keda.http), the metrics-only Service a Deployment gets when it exposes metrics without a Service of
+(and its origin and directPorts Services under keda.http), the metrics-only Service a Deployment gets when it exposes metrics without a Service of
 its own, and, for StatefulSets, the governing headless Service while the chart renders
 it.
 
@@ -82,6 +83,12 @@ Params: $ctx (the dot)
         {{- $_ := set $claims (include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName)) (printf "%s.%s.service" $kind $wlName) -}}
         {{- if eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" -}}
           {{- $_ := set $claims (include "uhc.kedaHttpOriginServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName)) (printf "%s.%s.keda.http" $kind $wlName) -}}
+          {{- range $d := include "uhc.kedaHttpDirectServices" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | fromJson -}}
+            {{- if hasKey $claims $d.service -}}
+              {{- fail (printf "Service name %q is claimed by both %s and %s.%s.keda.http.directPorts. Rename the service.ports entry %s." $d.service (index $claims $d.service) $kind $wlName $d.portName) -}}
+            {{- end -}}
+            {{- $_ := set $claims $d.service (printf "%s.%s.keda.http.directPorts" $kind $wlName) -}}
+          {{- end -}}
         {{- end -}}
       {{- end -}}
       {{- $metricsName := include "uhc.metricsOnlyServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) -}}
@@ -131,8 +138,17 @@ Params: as uhc.plainService
 {{- if eq (include "uhc.kedaHttpEnabled" (dict "wl" .wl)) "true" -}}
 {{- $addon := include "uhc.kedaHttpAddon" .ctx | fromJson -}}
 {{- $origin := include "uhc.kedaHttpOriginServiceName" (dict "ctx" .ctx "wl" .wl "wlName" .wlName) -}}
-{{- include "uhc.plainService" (merge (dict "name" $origin "httpPort" (int $addon.port)) .) -}}
+{{- $wl := .wl -}}
+{{- with .wl.keda.http.directPorts -}}
+  {{- $svc := deepCopy $wl.service -}}
+  {{- range $pName := without . "http" "metrics" -}}
+    {{- $_ := unset ($svc.ports | default dict) $pName -}}
+  {{- end -}}
+  {{- $wl = set (omit $wl "service") "service" $svc -}}
+{{- end -}}
+{{- include "uhc.plainService" (set (merge (dict "name" $origin "httpPort" (int $addon.port)) (omit . "wl")) "wl" $wl) -}}
 {{- include "uhc.kedaHttpProxyService" (dict "ctx" .ctx "wl" .wl "wlName" .wlName) -}}
+{{- include "uhc.kedaHttpDirectServicesRender" (dict "ctx" .ctx "wl" .wl "wlName" .wlName) -}}
 {{- else -}}
 {{- include "uhc.plainService" . -}}
 {{- end -}}
