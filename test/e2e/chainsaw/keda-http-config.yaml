@@ -1,0 +1,14 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Configuration
+metadata:
+  name: universal-helm-chart-e2e-keda-http
+spec:
+  namespace: e2e-keda-http
+  parallel: 1
+  timeouts:
+    apply: 30s
+    assert: 3m
+    cleanup: 30s
+    delete: 30s
+    error: 30s
+    exec: 5m

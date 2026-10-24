@@ -18,9 +18,14 @@ spec:
   podSelector:
     matchLabels:
       {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+  {{- $policyTypes := $wl.networkPolicy.policyTypes | default (list "Ingress") }}
   policyTypes:
-    {{- toYaml ($wl.networkPolicy.policyTypes | default (list "Ingress")) | nindent 4 }}
-  {{- with $wl.networkPolicy.ingress }}
+    {{- toYaml $policyTypes | nindent 4 }}
+  {{- $ingress := $wl.networkPolicy.ingress | default list }}
+  {{- if and (has "Ingress" $policyTypes) (eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true") }}
+  {{- $ingress = append $ingress (include "uhc.kedaHttpInterceptorPeer" $ctx | fromYaml) }}
+  {{- end }}
+  {{- with $ingress }}
   ingress:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -50,9 +55,14 @@ spec:
   podSelector:
     matchLabels:
       {{- include "uhc.workloadSelectorLabels" (dict "ctx" $ctx "workloadName" $wlName) | nindent 6 }}
+  {{- $policyTypes := $wl.networkPolicy.policyTypes | default (list "Ingress") }}
   policyTypes:
-    {{- toYaml ($wl.networkPolicy.policyTypes | default (list "Ingress")) | nindent 4 }}
-  {{- with $wl.networkPolicy.ingress }}
+    {{- toYaml $policyTypes | nindent 4 }}
+  {{- $ingress := $wl.networkPolicy.ingress | default list }}
+  {{- if and (has "Ingress" $policyTypes) (eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true") }}
+  {{- $ingress = append $ingress (include "uhc.kedaHttpInterceptorPeer" $ctx | fromYaml) }}
+  {{- end }}
+  {{- with $ingress }}
   ingress:
     {{- toYaml . | nindent 4 }}
   {{- end }}

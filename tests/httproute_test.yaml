@@ -1021,3 +1021,70 @@ tests:
       - equal:
           path: spec.rules[0].backendRefs[0].name
           value: legacy-api-svc
+
+  - it: should send a keda.http workload's defaulted rules to the interceptor
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: PathPrefix, value: /}}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - group: ""
+              kind: Service
+              name: keda-add-ons-http-interceptor-proxy
+              namespace: keda
+              port: 8080
+              weight: 1
+
+  - it: should follow the configured interceptor Service, namespace and port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon: {namespace: autoscaling, interceptorService: interceptor-80, port: 80}
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules: [{}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0]
+          value:
+            group: ""
+            kind: Service
+            name: interceptor-80
+            namespace: autoscaling
+            port: 80
+            weight: 1
+
+  - it: should leave keda.http rules with their own serviceName or backendRefs alone
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules:
+        - {serviceName: elsewhere, servicePort: 80}
+        - {backendRefs: [{name: other, port: 81}]}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: elsewhere, port: 80, weight: 1}
+      - equal:
+          path: spec.rules[1].backendRefs
+          value:
+            - {group: "", kind: Service, name: other, port: 81, weight: 1}
+
+  - it: should keep the workload Service as backend when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.enabled: false
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules: [{}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web, port: 80, weight: 1}

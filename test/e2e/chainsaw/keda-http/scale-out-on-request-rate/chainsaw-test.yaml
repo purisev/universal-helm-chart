@@ -1,0 +1,40 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: scale-out-on-request-rate
+spec:
+  steps:
+    - name: a sustained request rate above the per-replica target scales the Deployment past one replica
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 3m
+            content: |
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=150 "http://e2e-web/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+        - script:
+            timeout: 4m
+            content: |
+              set -e
+              # About 10 requests a second for up to three minutes, against a
+              # target of 2 per replica (values/keda-http.yaml); the load stops
+              # as soon as a second replica is ready.
+              kubectl exec prober -n "$NAMESPACE" -- sh -c \
+                'end=$(( $(date +%s) + 180 )); while [ $(date +%s) -lt $end ]; do for i in 1 2 3 4 5; do wget -q -O /dev/null --timeout=10 http://e2e-web/ & done; wait; sleep 0.5; done' &
+              LOAD=$!
+              trap 'kill $LOAD 2>/dev/null || true' EXIT
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" at-least e2e-web 2 200
+            check:
+              ($error): ~
+              (contains($stdout, 'result=at-least-2')): true

@@ -2,6 +2,17 @@
 
 What each release adds, changes and fixes. Values-file edits an upgrade may need are in the [migration guide](docs/03-reference/04-migration.md).
 
+## 3.4.0 - unreleased
+
+### Added
+
+- `keda.http` scales a Deployment or StatefulSet on HTTP traffic, down to zero, through the KEDA HTTP add-on: an `InterceptorRoute`, an `external-push` trigger, an ExternalName in place of the workload Service with the original Service renamed `<svc>-origin`, HTTPRoute rules sent to the interceptor, and a NetworkPolicy rule admitting it. `integrations.keda.httpAddon` says where the add-on runs.
+- `integrations.argocd.syncWaves.interceptorRoute`.
+
+### Fixed
+
+- A `keda` or `hpa` block without `enabled: true` drops `spec.replicas` from the Deployment or StatefulSet, as it already rendered the ScaledObject or HPA.
+
 ## 3.3.0 - 2026-10-04
 
 ### Added

@@ -79,8 +79,17 @@ spec:
     {{- end }}
     {{- $svcName := include "uhc.serviceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
     {{- $svcPort := int (($wl.service | default dict).port | default 80) }}
+    {{- $svcNamespace := "" }}
+    {{- /* Gateway implementations rarely accept an ExternalName backend, so a keda.http
+       workload's rules go straight to the interceptor Service in the add-on namespace. */ -}}
+    {{- if eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
+    {{- $addon := include "uhc.kedaHttpAddon" $ctx | fromJson }}
+    {{- $svcName = $addon.interceptorService }}
+    {{- $svcPort = int $addon.port }}
+    {{- $svcNamespace = $addon.namespace }}
+    {{- end }}
     {{- range $wl.httpRoute.rules }}
-    - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" . "defaultBackend" $svcName "defaultPort" $svcPort) | nindent 6 | trimPrefix "\n      " }}
+    - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" . "defaultBackend" $svcName "defaultPort" $svcPort "defaultNamespace" $svcNamespace) | nindent 6 | trimPrefix "\n      " }}
     {{- end }}
   {{- end }}
 {{- end }}

@@ -217,7 +217,19 @@
         "cooldownPeriod": {"type": "integer", "minimum": 0},
         "idleReplicaCount": {"type": "integer", "minimum": 0},
         "advanced": {"type": "object"},
-        "triggers": {"type": "array"}
+        "triggers": {"type": "array"},
+        "http": {"$ref": "#/$defs/kedaHttpShape"}
+      }
+    },
+    "kedaHttpShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "hosts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "scalingMetric": {"type": "object"},
+        "coldStart": {"type": "object"},
+        "timeouts": {"type": "object"}
       }
     },
     "hpaShape": {
@@ -1385,6 +1397,7 @@
                 "hpa": { "type": ["integer", "string", "null"] },
                 "vpa": { "type": ["integer", "string", "null"] },
                 "scaledObject": { "type": ["integer", "string", "null"] },
+                "interceptorRoute": { "type": ["integer", "string", "null"] },
                 "podDisruptionBudget": { "type": ["integer", "string", "null"] },
                 "serviceMonitor": { "type": ["integer", "string", "null"] },
                 "podMonitor": { "type": ["integer", "string", "null"] },
@@ -1442,6 +1455,23 @@
             "externalSecrets": {
               "type": "object",
               "additionalProperties": {"$ref": "#/$defs/esoExternalSecretEntry"}
+            }
+          }
+        },
+        "keda": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "httpAddon": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "namespace": { "type": "string", "minLength": 1 },
+                "interceptorService": { "type": "string", "minLength": 1 },
+                "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+                "scalerAddress": { "type": "string" },
+                "clusterDomain": { "type": "string", "minLength": 1 }
+              }
             }
           }
         },

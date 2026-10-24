@@ -1,0 +1,41 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: scale-back-to-zero
+spec:
+  steps:
+    - name: a request wakes the Deployment
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 3m
+            content: |
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=150 "http://e2e-web/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+        - script:
+            timeout: 2m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" at-least e2e-web 1 110
+            check:
+              ($error): ~
+              (contains($stdout, 'result=at-least-1')): true
+    - name: once traffic stops, KEDA returns it to zero after the cooldown
+      try:
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-web 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true

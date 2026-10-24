@@ -1,0 +1,60 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: in-cluster-cold-start
+spec:
+  steps:
+    - name: the Deployment is at zero before the first request
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-web 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true
+    - name: a request to the unchanged Service name is held while KEDA starts a pod, then answered
+      try:
+        - script:
+            timeout: 3m
+            content: |
+              set -e
+              # busybox wget -S prints the response headers on stderr.
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -S -O- --timeout=150 "http://e2e-web/" 2>&1
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+              "(contains(to_lower($stdout), 'x-keda-http-cold-start: true'))": true
+        - script:
+            timeout: 2m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" at-least e2e-web 1 110
+            check:
+              ($error): ~
+              (contains($stdout, 'result=at-least-1')): true
+    - name: every in-cluster form of the Service name reaches the running pod without a cold start
+      try:
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              for host in e2e-web e2e-web.$NAMESPACE e2e-web.$NAMESPACE.svc e2e-web.$NAMESPACE.svc.cluster.local; do
+                out=$(kubectl exec prober -n "$NAMESPACE" -- wget -S -O- --timeout=30 "http://${host}/" 2>&1)
+                echo "$out" | grep -q 'Welcome to nginx' || { echo "no page via ${host}"; exit 1; }
+                echo "$out" | grep -qi 'x-keda-http-cold-start: false' || { echo "unexpected cold start via ${host}"; exit 1; }
+                echo "ok ${host}"
+              done
+            check:
+              ($error): ~
+              (contains($stdout, 'ok e2e-web.e2e-keda-http.svc.cluster.local')): true
