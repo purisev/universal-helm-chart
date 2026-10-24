@@ -60,6 +60,8 @@ integrations:
     imageUpdater:
       enabled: true
       namespace: argocd
+      labels:
+        team: delivery
       appNamePattern: myapp
       commonUpdateSettings:
         updateStrategy: semver
@@ -85,6 +87,10 @@ integrations:
       vault:
         enabled: true
         kind: SecretStore
+        labels:
+          team: platform
+        annotations:
+          owner: platform-team
         provider:
           vault:
             server: https://vault.example.com
@@ -113,6 +119,8 @@ integrations:
         enabled: true
         secretStore: vault
         refreshInterval: 1h
+        labels:
+          team: api
         targetName: app-secrets
         data:
           DB_PASSWORD:
@@ -325,6 +333,10 @@ configMaps:
   app-config:
     enabled: true
     mountPath: /etc/app
+    labels:
+      config-kind: app
+    annotations:
+      owner: api-team
     data:
       config.yaml: |
         log_level: info
@@ -596,6 +608,8 @@ deployments:
       enabled: true
       port: metrics
       path: /metrics
+      labels:
+        release: kube-prometheus-stack    # on this workload's ServiceMonitor
 
     probesEnabled: true
     readinessProbe:
@@ -785,6 +799,8 @@ deployments:
       maxReplicas: 20
       pollingInterval: 30
       cooldownPeriod: 300
+      labels:
+        team: worker                      # on this workload's ScaledObject
       triggers:
         - type: kafka
           metadata:
