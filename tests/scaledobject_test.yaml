@@ -324,6 +324,50 @@ tests:
               metricType: Utilization
               metadata: {value: "60"}
 
+  - it: should add a trigger per keda.http.routes entry between the workload's and the declared triggers
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.service.ports.feed: {port: 9200}
+      deployments.web.keda.http.routes:
+        stream: {paths: [/stream]}
+        feed: {paths: [/feed]}
+      deployments.web.keda.triggers:
+        - type: cpu
+          metricType: Utilization
+          metadata: {value: "60"}
+    asserts:
+      - equal:
+          path: spec.triggers
+          value:
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web-feed
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web-stream
+            - type: cpu
+              metricType: Utilization
+              metadata: {value: "60"}
+
+  - it: should add a keda.http.routes trigger for a StatefulSet
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, stream: {port: 9100}}}
+      statefulSets.cache.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - equal:
+          path: spec.triggers[1].metadata.interceptorRoute
+          value: app-cache-stream
+
   - it: should derive the scaler address from httpAddon.namespace
     values:
       - fixtures/keda-http.yaml

@@ -436,8 +436,9 @@ Callers keep using the workload's Service name. The chart renders:
 | Service `<svc>-origin` | The Service built from `service`, selecting the pods. The interceptor forwards here, and the metrics port and `prometheus.io/*` annotations stay here. |
 | Service `<svc>-<portName>` | One `ClusterIP` Service for each port listed in `keda.http.directPorts`, selecting the pods. See [Ports past the interceptor](#ports-past-the-interceptor). |
 | `InterceptorRoute` `<fullname>-<workload>` | `target` is the origin Service's `http` port. `hosts` hold `<svc>`, `<svc>.<ns>`, `<svc>.<ns>.svc`, `<svc>.<ns>.svc.<clusterDomain>`, the root `httpRoute.hostnames` when the workload has an `httpRoute`, the hosts of every Ingress path that names `<svc>`, and `keda.http.hosts`. |
-| `ScaledObject` | An `external-push` trigger for the route goes first in `triggers`; declared triggers follow. `minReplicaCount` defaults to `0`. |
-| HTTPRoute rules of the workload | Rules without `serviceName` or `backendRefs` point at the interceptor Service in the add-on namespace, or at `<svc>-<portName>` when their `servicePort` is the port of a `directPorts` entry. |
+| `InterceptorRoute` `<fullname>-<workload>-<portName>` | One for each `keda.http.routes` entry: the same `hosts`, the entry's `paths`, and the origin Service's port of that name as `target`. See [Ports through the interceptor](#ports-through-the-interceptor). |
+| `ScaledObject` | An `external-push` trigger for the workload's route goes first in `triggers`, then one for each `routes` entry in name order; declared triggers follow. `minReplicaCount` defaults to `0`. |
+| HTTPRoute rules of the workload | Rules without `serviceName` or `backendRefs` point at the interceptor Service in the add-on namespace, or at `<svc>-<portName>` when their `servicePort` is the port of a `directPorts` entry. A rule whose `servicePort` is the port of a `routes` entry also points at the interceptor, on the interceptor port. |
 | NetworkPolicy of the workload | An ingress rule admitting the interceptor pods (`app.kubernetes.io/component: interceptor`, `app.kubernetes.io/name: http-add-on`) from the add-on namespace, whenever the policy covers `Ingress`. |
 
 `keda.http` takes these optional fields:
@@ -446,6 +447,7 @@ Callers keep using the workload's Service name. The chart renders:
 |-------|---------|---------|
 | `hosts` | `[]` | Extra host names for the route, evaluated through `tpl`. |
 | `directPorts` | `[]` | Names of `service.ports` entries served past the interceptor, each from a Service of its own. |
+| `routes` | `{}` | `service.ports` entries reached through the interceptor by path, keyed by port name. Each takes `paths` (required), and `scalingMetric`, `coldStart` and `timeouts` like the fields above. |
 | `scalingMetric` | `{concurrency: {targetValue: 100}}` | `InterceptorRoute.spec.scalingMetric`: `concurrency` and/or `requestRate`. |
 | `coldStart` | — | `InterceptorRoute.spec.coldStart`, passed through. |
 | `timeouts` | — | `InterceptorRoute.spec.timeouts`, passed through. |
@@ -517,17 +519,50 @@ The Service of a direct port carries the port's `protocol` and `appProtocol` and
 
 Traffic on a direct port does not pass the interceptor: it is not counted toward `scalingMetric`, and it does not start a workload scaled to zero. A port whose callers arrive only while the HTTP side keeps a pod running fits; a port that has to wake the workload by itself does not, unless `keda.minReplicas` is at least `1`. The workload's NetworkPolicy admits the interceptor only, so a policy that covers `Ingress` needs its own rule for the callers of a direct port.
 
+#### Ports through the interceptor
+
+A port listed under `routes` stays on `<svc>-origin` and gets an InterceptorRoute of its own. The interceptor listens on one port and picks a route by host and longest matching path across all routes, so requests to the entry's `paths` go to that port, and everything else to `http`:
+
+```yaml
+deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        stream:
+          port: 9100
+    keda:
+      http:
+        enabled: true
+        routes:
+          stream:
+            paths: [/stream]
+            scalingMetric:
+              concurrency:
+                targetValue: 1000
+```
+
+Callers keep using `<svc>` on the interceptor port: `http://<svc>/stream/...` reaches port `9100` of the pods, and `http://<svc>/` reaches `http`. Ingress paths do the same with `servicePort` set to the interceptor port. A workload `httpRoute` rule may say `servicePort: 9100`; the chart points it at the interceptor, and every path it matches has to lie under the entry's `paths`.
+
+Each route adds its own `external-push` trigger, so a request on a routed path counts toward scaling and starts a workload scaled to zero. The interceptor counts a request from its start to its end, and a WebSocket or long-poll request stays open for minutes: give its route a `scalingMetric` sized for open connections, or a few hundred idle clients look like a burst of load. While any such connection is open, the workload does not scale to zero. A long-poll route may also need `timeouts.responseHeader` above its poll interval.
+
+With `keda.http` off, `routes` is ignored and the port stays on `<svc>`.
+
 #### What the render rejects
 
 Every port of `<svc>` resolves to the interceptor, which serves one HTTP port. With `keda.http` on, the render fails when:
 
 - the workload renders no Service, or its `service.type` is not `ClusterIP`, or `service.clusterIP` is `None`;
-- `service.ports` has no `http` entry, or has entries other than `http`, `metrics` and those listed in `directPorts`;
+- `service.ports` has no `http` entry, or has entries other than `http`, `metrics` and those listed in `directPorts` or `routes`;
 - `directPorts` lists `http`, `metrics` or a name `service.ports` does not declare, or a listed port uses the interceptor port;
+- `routes` names `http`, `metrics`, a `directPorts` entry or a name `service.ports` does not declare, lists one path under two entries, or names a port that uses the interceptor port;
+- a workload HTTPRoute rule on the port of a `routes` entry matches a path outside that entry's `paths`, or by regular expression;
+- an InterceptorRoute name of a `routes` entry is also the route name of another workload;
 - the `http` port is set and differs from `integrations.keda.httpAddon.port`;
 - the workload has a `grpcRoute` or `tlsRoute`;
 - one of the workload's HTTPRoute rules sends to the interceptor with a `servicePort` other than the interceptor port;
-- an Ingress path names `<svc>` with a `servicePort` other than the interceptor port; for the port of a `directPorts` entry, the message names the Service to use instead;
+- an Ingress path names `<svc>` with a `servicePort` other than the interceptor port; for the port of a `directPorts` entry, the message names the Service to use instead, and for the port of a `routes` entry, the interceptor port;
 - the cluster serves `keda.sh/v1alpha1` without `http.keda.sh/v1beta1`.
 
 #### Limits

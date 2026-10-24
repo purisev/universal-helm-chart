@@ -90,16 +90,22 @@ spec:
     {{- end }}
     {{- $wlKey := ternary "deployments" "statefulSets" (eq $wlType "d") }}
     {{- $direct := dict }}
+    {{- $routed := dict }}
     {{- if eq (include "uhc.kedaHttpEnabled" (dict "wl" $wl)) "true" }}
     {{- $direct = include "uhc.kedaHttpDirectServices" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | fromJson }}
+    {{- $routed = include "uhc.kedaHttpRoutedPorts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | fromJson }}
     {{- end }}
     {{- range $i, $rule := $wl.httpRoute.rules }}
     {{- $backend := $svcName }}
     {{- $namespace := $svcNamespace }}
-    {{- /* A rule on a keda.http.directPorts port goes to that port's own Service. */ -}}
+    {{- /* A rule on a keda.http.directPorts port goes to that port's own Service; one
+       on a keda.http.routes port goes to the interceptor, which picks it by path. */ -}}
     {{- with and $rule.servicePort (index $direct (toString (int $rule.servicePort))) }}
     {{- $backend = .service }}
     {{- $namespace = "" }}
+    {{- end }}
+    {{- if and $rule.servicePort (not $rule.serviceName) (hasKey $routed (toString (int $rule.servicePort))) (ne (include "uhc.httpRouteRuleRedirects" $rule) "true") }}
+    {{- $rule = omit $rule "servicePort" }}
     {{- end }}
     - {{ include "uhc.httpRouteRuleSpec" (dict "ctx" $ctx "rule" $rule "defaultBackend" $backend "defaultPort" $svcPort "defaultNamespace" $namespace "path" (printf "%s.%s.httpRoute.rules[%d]" $wlKey $wlName $i)) | nindent 6 | trimPrefix "\n      " }}
     {{- end }}

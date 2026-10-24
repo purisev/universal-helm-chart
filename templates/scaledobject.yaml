@@ -33,9 +33,7 @@ spec:
   maxReplicaCount: {{ required (printf "deployments.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
     {{- if $http }}
-    {{- $addon := include "uhc.kedaHttpAddon" $ctx | fromJson }}
-    {{- $httpTrigger := dict "type" "external-push" "metadata" (dict "scalerAddress" $addon.scalerAddress "interceptorRoute" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName))) }}
-    {{- toYaml (prepend ($wl.keda.triggers | default list) $httpTrigger) | nindent 4 }}
+    {{- include "uhc.kedaHttpTriggers" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | nindent 4 }}
     {{- else }}
     {{- toYaml $wl.keda.triggers | nindent 4 }}
     {{- end }}
@@ -92,9 +90,7 @@ spec:
   maxReplicaCount: {{ required (printf "statefulSets.%s.keda.maxReplicas is required" $wlName) $wl.keda.maxReplicas }}
   triggers:
     {{- if $http }}
-    {{- $addon := include "uhc.kedaHttpAddon" $ctx | fromJson }}
-    {{- $httpTrigger := dict "type" "external-push" "metadata" (dict "scalerAddress" $addon.scalerAddress "interceptorRoute" (include "uhc.workloadResourceName" (dict "ctx" $ctx "wlName" $wlName))) }}
-    {{- toYaml (prepend ($wl.keda.triggers | default list) $httpTrigger) | nindent 4 }}
+    {{- include "uhc.kedaHttpTriggers" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | nindent 4 }}
     {{- else }}
     {{- toYaml $wl.keda.triggers | nindent 4 }}
     {{- end }}

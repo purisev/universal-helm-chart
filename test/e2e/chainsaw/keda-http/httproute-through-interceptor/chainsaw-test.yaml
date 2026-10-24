@@ -14,6 +14,16 @@ spec:
                 name: e2e
               spec:
                 rules:
+                  # The keda.http.routes port's rule goes to the interceptor too,
+                  # which picks the port by path.
+                  - matches:
+                      - path:
+                          type: PathPrefix
+                          value: /stream
+                    backendRefs:
+                      - name: keda-add-ons-http-interceptor-proxy-80
+                        namespace: keda
+                        port: 80
                   - backendRefs:
                       - name: keda-add-ons-http-interceptor-proxy-80
                         namespace: keda

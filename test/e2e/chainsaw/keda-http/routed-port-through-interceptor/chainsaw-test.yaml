@@ -1,0 +1,83 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: routed-port-through-interceptor
+spec:
+  steps:
+    - name: the Deployment is at zero before the first request
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-web 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true
+    - name: a request on the routed path alone wakes the workload and is answered by the routed port
+      try:
+        - script:
+            timeout: 3m
+            content: |
+              set -e
+              # busybox wget -S prints the response headers on stderr.
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -S -O- --timeout=150 "http://e2e-web/stream/events" 2>&1
+            check:
+              ($error): ~
+              (contains($stdout, 'routed through the interceptor')): true
+              "(contains(to_lower($stdout), 'x-keda-http-cold-start: true'))": true
+    - name: the ScaledObject's HPA carries one external metric per InterceptorRoute
+      try:
+        - assert:
+            resource:
+              apiVersion: http.keda.sh/v1beta1
+              kind: InterceptorRoute
+              metadata:
+                name: e2e-web-stream
+              spec:
+                target:
+                  service: e2e-web-origin
+                  portName: stream
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"
+        - script:
+            timeout: 60s
+            content: |
+              COUNT=$(kubectl get hpa keda-hpa-e2e-web -n "$NAMESPACE" \
+                -o jsonpath='{range .spec.metrics[*]}{.type}{"\n"}{end}' | grep -c External || true)
+              echo "external-metrics=${COUNT}"
+            check:
+              ($error): ~
+              (contains($stdout, 'external-metrics=2')): true
+    - name: other paths stay on the http port, and the routed path works through the Gateway and the Ingress
+      try:
+        - script:
+            timeout: 2m
+            content: |
+              set -e
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-web/"
+              GW_SVC=$(kubectl get svc -n "$NAMESPACE" \
+                -l gateway.networking.k8s.io/gateway-name=e2e-gateway \
+                -o jsonpath='{.items[0].metadata.name}')
+              echo "gateway: $(kubectl exec prober -n "$NAMESPACE" -- \
+                wget -q -O- --timeout=30 --header="Host: httproute.keda-http.e2e.local" \
+                "http://${GW_SVC}.${NAMESPACE}.svc.cluster.local/stream")"
+              echo "ingress: $(kubectl exec prober -n "$NAMESPACE" -- \
+                wget -q -O- --timeout=30 --header="Host: ingress.keda-http.e2e.local" \
+                "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/stream")"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+              "(contains($stdout, 'gateway: routed through the interceptor'))": true
+              "(contains($stdout, 'ingress: routed through the interceptor'))": true

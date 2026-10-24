@@ -1,4 +1,5 @@
 {{- $ctx := . }}
+{{- include "uhc.assertUniqueInterceptorRouteNames" $ctx }}
 {{- range $kind := list "deployments" "statefulSets" }}
 {{- $specs := index $ctx.Values $kind | default dict }}
 {{- range $wlName := keys $specs | sortAlpha }}
@@ -11,6 +12,7 @@
 {{- end }}
 {{- include "uhc.assertKedaHttp" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) }}
 {{- $http := $wl.keda.http }}
+{{- $hosts := include "uhc.kedaHttpHosts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) | fromJsonArray }}
 ---
 apiVersion: http.keda.sh/v1beta1
 kind: InterceptorRoute
@@ -28,7 +30,7 @@ spec:
     portName: http
   rules:
     - hosts:
-        {{- range include "uhc.kedaHttpHosts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName "kind" $kind) | fromJsonArray }}
+        {{- range $hosts }}
         - {{ . | quote }}
         {{- end }}
   scalingMetric:
@@ -41,6 +43,48 @@ spec:
   timeouts:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+{{- /* One more route per keda.http.routes entry: same hosts, its own paths, the
+     origin Service's port of that name as target. The interceptor picks the route
+     with the longest matching path. */ -}}
+{{- $routed := include "uhc.kedaHttpRoutedPorts" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) | fromJson }}
+{{- range $portKey := keys $routed | sortAlpha }}
+{{- $r := index $routed $portKey }}
+{{- $spec := index $http.routes $r.portName }}
+---
+apiVersion: http.keda.sh/v1beta1
+kind: InterceptorRoute
+metadata:
+  name: {{ $r.route }}
+  labels:
+    {{- include "uhc.workloadLabels" (dict "ctx" $ctx "workloadName" $wlName "extra" ($wl.keda.labels | default dict)) | nindent 4 }}
+  {{- $annots := include "uhc.metadataAnnotations" (dict "ctx" $ctx "kind" "interceptorRoute" "extra" ($wl.keda.annotations | default dict)) }}
+  {{- if $annots }}
+  {{- $annots | nindent 2 }}
+  {{- end }}
+spec:
+  target:
+    service: {{ include "uhc.kedaHttpOriginServiceName" (dict "ctx" $ctx "wl" $wl "wlName" $wlName) }}
+    portName: {{ $r.portName }}
+  rules:
+    - hosts:
+        {{- range $hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      paths:
+        {{- range $spec.paths }}
+        - value: {{ . | quote }}
+        {{- end }}
+  scalingMetric:
+    {{- toYaml ($spec.scalingMetric | default (dict "concurrency" (dict "targetValue" 100))) | nindent 4 }}
+  {{- with $spec.coldStart }}
+  coldStart:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $spec.timeouts }}
+  timeouts:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

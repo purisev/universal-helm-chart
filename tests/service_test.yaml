@@ -1762,3 +1762,21 @@ tests:
           path: metadata.annotations["example.com/owner"]
           value: storefront
         documentIndex: 2
+
+  - it: should keep a keda.http.routes port on the origin Service only
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100, targetPort: 3100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - hasDocuments:
+          count: 2
+      - contains:
+          path: spec.ports
+          content: {name: stream, port: 9100, targetPort: 3100, protocol: TCP}
+        documentIndex: 0
+      - lengthEqual:
+          path: spec.ports
+          count: 1
+        documentIndex: 1

@@ -232,6 +232,20 @@
         "enabled": {"type": "boolean"},
         "hosts": {"type": "array", "items": {"type": "string", "minLength": 1}},
         "directPorts": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "routes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["paths"],
+            "properties": {
+              "paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^/[^/]"}},
+              "scalingMetric": {"type": "object"},
+              "coldStart": {"type": "object"},
+              "timeouts": {"type": "object"}
+            }
+          }
+        },
         "scalingMetric": {"type": "object"},
         "coldStart": {"type": "object"},
         "timeouts": {"type": "object"}
