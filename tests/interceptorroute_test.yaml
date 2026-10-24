@@ -549,6 +549,41 @@ tests:
       - failedTemplate:
           errorMessage: "ingress.hosts.web.example.com.paths[0] sends traffic to Service \"app-web\" on port 9000, but deployments.web.keda.http serves that port from Service \"app-web-events\". Set serviceName to \"app-web-events\"."
 
+  - it: should fail when an ingresses entry reaches a direct port through the release name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      naming.omitWorkloadSuffix: true
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      ingresses.public.hosts:
+        public.example.com:
+          paths: [{path: /events, servicePort: 9000}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingresses.public.hosts.public.example.com.paths[0] sends traffic to Service \"app\" on port 9000, but deployments.web.keda.http serves that port from Service \"app-events\". Set serviceName to \"app-events\"."
+
+  - it: should accept a StatefulSet httpRoute rule on a direct port
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, events: {port: 9000}}}
+      statefulSets.cache.keda.http.directPorts: [events]
+      statefulSets.cache.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when a StatefulSet lists a port its Service does not declare
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "statefulSets.cache.keda.http.directPorts lists events, but service.ports has no events entry. Declare the port under service.ports or remove it from directPorts."
+
   - it: should leave an Ingress path to a direct port's own Service out of the hosts
     values:
       - fixtures/keda-http.yaml
