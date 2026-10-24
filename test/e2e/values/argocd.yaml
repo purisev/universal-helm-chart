@@ -63,11 +63,10 @@ deployments:
 
 integrations:
   argocd:
-    customize:
-      labels:
-        e2e/delivery: argocd
     imageUpdater:
       enabled: true
+      labels:
+        e2e/delivery: argocd
       annotations:
         e2e/owner: argocd
       # argocd-image-updater only matches Applications living in the same

@@ -2,13 +2,6 @@ fullnameOverride: e2e
 
 integrations:
   monitoring:
-    # Prometheus and VMAgent select scrape objects by this label, so every
-    # *-targets-up / *-podmonitor-scrape scenario depends on it reaching them.
-    customize:
-      labels:
-        e2e-scrape: selected
-      annotations:
-        e2e/owner: observability
     defaults:
       enabled: true
       # Overridden with --set for the VictoriaMetrics leg of the matrix.
@@ -35,6 +28,12 @@ deployments:
       requests:
         cpu: 50m
         memory: 32Mi
+
+    metrics:
+      labels:
+        e2e/scrape: api
+      annotations:
+        e2e/owner: observability
 
   # Same target, but discovered via prometheus.io/* Service annotations
   # instead of a ServiceMonitor/VMServiceScrape CRD object.
@@ -83,3 +82,7 @@ deployments:
     metrics:
       enabled: true
       type: pod
+      labels:
+        e2e/scrape: api-pod
+      annotations:
+        e2e/owner: observability

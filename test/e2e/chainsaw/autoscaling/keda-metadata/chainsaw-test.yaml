@@ -1,10 +1,10 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: keda-customize-metadata
+  name: keda-metadata
 spec:
   steps:
-    - name: integrations.keda.customize lands on the ScaledObject
+    - name: the workload's keda labels and annotations land on its ScaledObject
       try:
         - assert:
             resource:

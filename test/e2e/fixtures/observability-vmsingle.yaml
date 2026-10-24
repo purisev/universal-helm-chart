@@ -18,17 +18,9 @@ metadata:
   # The operator names the generated Service vmagent-<this name>.
   name: e2e
 spec:
-  # Like Prometheus in the other matrix leg, the agent only picks up scrape
-  # objects carrying e2e-scrape=selected, which the chart sets through
-  # integrations.monitoring.customize. The empty namespace selectors widen
-  # the search from the VMAgent's own namespace to every namespace.
-  serviceScrapeSelector:
-    matchLabels:
-      e2e-scrape: selected
-  serviceScrapeNamespaceSelector: {}
-  podScrapeSelector:
-    matchLabels:
-      e2e-scrape: selected
-  podScrapeNamespaceSelector: {}
+  # Both ...Selector and ...NamespaceSelector default to nil, which means
+  # "select nothing" (not "select everything") — this flips that so the
+  # agent actually scrapes the chart's rendered VMServiceScrape/VMPodScrape.
+  selectAllByDefault: true
   remoteWrite:
     - url: http://vmsingle-e2e.vm.svc.cluster.local:8429/api/v1/write

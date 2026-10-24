@@ -1,10 +1,10 @@
 apiVersion: chainsaw.kyverno.io/v1alpha1
 kind: Test
 metadata:
-  name: eso-customize-metadata
+  name: eso-metadata
 spec:
   steps:
-    - name: integrations.eso.customize lands on the SecretStore, which ESO still marks Ready
+    - name: a secretStores entry's labels and annotations land on its SecretStore, which ESO still marks Ready
       try:
         - assert:
             resource:
@@ -20,7 +20,7 @@ spec:
               status:
                 (conditions[?type == 'Ready']):
                   - status: "True"
-    - name: an externalSecrets entry's label wins over customize, and the secret still syncs
+    - name: an externalSecrets entry's labels and annotations land on its ExternalSecret, which still syncs
       try:
         - assert:
             resource:
