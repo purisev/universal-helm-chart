@@ -11,6 +11,7 @@ ci/
 tests/
 test/
 .github/
+.trivyignore.yaml
 
 # Documentation, examples, ADRs — never shipped in the OCI artifact
 docs/
