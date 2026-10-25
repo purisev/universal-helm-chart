@@ -1057,8 +1057,22 @@ jobs:
           kubectl get imageupdater -n argocd -o yaml || true
           echo "::endgroup::"
 
+          echo "::group::ArgoCD pods"
+          kubectl get pods -n argocd -o wide || true
+          kubectl describe pods -n argocd || true
+          echo "::endgroup::"
+
+          echo "::group::ArgoCD events"
+          kubectl get events -n argocd --sort-by=.lastTimestamp || true
+          echo "::endgroup::"
+
+          # The Argo CD pod templates carry only app.kubernetes.io/name, so the
+          # components are named one by one.
           echo "::group::ArgoCD component logs"
-          kubectl logs -n argocd -l app.kubernetes.io/part-of=argocd --all-containers --prefix --tail=200 || true
+          for component in deployment/argocd-repo-server deployment/argocd-redis \
+            deployment/argocd-applicationset-controller statefulset/argocd-application-controller; do
+            kubectl logs -n argocd "$component" --all-containers --prefix --tail=200 || true
+          done
           echo "::endgroup::"
 
           echo "::group::argocd-image-updater logs"
