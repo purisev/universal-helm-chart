@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-7a3e427a.js";
+            window.path_to_searchindex_js = "../searchindex-6adf5a54.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -194,7 +194,7 @@
 <p>Two label <em>sources</em> converge on each resource the chart renders:</p>
 <ul>
 <li><strong>Chart-managed labels</strong> — the <code>app.kubernetes.io/*</code> set the chart computes (<code>name</code>, <code>instance</code>, <code>version</code>, <code>managed-by</code>, <code>part-of</code>, <code>component</code>).</li>
-<li><strong>User-supplied labels</strong> — <code>commonLabels</code> plus per-feature annotation/label customisation under <code>integrations.&lt;name&gt;.customize.labels</code>.</li>
+<li><strong>User-supplied labels</strong> — <code>commonLabels</code> plus the <code>labels</code> a values entry sets for the resources rendered from it.</li>
 </ul>
 <p>Without explicit rules, two failure modes are easy to hit:</p>
 <ul>

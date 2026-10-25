@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-7a3e427a.js";
+            window.path_to_searchindex_js = "searchindex-6adf5a54.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -316,7 +316,7 @@
 </code></pre>
 <p>There is no Helm “repo add” step — Helm 3.8+ pulls OCI charts directly:</p>
 <pre><code class="language-bash">helm install my-app oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.3.0 \
+  --version 3.4.0 \
   -f values.yaml
 </code></pre>
 <h2 id="optional-crds"><a class="header" href="#optional-crds">Optional CRDs</a></h2>
@@ -352,7 +352,7 @@
           port: 80
 </code></pre>
 <p>Install:</p>
-<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.3.0 -f values.yaml
+<pre><code class="language-bash">helm install demo oci://ghcr.io/purisev/universal-helm-chart --version 3.4.0 -f values.yaml
 </code></pre>
 <p>A complete copy-and-deploy version of this scenario, including Argo CD and Flux manifests, lives at <a href="02-examples/01-minimal"><code>../02-examples/01-minimal/</code></a>.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -388,7 +388,7 @@
 <tr><td>05</td><td><a href="02-examples/05-cronjobs"><code>05-cronjobs/</code></a></td><td><code>jobGroups</code> — Job (PreSync hook, tasks-mode) + CronJob (two scheduled jobs)</td></tr>
 <tr><td>06</td><td><a href="02-examples/06-monitoring"><code>06-monitoring/</code></a></td><td>ServiceMonitor + PodMonitor + annotations-mode + per-workload provider override (VM)</td></tr>
 <tr><td>07</td><td><a href="02-examples/07-external-secrets"><code>07-external-secrets/</code></a></td><td>ESO <code>SecretStore</code> (Vault) + <code>ExternalSecret</code> (<code>data</code> and <code>dataFrom</code>) + Reloader</td></tr>
-<tr><td>08</td><td><a href="02-examples/08-keda-event-driven"><code>08-keda-event-driven/</code></a></td><td>KEDA <code>ScaledObject</code> (Kafka lag trigger) + VPA Initial mode (orthogonal)</td></tr>
+<tr><td>08</td><td><a href="02-examples/08-keda-event-driven"><code>08-keda-event-driven/</code></a></td><td>KEDA <code>ScaledObject</code> (Kafka lag trigger) + VPA Initial mode (orthogonal); HTTP scale to zero through the KEDA HTTP add-on</td></tr>
 <tr><td>09</td><td><a href="02-examples/09-multi-env-overrides"><code>09-multi-env-overrides/</code></a></td><td>Base values + per-env overlays + Argo CD <code>ApplicationSet</code> + Flux <code>valuesFrom</code></td></tr>
 <tr><td>10</td><td><a href="02-examples/10-init-containers"><code>10-init-containers/</code></a></td><td>Per-workload <code>initContainers</code> map — wait-for-db + schema migration before the main container starts</td></tr>
 <tr><td>99</td><td><a href="02-examples/99-kitchen-sink"><code>99-kitchen-sink/</code></a></td><td>Everything-on showcase</td></tr>
@@ -405,6 +405,7 @@
 <li>Wiring up scrape targets → <code>06-monitoring</code>.</li>
 <li>Pulling secrets from Vault / AWS / GCP → <code>07-external-secrets</code>.</li>
 <li>Event-driven worker scaling → <code>08-keda-event-driven</code>.</li>
+<li>HTTP service that scales to zero → <code>08-keda-event-driven</code>.</li>
 <li>Same app in dev / staging / prod → <code>09-multi-env-overrides</code>.</li>
 <li>Init containers for wait-for-X / one-shot bootstrap before the main app → <code>10-init-containers</code>.</li>
 <li>All the bells and whistles → <code>99-kitchen-sink</code>.</li>
@@ -820,7 +821,9 @@ kubectl apply -f flux/
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="08--keda-event-driven-autoscaling"><a class="header" href="#08--keda-event-driven-autoscaling">08 — KEDA event-driven autoscaling</a></h1>
 <p>A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus VPA in <code>Initial</code> mode for right-sized memory requests on first pod start.</p>
+<p>Next to it, an HTTP frontend that scales 0 → 10 replicas on request rate through the <a href="https://keda.sh/http-add-on/latest/">KEDA HTTP add-on</a>, and wakes from zero on the first request.</p>
 <h2 id="what-this-shows-7"><a class="header" href="#what-this-shows-7">What this shows</a></h2>
+<h3 id="worker-kafka-lag"><a class="header" href="#worker-kafka-lag"><code>worker</code>: Kafka lag</a></h3>
 <ul>
 <li><code>keda.enabled: true</code> on the worker, with a <code>kafka</code> trigger keyed on consumer-group lag.</li>
 <li><code>minReplicas: 1</code>, not <code>0</code> — this worker should never have a gap in consumption. Set <code>minReplicas: 0</code> instead when the workload can tolerate sitting idle (e.g. a <code>cron</code> trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.</li>
@@ -831,6 +834,17 @@ kubectl apply -f flux/
 <li><code>metrics.type: pod</code> + <code>integrations.monitoring.defaults.exposeService.enabled: true</code> → a metrics-only Service <code>&lt;release&gt;-worker-metrics</code> is auto-emitted, and a <code>PodMonitor</code> scrapes the worker pods directly.</li>
 <li>The Deployment manifest will have <strong>no <code>spec.replicas</code></strong> because an HPA-class scaler is on — so Helm <code>upgrade</code> doesn’t bounce the count back to a static value on every sync.</li>
 </ul>
+<h3 id="web-http-traffic-down-to-zero"><a class="header" href="#web-http-traffic-down-to-zero"><code>web</code>: HTTP traffic, down to zero</a></h3>
+<ul>
+<li><code>keda.http.enabled: true</code> turns the ScaledObject into one driven by the add-on’s interceptor, which counts requests, holds the first one while KEDA starts a pod, and forwards it once the pod is ready. <code>minReplicas</code> defaults to <code>0</code>.</li>
+<li>The Service keeps its name, <code>orders-web</code>, and becomes an <code>ExternalName</code> for the interceptor. The pods are behind <code>orders-web-origin</code>, which also carries the metrics port the ServiceMonitor scrapes.</li>
+<li>The <code>http</code> port is left unset, so it takes the interceptor port, <code>8080</code>. An ExternalName cannot remap ports, so callers and the Ingress use <code>8080</code>.</li>
+<li><code>scalingMetric.requestRate</code> adds one replica per 50 requests a second over a one-minute window.</li>
+<li><code>live</code> is a second port, for server-sent events. <code>keda.http.routes.live</code> gives it an <code>InterceptorRoute</code> of its own on <code>/live</code>: <code>http://orders-web:8080/live</code> reaches port <code>9100</code>, everything else reaches <code>http</code>. The route has its own trigger, so a stream request wakes the workload too. An open stream counts as one request for as long as it lasts, so its <code>concurrency</code> target is sized for connections.</li>
+<li>The Ingress names <code>orders-web</code> on <code>8080</code>. Its host, <code>orders.example.com</code>, is added to both InterceptorRoutes.</li>
+<li><code>podDisruptionBudget.maxUnavailable: 1</code> replaces the root PDB for this workload: <code>minAvailable: 1</code> would block draining the node that runs its only pod.</li>
+</ul>
+<p>A port that should not go through the interceptor goes under <code>keda.http.directPorts</code> instead and gets a Service of its own; its traffic neither counts nor wakes the workload. The full set of fields, and the shapes the render rejects, are in the <a href="#keda-http-add-on-kedahttp">values reference</a>.</p>
 <h2 id="delta-from-02-web-app-ingress-4"><a class="header" href="#delta-from-02-web-app-ingress-4">Delta from <code>02-web-app-ingress</code></a></h2>
 <div class="table-wrapper">
 <table>
@@ -843,7 +857,8 @@ kubectl apply -f flux/
 <tr><td>Added VPA</td><td>Orthogonal, recommends/sets memory requests on initial pod create.</td></tr>
 <tr><td>Service off</td><td>Worker has no listener; metrics-only Service auto-emitted instead.</td></tr>
 <tr><td><code>metrics.type: pod</code></td><td>PodMonitor instead of ServiceMonitor.</td></tr>
-<tr><td>Removed Ingress</td><td>No external traffic.</td></tr>
+<tr><td>Ingress on <code>web</code></td><td>Backend is the ExternalName on the interceptor port.</td></tr>
+<tr><td><code>web</code> on KEDA HTTP</td><td>Scales to zero; the interceptor wakes it on the first request.</td></tr>
 </tbody>
 </table>
 </div>
@@ -871,6 +886,8 @@ kubectl apply -f flux/
 <h2 id="prerequisites-5"><a class="header" href="#prerequisites-5">Prerequisites</a></h2>
 <ul>
 <li>KEDA installed in the cluster (<code>keda.sh</code> CRDs).</li>
+<li>KEDA HTTP add-on v0.14.0 or later in the <code>keda</code> namespace (<code>http.keda.sh/v1beta1</code> <code>InterceptorRoute</code>). Set <code>integrations.keda.httpAddon</code> if it runs elsewhere.</li>
+<li>An Ingress controller that accepts <code>ExternalName</code> backends; ingress-nginx does.</li>
 <li>VPA installed (<code>autoscaling.k8s.io</code> CRDs).</li>
 <li>A Kafka cluster reachable at <code>kafka.kafka:9092</code> with topic <code>orders</code> and consumer group <code>orders-worker</code>. Adjust to your environment.</li>
 <li>Prometheus Operator CRDs for the PodMonitor (or remove the <code>metrics:</code> block).</li>
@@ -1070,7 +1087,7 @@ kubectl apply -f flux/
 <tr><td>Job groups</td><td><code>jobGroups</code></td><td><a href="#005--jobgroups-unifying-job-and-cronjob">ADR 005</a> · <a href="#012--pod-spec-hashing-for-job-idempotency-under-gitops">ADR 012</a> · <a href="02-examples/05-cronjobs"><code>02-examples/05-cronjobs/</code></a></td></tr>
 <tr><td>Networking — Ingress</td><td><code>ingress</code> (<code>hosts</code>, <code>tls</code> as native k8s list, <code>defaultBackend</code>), <code>ingresses</code></td><td><a href="#009--dual-networking-stack-ingress--gateway-api">ADR 009</a> · <a href="02-examples/02-web-app-ingress"><code>02-examples/02-web-app-ingress/</code></a></td></tr>
 <tr><td>Networking — Gateway API</td><td><code>httpRoute</code>, <code>httpRoutes</code>, <code>grpcRoute</code>, <code>grpcRoutes</code>, <code>tlsRoute</code>, <code>tlsRoutes</code>, <code>referenceGrant</code>, <code>referenceGrants</code></td><td><a href="#009--dual-networking-stack-ingress--gateway-api">ADR 009</a> · <a href="02-examples/04-gateway-api"><code>02-examples/04-gateway-api/</code></a></td></tr>
-<tr><td>Autoscaling</td><td>per-workload <code>hpa</code>, <code>keda</code>, <code>verticalPodAutoscaler</code></td><td><a href="#007--autoscaler-mutual-exclusion-hpa--keda--vpa">ADR 007</a> · <a href="02-examples/08-keda-event-driven"><code>02-examples/08-keda-event-driven/</code></a></td></tr>
+<tr><td>Autoscaling</td><td>per-workload <code>hpa</code>, <code>keda</code> (incl. <code>keda.http</code>), <code>verticalPodAutoscaler</code>, <code>integrations.keda.httpAddon</code></td><td><a href="#007--autoscaler-mutual-exclusion-hpa--keda--vpa">ADR 007</a> · <a href="02-examples/08-keda-event-driven"><code>02-examples/08-keda-event-driven/</code></a></td></tr>
 <tr><td>Monitoring</td><td><code>integrations.monitoring.defaults</code>, per-workload <code>metrics</code>, auto-exposed metrics port</td><td><a href="#008--multi-provider-monitoring-matrix">ADR 008</a> · <a href="#016--metrics-port-auto-exposure-on-service">ADR 016</a> · <a href="02-examples/06-monitoring"><code>02-examples/06-monitoring/</code></a></td></tr>
 <tr><td>Secrets (ESO)</td><td><code>integrations.eso.enabled</code>, <code>integrations.eso.secretStores</code>, <code>integrations.eso.externalSecrets</code></td><td><a href="#015--eso-data-vs-datafrom-and-chart-vs-external-disambiguation">ADR 015</a> · <a href="02-examples/07-external-secrets"><code>02-examples/07-external-secrets/</code></a></td></tr>
 <tr><td>Identity &amp; RBAC</td><td><code>serviceAccount</code> (<code>create</code> defaults to <code>true</code>), <code>rbac</code> (<code>enabled</code>, <code>clusterScoped</code>, <code>rules</code>), <code>automountServiceAccountToken</code></td><td><a href="02-examples/07-external-secrets"><code>02-examples/07-external-secrets/</code></a></td></tr>
@@ -1096,6 +1113,36 @@ kubectl apply -f flux/
 <li><code>labels.standard.{partOf,version,managedBy,enabled}</code> toggles affect singletons (ServiceAccount, Ingress, Routes, etc.) but not workload selectors.</li>
 </ul>
 <p>See <a href="#011--standard-wins-labels-and-invariant-workload-selectors">ADR 011</a>.</p>
+<h3 id="labels-and-annotations-on-generated-resources"><a class="header" href="#labels-and-annotations-on-generated-resources">Labels and annotations on generated resources</a></h3>
+<p>These keys take <code>labels</code> and <code>annotations</code> for the resources rendered from them:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Resources</th></tr>
+</thead>
+<tbody>
+<tr><td><code>configMaps.&lt;key&gt;</code></td><td>its ConfigMap</td></tr>
+<tr><td><code>integrations.eso.secretStores.&lt;key&gt;</code></td><td>its SecretStore / ClusterSecretStore</td></tr>
+<tr><td><code>integrations.eso.externalSecrets.&lt;key&gt;</code></td><td>its ExternalSecret</td></tr>
+<tr><td><code>integrations.argocd.imageUpdater</code></td><td>the ImageUpdater (<code>annotations</code> and <code>labels</code>)</td></tr>
+<tr><td><code>deployments.&lt;name&gt;.metrics</code>, <code>statefulSets.&lt;name&gt;.metrics</code></td><td>the workload’s ServiceMonitor, PodMonitor, VMServiceScrape or VMPodScrape</td></tr>
+<tr><td><code>deployments.&lt;name&gt;.keda</code>, <code>statefulSets.&lt;name&gt;.keda</code></td><td>the workload’s ScaledObject and, with <code>keda.http</code>, its InterceptorRoute</td></tr>
+</tbody>
+</table>
+</div>
+<p>Labels resolve as <code>commonLabels</code> → the key’s <code>labels</code> → chart-managed <code>app.kubernetes.io/*</code>, last wins, so a chart-managed key cannot be shadowed. Annotations resolve as <code>commonAnnotations</code> → Reloader → sync-wave → the key’s <code>annotations</code>, last wins.</p>
+<p><code>metrics.labels</code> and <code>keda.labels</code> are fields of their blocks like any other: writing either one defines the block, which turns metrics or KEDA on for that workload unless the block also sets <code>enabled: false</code>.</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    metrics:
+      labels:
+        release: kube-prometheus-stack
+configMaps:
+  app-config:
+    labels:
+      config-kind: logging
+    data: { ... }
+</code></pre>
 <h3 id="port-ordering-inside-service--pod-template"><a class="header" href="#port-ordering-inside-service--pod-template">Port ordering inside Service / pod template</a></h3>
 <p>When a workload’s <code>service.ports</code> (or per-container <code>ports</code>) is iterated:</p>
 <pre><code>http (if present)  →  others alphabetically  →  metrics (if present)
@@ -1253,6 +1300,23 @@ chart renders itself.
 <blockquote>
 <p><strong>Schema strictness.</strong> Each rule entry is validated against a strict schema (<code>additionalProperties: false</code>) listing only the fields above plus <code>matches</code>, <code>filters</code>, <code>backendRefs</code>, <code>serviceName</code>, and <code>servicePort</code>. Unknown keys (typos, deprecated fields, or Gateway API fields not yet wired into the chart) fail at <code>helm template</code> time with a clear validation error rather than being silently dropped. If you depend on a Gateway API HTTPRouteRule field not in this list, open an issue or submit a PR — see <a href="#009--dual-networking-stack-ingress--gateway-api">ADR 009</a>.</p>
 </blockquote>
+<h4 id="redirect-rules"><a class="header" href="#redirect-rules">Redirect rules</a></h4>
+<p>Gateway API rejects a rule that has a <code>RequestRedirect</code> filter and any <code>backendRefs</code>. Such a rule renders without <code>backendRefs</code>: the default backend is not filled in, and <code>backendRefs: []</code> stays empty. A redirect rule that names a backend itself, through <code>backendRefs</code>, <code>serviceName</code> or <code>servicePort</code>, fails the render:</p>
+<pre><code>httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule.
+</code></pre>
+<pre><code class="language-yaml">httpRoutes:
+  http-to-https:
+    parentRefs:
+      - name: public-gw
+        sectionName: http
+    rules:
+      - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+</code></pre>
+<p>GRPCRoute has no redirect filter and TLSRoute no filters, so their rules always get a backend.</p>
 <h4 id="gateway-api-channel-and-version-requirements"><a class="header" href="#gateway-api-channel-and-version-requirements">Gateway API channel and version requirements</a></h4>
 <p>The chart’s CRD-channel detection runs at template time when <code>gateway.networking.k8s.io/v1</code> is present in <code>Capabilities.APIVersions</code> and emits a fail-fast error if the field’s required CRD channel is missing. Detection is skipped when rendering offline (<code>helm template</code> without <code>--api-versions</code>).</p>
 <div class="table-wrapper">
@@ -1351,6 +1415,156 @@ chart renders itself.
 </code></pre>
 <p><code>behavior</code> is the Kubernetes HPA scaling-behavior shape, applied to the HPA that KEDA creates. It is worth setting on a lag-driven trigger: the HPA default doubles the replica count every 15 seconds, which overshoots on a queue that drains quickly. The example above adds one pod a minute instead.</p>
 <p>Because nothing here is validated field by field, a typo inside <code>advanced</code> reaches the cluster and is rejected by the KEDA CRD rather than by <code>helm template</code>. Check the field names against the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> for the KEDA version you run.</p>
+<h3 id="keda-http-add-on-kedahttp"><a class="header" href="#keda-http-add-on-kedahttp">KEDA HTTP add-on (<code>keda.http</code>)</a></h3>
+<p><code>keda.http</code> scales a Deployment or StatefulSet on HTTP traffic, down to zero, through the <a href="https://keda.sh/http-add-on/latest/">KEDA HTTP add-on</a> (v0.14.0 or later, which serves <code>InterceptorRoute</code>). The add-on runs an interceptor in front of the workload: it counts requests, holds the first one while KEDA starts a pod, and forwards to the pod once it is ready.</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+    keda:
+      maxReplicas: 10
+      http:
+        enabled: true
+</code></pre>
+<p>Callers keep using the workload’s Service name. The chart renders:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Object</th><th>Shape</th></tr>
+</thead>
+<tbody>
+<tr><td>Service <code>&lt;svc&gt;</code></td><td><code>ExternalName</code> for the interceptor Service, so in-cluster callers and Ingress backends reach the interceptor under the name they already use.</td></tr>
+<tr><td>Service <code>&lt;svc&gt;-origin</code></td><td>The Service built from <code>service</code>, selecting the pods. The interceptor forwards here, and the metrics port and <code>prometheus.io/*</code> annotations stay here.</td></tr>
+<tr><td>Service <code>&lt;svc&gt;-&lt;portName&gt;</code></td><td>One <code>ClusterIP</code> Service for each port listed in <code>keda.http.directPorts</code>, selecting the pods. See <a href="#ports-past-the-interceptor">Ports past the interceptor</a>.</td></tr>
+<tr><td><code>InterceptorRoute</code> <code>&lt;fullname&gt;-&lt;workload&gt;</code></td><td><code>target</code> is the origin Service’s <code>http</code> port. <code>hosts</code> hold <code>&lt;svc&gt;</code>, <code>&lt;svc&gt;.&lt;ns&gt;</code>, <code>&lt;svc&gt;.&lt;ns&gt;.svc</code>, <code>&lt;svc&gt;.&lt;ns&gt;.svc.&lt;clusterDomain&gt;</code>, the root <code>httpRoute.hostnames</code> when the workload has an <code>httpRoute</code>, the hosts of every Ingress path that names <code>&lt;svc&gt;</code>, and <code>keda.http.hosts</code>.</td></tr>
+<tr><td><code>InterceptorRoute</code> <code>&lt;fullname&gt;-&lt;workload&gt;-&lt;portName&gt;</code></td><td>One for each <code>keda.http.routes</code> entry: the same <code>hosts</code>, the entry’s <code>paths</code>, and the origin Service’s port of that name as <code>target</code>. See <a href="#ports-through-the-interceptor">Ports through the interceptor</a>.</td></tr>
+<tr><td><code>ScaledObject</code></td><td>An <code>external-push</code> trigger for the workload’s route goes first in <code>triggers</code>, then one for each <code>routes</code> entry in name order; declared triggers follow. <code>minReplicaCount</code> defaults to <code>0</code>.</td></tr>
+<tr><td>HTTPRoute rules of the workload</td><td>Rules without <code>serviceName</code> or <code>backendRefs</code> point at the interceptor Service in the add-on namespace, or at <code>&lt;svc&gt;-&lt;portName&gt;</code> when their <code>servicePort</code> is the port of a <code>directPorts</code> entry. A rule whose <code>servicePort</code> is the port of a <code>routes</code> entry also points at the interceptor, on the interceptor port.</td></tr>
+<tr><td>NetworkPolicy of the workload</td><td>An ingress rule admitting the interceptor pods (<code>app.kubernetes.io/component: interceptor</code>, <code>app.kubernetes.io/name: http-add-on</code>) from the add-on namespace, whenever the policy covers <code>Ingress</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>keda.http</code> takes these optional fields:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>hosts</code></td><td><code>[]</code></td><td>Extra host names for the route, evaluated through <code>tpl</code>.</td></tr>
+<tr><td><code>directPorts</code></td><td><code>[]</code></td><td>Names of <code>service.ports</code> entries served past the interceptor, each from a Service of its own.</td></tr>
+<tr><td><code>routes</code></td><td><code>{}</code></td><td><code>service.ports</code> entries reached through the interceptor by path, keyed by port name. Each takes <code>paths</code> (required), and <code>scalingMetric</code>, <code>coldStart</code> and <code>timeouts</code> like the fields above.</td></tr>
+<tr><td><code>scalingMetric</code></td><td><code>{concurrency: {targetValue: 100}}</code></td><td><code>InterceptorRoute.spec.scalingMetric</code>: <code>concurrency</code> and/or <code>requestRate</code>.</td></tr>
+<tr><td><code>coldStart</code></td><td>—</td><td><code>InterceptorRoute.spec.coldStart</code>, passed through.</td></tr>
+<tr><td><code>timeouts</code></td><td>—</td><td><code>InterceptorRoute.spec.timeouts</code>, passed through.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Where the add-on runs is set once per release under <code>integrations.keda.httpAddon</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>namespace</code></td><td><code>keda</code></td><td>Namespace of the add-on.</td></tr>
+<tr><td><code>interceptorService</code></td><td><code>keda-add-ons-http-interceptor-proxy</code></td><td>Interceptor Service the ExternalName and HTTPRoute rules point at.</td></tr>
+<tr><td><code>port</code></td><td><code>8080</code></td><td>Port of that Service. It is also the port of the workload Service’s <code>http</code> entry.</td></tr>
+<tr><td><code>scalerAddress</code></td><td><code>keda-add-ons-http-external-scaler.&lt;namespace&gt;:9090</code></td><td><code>scalerAddress</code> of the <code>external-push</code> trigger.</td></tr>
+<tr><td><code>clusterDomain</code></td><td><code>cluster.local</code></td><td>Domain of the fully qualified host and of the ExternalName target.</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="the-client-port"><a class="header" href="#the-client-port">The client port</a></h4>
+<p>An ExternalName is a DNS alias and cannot remap ports, so callers connect to the interceptor Service on the port they use for <code>&lt;svc&gt;</code>. The <code>http</code> port of a <code>keda.http</code> workload is therefore <code>integrations.keda.httpAddon.port</code>: left unset, it takes that value; set to anything else, the render fails. The interceptor itself listens on the port its own chart sets (<code>interceptor.proxy.port</code>, <code>8080</code>). For callers that stay on port 80, the platform adds a Service in the add-on namespace that serves the interceptor pods on 80, and the release points at it:</p>
+<pre><code class="language-yaml"># Platform, once per cluster, in the add-on namespace
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-add-ons-http-interceptor-proxy-80
+  namespace: keda
+spec:
+  selector:
+    app.kubernetes.io/component: interceptor
+    app.kubernetes.io/name: http-add-on
+  ports:
+    - name: proxy
+      port: 80
+      targetPort: proxy
+</code></pre>
+<pre><code class="language-yaml"># Release
+integrations:
+  keda:
+    httpAddon:
+      interceptorService: keda-add-ons-http-interceptor-proxy-80
+      port: 80
+</code></pre>
+<p>An HTTPRoute in the application namespace references the interceptor Service across namespaces, which needs a <code>ReferenceGrant</code> in the add-on namespace. The chart does not render it; the platform owns it.</p>
+<h4 id="ports-past-the-interceptor"><a class="header" href="#ports-past-the-interceptor">Ports past the interceptor</a></h4>
+<p>The interceptor serves one HTTP port, so a workload with other ports on its Service lists them in <code>directPorts</code>. Each one leaves <code>&lt;svc&gt;</code> and gets a <code>ClusterIP</code> Service <code>&lt;svc&gt;-&lt;portName&gt;</code> that selects the pods directly:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        events:
+          port: 9000
+    keda:
+      http:
+        enabled: true
+        directPorts: [events]
+</code></pre>
+<p>renders <code>&lt;svc&gt;</code> (ExternalName, <code>http</code>), <code>&lt;svc&gt;-origin</code> (<code>http</code>) and <code>&lt;svc&gt;-events</code> (<code>events</code>, port <code>9000</code>). Callers of the port, Ingress paths included, use <code>&lt;svc&gt;-events</code>. A workload <code>httpRoute</code> rule with <code>servicePort: 9000</code> and no backend of its own is sent there by the chart. With <code>keda.http</code> off, <code>directPorts</code> is ignored and the port stays on <code>&lt;svc&gt;</code>.</p>
+<p>The Service of a direct port carries the port’s <code>protocol</code> and <code>appProtocol</code> and none of the <code>service</code> annotations or other <code>service</code> fields. <code>metrics</code> cannot be listed; it stays on <code>&lt;svc&gt;-origin</code> and is never added to a route.</p>
+<p>Traffic on a direct port does not pass the interceptor: it is not counted toward <code>scalingMetric</code>, and it does not start a workload scaled to zero. A port whose callers arrive only while the HTTP side keeps a pod running fits; a port that has to wake the workload by itself does not, unless <code>keda.minReplicas</code> is at least <code>1</code>. The workload’s NetworkPolicy admits the interceptor only, so a policy that covers <code>Ingress</code> needs its own rule for the callers of a direct port.</p>
+<h4 id="ports-through-the-interceptor"><a class="header" href="#ports-through-the-interceptor">Ports through the interceptor</a></h4>
+<p>A port listed under <code>routes</code> stays on <code>&lt;svc&gt;-origin</code> and gets an InterceptorRoute of its own. The interceptor listens on one port and picks a route by host and longest matching path across all routes, so requests to the entry’s <code>paths</code> go to that port, and everything else to <code>http</code>:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        stream:
+          port: 9100
+    keda:
+      http:
+        enabled: true
+        routes:
+          stream:
+            paths: [/stream]
+            scalingMetric:
+              concurrency:
+                targetValue: 1000
+</code></pre>
+<p>Callers keep using <code>&lt;svc&gt;</code> on the interceptor port: <code>http://&lt;svc&gt;/stream/...</code> reaches port <code>9100</code> of the pods, and <code>http://&lt;svc&gt;/</code> reaches <code>http</code>. Ingress paths do the same with <code>servicePort</code> set to the interceptor port. A workload <code>httpRoute</code> rule may say <code>servicePort: 9100</code>; the chart points it at the interceptor, and every path it matches has to lie under the entry’s <code>paths</code>.</p>
+<p>Each route adds its own <code>external-push</code> trigger, so a request on a routed path counts toward scaling and starts a workload scaled to zero. The interceptor counts a request from its start to its end, and a WebSocket or long-poll request stays open for minutes: give its route a <code>scalingMetric</code> sized for open connections, or a few hundred idle clients look like a burst of load. While any such connection is open, the workload does not scale to zero. A long-poll route may also need <code>timeouts.responseHeader</code> above its poll interval.</p>
+<p>With <code>keda.http</code> off, <code>routes</code> is ignored and the port stays on <code>&lt;svc&gt;</code>.</p>
+<h4 id="what-the-render-rejects"><a class="header" href="#what-the-render-rejects">What the render rejects</a></h4>
+<p>Every port of <code>&lt;svc&gt;</code> resolves to the interceptor, which serves one HTTP port. With <code>keda.http</code> on, the render fails when:</p>
+<ul>
+<li>the workload renders no Service, or its <code>service.type</code> is not <code>ClusterIP</code>, or <code>service.clusterIP</code> is <code>None</code>;</li>
+<li><code>service.ports</code> has no <code>http</code> entry, or has entries other than <code>http</code>, <code>metrics</code> and those listed in <code>directPorts</code> or <code>routes</code>;</li>
+<li><code>directPorts</code> lists <code>http</code>, <code>metrics</code> or a name <code>service.ports</code> does not declare, or a listed port uses the interceptor port;</li>
+<li><code>routes</code> names <code>http</code>, <code>metrics</code>, a <code>directPorts</code> entry or a name <code>service.ports</code> does not declare, lists one path under two entries, or names a port that uses the interceptor port;</li>
+<li>a workload HTTPRoute rule on the port of a <code>routes</code> entry matches a path outside that entry’s <code>paths</code>, or by regular expression;</li>
+<li>an InterceptorRoute name of a <code>routes</code> entry is also the route name of another workload;</li>
+<li>the <code>http</code> port is set and differs from <code>integrations.keda.httpAddon.port</code>;</li>
+<li>the workload has a <code>grpcRoute</code> or <code>tlsRoute</code>;</li>
+<li>one of the workload’s HTTPRoute rules sends to the interceptor with a <code>servicePort</code> other than the interceptor port;</li>
+<li>an Ingress path names <code>&lt;svc&gt;</code> with a <code>servicePort</code> other than the interceptor port; for the port of a <code>directPorts</code> entry, the message names the Service to use instead, and for the port of a <code>routes</code> entry, the interceptor port;</li>
+<li>the cluster serves <code>keda.sh/v1alpha1</code> without <code>http.keda.sh/v1beta1</code>.</li>
+</ul>
+<h4 id="limits"><a class="header" href="#limits">Limits</a></h4>
+<ul>
+<li>Ingress backends reach the interceptor through the ExternalName, so the Ingress controller has to support ExternalName Services (ingress-nginx does; Traefik needs <code>allowExternalNameServices</code>).</li>
+<li>Only the workload’s own <code>httpRoute</code> rules are redirected. A rule in the root <code>httpRoute.rules</code> or in <code>httpRoutes</code> that names <code>&lt;svc&gt;</code> keeps pointing at the ExternalName, which most Gateway implementations reject; point those at the interceptor Service explicitly.</li>
+<li>Turning <code>keda.http</code> on or off changes the live <code>&lt;svc&gt;</code> between <code>ClusterIP</code> and <code>ExternalName</code>. The cluster IP is released on the way to ExternalName and a new one is allocated on the way back. Until cached DNS answers expire, callers keep reaching the previous target: after <code>keda.http</code> is turned off, a request that still resolves to the interceptor finds no route and is held until it times out.</li>
+<li><code>syncWaves.interceptorRoute</code> (default <code>20</code>) applies to the InterceptorRoute and to the ExternalName Service, so callers are switched over together with the route and before the ScaledObject (<code>21</code>).</li>
+</ul>
 <h3 id="scheduling-field-inheritance"><a class="header" href="#scheduling-field-inheritance">Scheduling field inheritance</a></h3>
 <p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
 <h3 id="topology-spread-constraint-fields"><a class="header" href="#topology-spread-constraint-fields">Topology spread constraint fields</a></h3>
@@ -1448,7 +1662,7 @@ deployments.web.createConfigmap and configMaps.web-config.
 <h2 id="ide-setup"><a class="header" href="#ide-setup">IDE setup</a></h2>
 <h3 id="yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><a class="header" href="#yaml-language-server--red-hat-yaml-extension-vs-code-neovim-others"><code>yaml-language-server</code> / Red Hat YAML extension (VS Code, Neovim, others)</a></h3>
 <p>Add a directive at the top of any values file you author:</p>
-<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.3.0/values.schema.json
+<pre><code class="language-yaml"># yaml-language-server: $schema=https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.4.0/values.schema.json
 deployments:
   api:
     image:
@@ -1459,7 +1673,7 @@ deployments:
 <h3 id="jetbrains-ides-intellij-goland-pycharm-"><a class="header" href="#jetbrains-ides-intellij-goland-pycharm-">JetBrains IDEs (IntelliJ, GoLand, PyCharm, …)</a></h3>
 <p><code>Settings</code> → <code>Languages &amp; Frameworks</code> → <code>Schemas and DTDs</code> → <code>JSON Schema Mappings</code>:</p>
 <ul>
-<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.3.0/values.schema.json</code></li>
+<li><strong>Schema file or URL:</strong> <code>https://raw.githubusercontent.com/purisev/universal-helm-chart/v3.4.0/values.schema.json</code></li>
 <li><strong>Schema version:</strong> JSON Schema 2020-12 (the latest)</li>
 <li><strong>File path pattern:</strong> <code>*values*.yaml</code> (or per-project glob).</li>
 </ul>
@@ -1474,7 +1688,7 @@ deployments:
 </code></pre>
 <p>Use this when iterating on overlay values in a config repo where Helm isn’t installed.</p>
 <h2 id="pinning-the-schema-url"><a class="header" href="#pinning-the-schema-url">Pinning the schema URL</a></h2>
-<p>The <code>v3.3.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
+<p>The <code>v3.4.0</code> segment in the schema URL above is a git tag. Replace it with the chart version you’re targeting (or a branch name if you’re tracking a development line). For an OCI artifact, the schema is bundled inside the chart and pulled on <code>helm template</code>/<code>helm install</code> automatically — IDE setup is only needed when authoring values outside an active <code>helm</code> invocation.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="compatibility"><a class="header" href="#compatibility">Compatibility</a></h1>
 <p>Versions and APIs the chart targets. The intent here is to be honest about <strong>what the chart renders</strong> rather than to claim a tested SemVer matrix that rots on every operator release.</p>
@@ -1861,6 +2075,7 @@ helm unittest .
 <tr><td><code>e2e-secrets-config</code></td><td><code>e2e:secrets-config</code></td><td>ESO SecretStore/ClusterSecretStore against a real single-replica Vault (Bank-Vaults operator), Stakater Reloader on ConfigMap, StatefulSet, and ExternalSecret changes</td></tr>
 <tr><td><code>e2e-observability</code></td><td><code>e2e:observability</code></td><td>ServiceMonitor/PodMonitor materialization and real scraping, Prometheus and VictoriaMetrics flavors</td></tr>
 <tr><td><code>e2e-network-policy</code></td><td><code>e2e:network-policy</code></td><td>NetworkPolicy ingress and egress enforcement (Calico; kind’s default CNI doesn’t enforce NetworkPolicy at all)</td></tr>
+<tr><td><code>e2e-keda-http</code></td><td><code>e2e:keda-http</code></td><td>KEDA HTTP add-on (<code>keda.http</code>): scale from zero on a request to the unchanged Service name, through an HTTPRoute and through an Ingress; scale back to zero; scale-out on request rate; NetworkPolicy admitting only the interceptor; metrics port on the origin Service; switching a live Service to ExternalName and back</td></tr>
 <tr><td><code>e2e-argocd</code></td><td><code>e2e:argocd</code></td><td>Argo CD Application sync/health, resync idempotency, Image Updater tag detection, PreSync hook ordering</td></tr>
 </tbody>
 </table>
@@ -2442,7 +2657,7 @@ deployments:
     defaults:
       enabled: false                      # see ADR 008 / ADR 016
 </code></pre>
-<p>The <code>customize.labels</code> and <code>customize.annotations</code> sub-blocks under each integration’s resources allow users to inject extra metadata onto the resources that integration owns (e.g. add a Reloader strategy annotation onto a ConfigMap). This is the same shape across integrations.</p>
+<p>Labels and annotations for a resource the chart renders are set on the values entry that resource comes from, not in a separate per-integration block.</p>
 <h2 id="consequences-5"><a class="header" href="#consequences-5">Consequences</a></h2>
 <p><strong>What this enables:</strong></p>
 <ul>
@@ -2822,7 +3037,7 @@ integrations:
 <p>Two label <em>sources</em> converge on each resource the chart renders:</p>
 <ul>
 <li><strong>Chart-managed labels</strong> — the <code>app.kubernetes.io/*</code> set the chart computes (<code>name</code>, <code>instance</code>, <code>version</code>, <code>managed-by</code>, <code>part-of</code>, <code>component</code>).</li>
-<li><strong>User-supplied labels</strong> — <code>commonLabels</code> plus per-feature annotation/label customisation under <code>integrations.&lt;name&gt;.customize.labels</code>.</li>
+<li><strong>User-supplied labels</strong> — <code>commonLabels</code> plus the <code>labels</code> a values entry sets for the resources rendered from it.</li>
 </ul>
 <p>Without explicit rules, two failure modes are easy to hit:</p>
 <ul>

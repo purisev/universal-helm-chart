@@ -16,7 +16,7 @@ fi
 
 helm upgrade --install kitchen-sink \
   oci://ghcr.io/purisev/universal-helm-chart \
-  --version 3.3.0 \
+  --version 3.4.0 \
   --namespace kitchen-sink \
   --create-namespace \
   -f values.yaml \

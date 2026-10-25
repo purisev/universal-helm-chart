@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-7a3e427a.js";
+            window.path_to_searchindex_js = "../searchindex-6adf5a54.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -208,6 +208,7 @@
 <tr><td><code>e2e-secrets-config</code></td><td><code>e2e:secrets-config</code></td><td>ESO SecretStore/ClusterSecretStore against a real single-replica Vault (Bank-Vaults operator), Stakater Reloader on ConfigMap, StatefulSet, and ExternalSecret changes</td></tr>
 <tr><td><code>e2e-observability</code></td><td><code>e2e:observability</code></td><td>ServiceMonitor/PodMonitor materialization and real scraping, Prometheus and VictoriaMetrics flavors</td></tr>
 <tr><td><code>e2e-network-policy</code></td><td><code>e2e:network-policy</code></td><td>NetworkPolicy ingress and egress enforcement (Calico; kind’s default CNI doesn’t enforce NetworkPolicy at all)</td></tr>
+<tr><td><code>e2e-keda-http</code></td><td><code>e2e:keda-http</code></td><td>KEDA HTTP add-on (<code>keda.http</code>): scale from zero on a request to the unchanged Service name, through an HTTPRoute and through an Ingress; scale back to zero; scale-out on request rate; NetworkPolicy admitting only the interceptor; metrics port on the origin Service; switching a live Service to ExternalName and back</td></tr>
 <tr><td><code>e2e-argocd</code></td><td><code>e2e:argocd</code></td><td>Argo CD Application sync/health, resync idempotency, Image Updater tag detection, PreSync hook ordering</td></tr>
 </tbody>
 </table>

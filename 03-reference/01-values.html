@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-7a3e427a.js";
+            window.path_to_searchindex_js = "../searchindex-6adf5a54.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -198,7 +198,7 @@
 <tr><td>Job groups</td><td><code>jobGroups</code></td><td><a href="../05-adr/005-jobgroups-unification.html">ADR 005</a> · <a href="../05-adr/012-job-spec-hashing-for-idempotency.html">ADR 012</a> · <a href="../02-examples/05-cronjobs/"><code>02-examples/05-cronjobs/</code></a></td></tr>
 <tr><td>Networking — Ingress</td><td><code>ingress</code> (<code>hosts</code>, <code>tls</code> as native k8s list, <code>defaultBackend</code>), <code>ingresses</code></td><td><a href="../05-adr/009-dual-networking-stack.html">ADR 009</a> · <a href="../02-examples/02-web-app-ingress/"><code>02-examples/02-web-app-ingress/</code></a></td></tr>
 <tr><td>Networking — Gateway API</td><td><code>httpRoute</code>, <code>httpRoutes</code>, <code>grpcRoute</code>, <code>grpcRoutes</code>, <code>tlsRoute</code>, <code>tlsRoutes</code>, <code>referenceGrant</code>, <code>referenceGrants</code></td><td><a href="../05-adr/009-dual-networking-stack.html">ADR 009</a> · <a href="../02-examples/04-gateway-api/"><code>02-examples/04-gateway-api/</code></a></td></tr>
-<tr><td>Autoscaling</td><td>per-workload <code>hpa</code>, <code>keda</code>, <code>verticalPodAutoscaler</code></td><td><a href="../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a> · <a href="../02-examples/08-keda-event-driven/"><code>02-examples/08-keda-event-driven/</code></a></td></tr>
+<tr><td>Autoscaling</td><td>per-workload <code>hpa</code>, <code>keda</code> (incl. <code>keda.http</code>), <code>verticalPodAutoscaler</code>, <code>integrations.keda.httpAddon</code></td><td><a href="../05-adr/007-autoscaler-mutual-exclusion.html">ADR 007</a> · <a href="../02-examples/08-keda-event-driven/"><code>02-examples/08-keda-event-driven/</code></a></td></tr>
 <tr><td>Monitoring</td><td><code>integrations.monitoring.defaults</code>, per-workload <code>metrics</code>, auto-exposed metrics port</td><td><a href="../05-adr/008-multi-provider-monitoring.html">ADR 008</a> · <a href="../05-adr/016-metrics-port-auto-exposure.html">ADR 016</a> · <a href="../02-examples/06-monitoring/"><code>02-examples/06-monitoring/</code></a></td></tr>
 <tr><td>Secrets (ESO)</td><td><code>integrations.eso.enabled</code>, <code>integrations.eso.secretStores</code>, <code>integrations.eso.externalSecrets</code></td><td><a href="../05-adr/015-eso-data-vs-datafrom.html">ADR 015</a> · <a href="../02-examples/07-external-secrets/"><code>02-examples/07-external-secrets/</code></a></td></tr>
 <tr><td>Identity &amp; RBAC</td><td><code>serviceAccount</code> (<code>create</code> defaults to <code>true</code>), <code>rbac</code> (<code>enabled</code>, <code>clusterScoped</code>, <code>rules</code>), <code>automountServiceAccountToken</code></td><td><a href="../02-examples/07-external-secrets/"><code>02-examples/07-external-secrets/</code></a></td></tr>
@@ -224,6 +224,36 @@
 <li><code>labels.standard.{partOf,version,managedBy,enabled}</code> toggles affect singletons (ServiceAccount, Ingress, Routes, etc.) but not workload selectors.</li>
 </ul>
 <p>See <a href="../05-adr/011-standard-wins-labels-and-invariant-selectors.html">ADR 011</a>.</p>
+<h3 id="labels-and-annotations-on-generated-resources"><a class="header" href="#labels-and-annotations-on-generated-resources">Labels and annotations on generated resources</a></h3>
+<p>These keys take <code>labels</code> and <code>annotations</code> for the resources rendered from them:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Key</th><th>Resources</th></tr>
+</thead>
+<tbody>
+<tr><td><code>configMaps.&lt;key&gt;</code></td><td>its ConfigMap</td></tr>
+<tr><td><code>integrations.eso.secretStores.&lt;key&gt;</code></td><td>its SecretStore / ClusterSecretStore</td></tr>
+<tr><td><code>integrations.eso.externalSecrets.&lt;key&gt;</code></td><td>its ExternalSecret</td></tr>
+<tr><td><code>integrations.argocd.imageUpdater</code></td><td>the ImageUpdater (<code>annotations</code> and <code>labels</code>)</td></tr>
+<tr><td><code>deployments.&lt;name&gt;.metrics</code>, <code>statefulSets.&lt;name&gt;.metrics</code></td><td>the workload’s ServiceMonitor, PodMonitor, VMServiceScrape or VMPodScrape</td></tr>
+<tr><td><code>deployments.&lt;name&gt;.keda</code>, <code>statefulSets.&lt;name&gt;.keda</code></td><td>the workload’s ScaledObject and, with <code>keda.http</code>, its InterceptorRoute</td></tr>
+</tbody>
+</table>
+</div>
+<p>Labels resolve as <code>commonLabels</code> → the key’s <code>labels</code> → chart-managed <code>app.kubernetes.io/*</code>, last wins, so a chart-managed key cannot be shadowed. Annotations resolve as <code>commonAnnotations</code> → Reloader → sync-wave → the key’s <code>annotations</code>, last wins.</p>
+<p><code>metrics.labels</code> and <code>keda.labels</code> are fields of their blocks like any other: writing either one defines the block, which turns metrics or KEDA on for that workload unless the block also sets <code>enabled: false</code>.</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    metrics:
+      labels:
+        release: kube-prometheus-stack
+configMaps:
+  app-config:
+    labels:
+      config-kind: logging
+    data: { ... }
+</code></pre>
 <h3 id="port-ordering-inside-service--pod-template"><a class="header" href="#port-ordering-inside-service--pod-template">Port ordering inside Service / pod template</a></h3>
 <p>When a workload’s <code>service.ports</code> (or per-container <code>ports</code>) is iterated:</p>
 <pre><code>http (if present)  →  others alphabetically  →  metrics (if present)
@@ -381,6 +411,23 @@ chart renders itself.
 <blockquote>
 <p><strong>Schema strictness.</strong> Each rule entry is validated against a strict schema (<code>additionalProperties: false</code>) listing only the fields above plus <code>matches</code>, <code>filters</code>, <code>backendRefs</code>, <code>serviceName</code>, and <code>servicePort</code>. Unknown keys (typos, deprecated fields, or Gateway API fields not yet wired into the chart) fail at <code>helm template</code> time with a clear validation error rather than being silently dropped. If you depend on a Gateway API HTTPRouteRule field not in this list, open an issue or submit a PR — see <a href="../05-adr/009-dual-networking-stack.html">ADR 009</a>.</p>
 </blockquote>
+<h4 id="redirect-rules"><a class="header" href="#redirect-rules">Redirect rules</a></h4>
+<p>Gateway API rejects a rule that has a <code>RequestRedirect</code> filter and any <code>backendRefs</code>. Such a rule renders without <code>backendRefs</code>: the default backend is not filled in, and <code>backendRefs: []</code> stays empty. A redirect rule that names a backend itself, through <code>backendRefs</code>, <code>serviceName</code> or <code>servicePort</code>, fails the render:</p>
+<pre><code>httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule.
+</code></pre>
+<pre><code class="language-yaml">httpRoutes:
+  http-to-https:
+    parentRefs:
+      - name: public-gw
+        sectionName: http
+    rules:
+      - filters:
+          - type: RequestRedirect
+            requestRedirect:
+              scheme: https
+              statusCode: 301
+</code></pre>
+<p>GRPCRoute has no redirect filter and TLSRoute no filters, so their rules always get a backend.</p>
 <h4 id="gateway-api-channel-and-version-requirements"><a class="header" href="#gateway-api-channel-and-version-requirements">Gateway API channel and version requirements</a></h4>
 <p>The chart’s CRD-channel detection runs at template time when <code>gateway.networking.k8s.io/v1</code> is present in <code>Capabilities.APIVersions</code> and emits a fail-fast error if the field’s required CRD channel is missing. Detection is skipped when rendering offline (<code>helm template</code> without <code>--api-versions</code>).</p>
 <div class="table-wrapper">
@@ -479,6 +526,156 @@ chart renders itself.
 </code></pre>
 <p><code>behavior</code> is the Kubernetes HPA scaling-behavior shape, applied to the HPA that KEDA creates. It is worth setting on a lag-driven trigger: the HPA default doubles the replica count every 15 seconds, which overshoots on a queue that drains quickly. The example above adds one pod a minute instead.</p>
 <p>Because nothing here is validated field by field, a typo inside <code>advanced</code> reaches the cluster and is rejected by the KEDA CRD rather than by <code>helm template</code>. Check the field names against the <a href="https://keda.sh/docs/latest/reference/scaledobject-spec/">ScaledObject spec</a> for the KEDA version you run.</p>
+<h3 id="keda-http-add-on-kedahttp"><a class="header" href="#keda-http-add-on-kedahttp">KEDA HTTP add-on (<code>keda.http</code>)</a></h3>
+<p><code>keda.http</code> scales a Deployment or StatefulSet on HTTP traffic, down to zero, through the <a href="https://keda.sh/http-add-on/latest/">KEDA HTTP add-on</a> (v0.14.0 or later, which serves <code>InterceptorRoute</code>). The add-on runs an interceptor in front of the workload: it counts requests, holds the first one while KEDA starts a pod, and forwards to the pod once it is ready.</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+    keda:
+      maxReplicas: 10
+      http:
+        enabled: true
+</code></pre>
+<p>Callers keep using the workload’s Service name. The chart renders:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Object</th><th>Shape</th></tr>
+</thead>
+<tbody>
+<tr><td>Service <code>&lt;svc&gt;</code></td><td><code>ExternalName</code> for the interceptor Service, so in-cluster callers and Ingress backends reach the interceptor under the name they already use.</td></tr>
+<tr><td>Service <code>&lt;svc&gt;-origin</code></td><td>The Service built from <code>service</code>, selecting the pods. The interceptor forwards here, and the metrics port and <code>prometheus.io/*</code> annotations stay here.</td></tr>
+<tr><td>Service <code>&lt;svc&gt;-&lt;portName&gt;</code></td><td>One <code>ClusterIP</code> Service for each port listed in <code>keda.http.directPorts</code>, selecting the pods. See <a href="#ports-past-the-interceptor">Ports past the interceptor</a>.</td></tr>
+<tr><td><code>InterceptorRoute</code> <code>&lt;fullname&gt;-&lt;workload&gt;</code></td><td><code>target</code> is the origin Service’s <code>http</code> port. <code>hosts</code> hold <code>&lt;svc&gt;</code>, <code>&lt;svc&gt;.&lt;ns&gt;</code>, <code>&lt;svc&gt;.&lt;ns&gt;.svc</code>, <code>&lt;svc&gt;.&lt;ns&gt;.svc.&lt;clusterDomain&gt;</code>, the root <code>httpRoute.hostnames</code> when the workload has an <code>httpRoute</code>, the hosts of every Ingress path that names <code>&lt;svc&gt;</code>, and <code>keda.http.hosts</code>.</td></tr>
+<tr><td><code>InterceptorRoute</code> <code>&lt;fullname&gt;-&lt;workload&gt;-&lt;portName&gt;</code></td><td>One for each <code>keda.http.routes</code> entry: the same <code>hosts</code>, the entry’s <code>paths</code>, and the origin Service’s port of that name as <code>target</code>. See <a href="#ports-through-the-interceptor">Ports through the interceptor</a>.</td></tr>
+<tr><td><code>ScaledObject</code></td><td>An <code>external-push</code> trigger for the workload’s route goes first in <code>triggers</code>, then one for each <code>routes</code> entry in name order; declared triggers follow. <code>minReplicaCount</code> defaults to <code>0</code>.</td></tr>
+<tr><td>HTTPRoute rules of the workload</td><td>Rules without <code>serviceName</code> or <code>backendRefs</code> point at the interceptor Service in the add-on namespace, or at <code>&lt;svc&gt;-&lt;portName&gt;</code> when their <code>servicePort</code> is the port of a <code>directPorts</code> entry. A rule whose <code>servicePort</code> is the port of a <code>routes</code> entry also points at the interceptor, on the interceptor port.</td></tr>
+<tr><td>NetworkPolicy of the workload</td><td>An ingress rule admitting the interceptor pods (<code>app.kubernetes.io/component: interceptor</code>, <code>app.kubernetes.io/name: http-add-on</code>) from the add-on namespace, whenever the policy covers <code>Ingress</code>.</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>keda.http</code> takes these optional fields:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>hosts</code></td><td><code>[]</code></td><td>Extra host names for the route, evaluated through <code>tpl</code>.</td></tr>
+<tr><td><code>directPorts</code></td><td><code>[]</code></td><td>Names of <code>service.ports</code> entries served past the interceptor, each from a Service of its own.</td></tr>
+<tr><td><code>routes</code></td><td><code>{}</code></td><td><code>service.ports</code> entries reached through the interceptor by path, keyed by port name. Each takes <code>paths</code> (required), and <code>scalingMetric</code>, <code>coldStart</code> and <code>timeouts</code> like the fields above.</td></tr>
+<tr><td><code>scalingMetric</code></td><td><code>{concurrency: {targetValue: 100}}</code></td><td><code>InterceptorRoute.spec.scalingMetric</code>: <code>concurrency</code> and/or <code>requestRate</code>.</td></tr>
+<tr><td><code>coldStart</code></td><td>—</td><td><code>InterceptorRoute.spec.coldStart</code>, passed through.</td></tr>
+<tr><td><code>timeouts</code></td><td>—</td><td><code>InterceptorRoute.spec.timeouts</code>, passed through.</td></tr>
+</tbody>
+</table>
+</div>
+<p>Where the add-on runs is set once per release under <code>integrations.keda.httpAddon</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Default</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>namespace</code></td><td><code>keda</code></td><td>Namespace of the add-on.</td></tr>
+<tr><td><code>interceptorService</code></td><td><code>keda-add-ons-http-interceptor-proxy</code></td><td>Interceptor Service the ExternalName and HTTPRoute rules point at.</td></tr>
+<tr><td><code>port</code></td><td><code>8080</code></td><td>Port of that Service. It is also the port of the workload Service’s <code>http</code> entry.</td></tr>
+<tr><td><code>scalerAddress</code></td><td><code>keda-add-ons-http-external-scaler.&lt;namespace&gt;:9090</code></td><td><code>scalerAddress</code> of the <code>external-push</code> trigger.</td></tr>
+<tr><td><code>clusterDomain</code></td><td><code>cluster.local</code></td><td>Domain of the fully qualified host and of the ExternalName target.</td></tr>
+</tbody>
+</table>
+</div>
+<h4 id="the-client-port"><a class="header" href="#the-client-port">The client port</a></h4>
+<p>An ExternalName is a DNS alias and cannot remap ports, so callers connect to the interceptor Service on the port they use for <code>&lt;svc&gt;</code>. The <code>http</code> port of a <code>keda.http</code> workload is therefore <code>integrations.keda.httpAddon.port</code>: left unset, it takes that value; set to anything else, the render fails. The interceptor itself listens on the port its own chart sets (<code>interceptor.proxy.port</code>, <code>8080</code>). For callers that stay on port 80, the platform adds a Service in the add-on namespace that serves the interceptor pods on 80, and the release points at it:</p>
+<pre><code class="language-yaml"># Platform, once per cluster, in the add-on namespace
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-add-ons-http-interceptor-proxy-80
+  namespace: keda
+spec:
+  selector:
+    app.kubernetes.io/component: interceptor
+    app.kubernetes.io/name: http-add-on
+  ports:
+    - name: proxy
+      port: 80
+      targetPort: proxy
+</code></pre>
+<pre><code class="language-yaml"># Release
+integrations:
+  keda:
+    httpAddon:
+      interceptorService: keda-add-ons-http-interceptor-proxy-80
+      port: 80
+</code></pre>
+<p>An HTTPRoute in the application namespace references the interceptor Service across namespaces, which needs a <code>ReferenceGrant</code> in the add-on namespace. The chart does not render it; the platform owns it.</p>
+<h4 id="ports-past-the-interceptor"><a class="header" href="#ports-past-the-interceptor">Ports past the interceptor</a></h4>
+<p>The interceptor serves one HTTP port, so a workload with other ports on its Service lists them in <code>directPorts</code>. Each one leaves <code>&lt;svc&gt;</code> and gets a <code>ClusterIP</code> Service <code>&lt;svc&gt;-&lt;portName&gt;</code> that selects the pods directly:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        events:
+          port: 9000
+    keda:
+      http:
+        enabled: true
+        directPorts: [events]
+</code></pre>
+<p>renders <code>&lt;svc&gt;</code> (ExternalName, <code>http</code>), <code>&lt;svc&gt;-origin</code> (<code>http</code>) and <code>&lt;svc&gt;-events</code> (<code>events</code>, port <code>9000</code>). Callers of the port, Ingress paths included, use <code>&lt;svc&gt;-events</code>. A workload <code>httpRoute</code> rule with <code>servicePort: 9000</code> and no backend of its own is sent there by the chart. With <code>keda.http</code> off, <code>directPorts</code> is ignored and the port stays on <code>&lt;svc&gt;</code>.</p>
+<p>The Service of a direct port carries the port’s <code>protocol</code> and <code>appProtocol</code> and none of the <code>service</code> annotations or other <code>service</code> fields. <code>metrics</code> cannot be listed; it stays on <code>&lt;svc&gt;-origin</code> and is never added to a route.</p>
+<p>Traffic on a direct port does not pass the interceptor: it is not counted toward <code>scalingMetric</code>, and it does not start a workload scaled to zero. A port whose callers arrive only while the HTTP side keeps a pod running fits; a port that has to wake the workload by itself does not, unless <code>keda.minReplicas</code> is at least <code>1</code>. The workload’s NetworkPolicy admits the interceptor only, so a policy that covers <code>Ingress</code> needs its own rule for the callers of a direct port.</p>
+<h4 id="ports-through-the-interceptor"><a class="header" href="#ports-through-the-interceptor">Ports through the interceptor</a></h4>
+<p>A port listed under <code>routes</code> stays on <code>&lt;svc&gt;-origin</code> and gets an InterceptorRoute of its own. The interceptor listens on one port and picks a route by host and longest matching path across all routes, so requests to the entry’s <code>paths</code> go to that port, and everything else to <code>http</code>:</p>
+<pre><code class="language-yaml">deployments:
+  web:
+    service:
+      ports:
+        http:
+          targetPort: 8080
+        stream:
+          port: 9100
+    keda:
+      http:
+        enabled: true
+        routes:
+          stream:
+            paths: [/stream]
+            scalingMetric:
+              concurrency:
+                targetValue: 1000
+</code></pre>
+<p>Callers keep using <code>&lt;svc&gt;</code> on the interceptor port: <code>http://&lt;svc&gt;/stream/...</code> reaches port <code>9100</code> of the pods, and <code>http://&lt;svc&gt;/</code> reaches <code>http</code>. Ingress paths do the same with <code>servicePort</code> set to the interceptor port. A workload <code>httpRoute</code> rule may say <code>servicePort: 9100</code>; the chart points it at the interceptor, and every path it matches has to lie under the entry’s <code>paths</code>.</p>
+<p>Each route adds its own <code>external-push</code> trigger, so a request on a routed path counts toward scaling and starts a workload scaled to zero. The interceptor counts a request from its start to its end, and a WebSocket or long-poll request stays open for minutes: give its route a <code>scalingMetric</code> sized for open connections, or a few hundred idle clients look like a burst of load. While any such connection is open, the workload does not scale to zero. A long-poll route may also need <code>timeouts.responseHeader</code> above its poll interval.</p>
+<p>With <code>keda.http</code> off, <code>routes</code> is ignored and the port stays on <code>&lt;svc&gt;</code>.</p>
+<h4 id="what-the-render-rejects"><a class="header" href="#what-the-render-rejects">What the render rejects</a></h4>
+<p>Every port of <code>&lt;svc&gt;</code> resolves to the interceptor, which serves one HTTP port. With <code>keda.http</code> on, the render fails when:</p>
+<ul>
+<li>the workload renders no Service, or its <code>service.type</code> is not <code>ClusterIP</code>, or <code>service.clusterIP</code> is <code>None</code>;</li>
+<li><code>service.ports</code> has no <code>http</code> entry, or has entries other than <code>http</code>, <code>metrics</code> and those listed in <code>directPorts</code> or <code>routes</code>;</li>
+<li><code>directPorts</code> lists <code>http</code>, <code>metrics</code> or a name <code>service.ports</code> does not declare, or a listed port uses the interceptor port;</li>
+<li><code>routes</code> names <code>http</code>, <code>metrics</code>, a <code>directPorts</code> entry or a name <code>service.ports</code> does not declare, lists one path under two entries, or names a port that uses the interceptor port;</li>
+<li>a workload HTTPRoute rule on the port of a <code>routes</code> entry matches a path outside that entry’s <code>paths</code>, or by regular expression;</li>
+<li>an InterceptorRoute name of a <code>routes</code> entry is also the route name of another workload;</li>
+<li>the <code>http</code> port is set and differs from <code>integrations.keda.httpAddon.port</code>;</li>
+<li>the workload has a <code>grpcRoute</code> or <code>tlsRoute</code>;</li>
+<li>one of the workload’s HTTPRoute rules sends to the interceptor with a <code>servicePort</code> other than the interceptor port;</li>
+<li>an Ingress path names <code>&lt;svc&gt;</code> with a <code>servicePort</code> other than the interceptor port; for the port of a <code>directPorts</code> entry, the message names the Service to use instead, and for the port of a <code>routes</code> entry, the interceptor port;</li>
+<li>the cluster serves <code>keda.sh/v1alpha1</code> without <code>http.keda.sh/v1beta1</code>.</li>
+</ul>
+<h4 id="limits"><a class="header" href="#limits">Limits</a></h4>
+<ul>
+<li>Ingress backends reach the interceptor through the ExternalName, so the Ingress controller has to support ExternalName Services (ingress-nginx does; Traefik needs <code>allowExternalNameServices</code>).</li>
+<li>Only the workload’s own <code>httpRoute</code> rules are redirected. A rule in the root <code>httpRoute.rules</code> or in <code>httpRoutes</code> that names <code>&lt;svc&gt;</code> keeps pointing at the ExternalName, which most Gateway implementations reject; point those at the interceptor Service explicitly.</li>
+<li>Turning <code>keda.http</code> on or off changes the live <code>&lt;svc&gt;</code> between <code>ClusterIP</code> and <code>ExternalName</code>. The cluster IP is released on the way to ExternalName and a new one is allocated on the way back. Until cached DNS answers expire, callers keep reaching the previous target: after <code>keda.http</code> is turned off, a request that still resolves to the interceptor finds no route and is held until it times out.</li>
+<li><code>syncWaves.interceptorRoute</code> (default <code>20</code>) applies to the InterceptorRoute and to the ExternalName Service, so callers are switched over together with the route and before the ScaledObject (<code>21</code>).</li>
+</ul>
 <h3 id="scheduling-field-inheritance"><a class="header" href="#scheduling-field-inheritance">Scheduling field inheritance</a></h3>
 <p><code>tolerations</code>, <code>affinity</code>, <code>nodeSelector</code> and <code>topologySpreadConstraints</code> all follow the same rule: if the workload defines the field, it <strong>replaces</strong> the root value entirely. If the workload omits the field, the root value is inherited. To disable root inheritance without providing a replacement, set the field to an empty value (<code>tolerations: []</code>, <code>affinity: {}</code>, <code>topologySpreadConstraints: []</code>).</p>
 <h3 id="topology-spread-constraint-fields"><a class="header" href="#topology-spread-constraint-fields">Topology spread constraint fields</a></h3>
