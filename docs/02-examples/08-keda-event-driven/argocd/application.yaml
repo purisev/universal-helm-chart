@@ -15,6 +15,7 @@ spec:
     helm:
       releaseName: keda
       values: |
+        fullnameOverride: orders
         integrations:
           monitoring:
             defaults:
@@ -26,6 +27,16 @@ spec:
                 enabled: true
                 port: 9090
                 targetPort: 9090
+        ingress:
+          enabled: true
+          ingressClassName: nginx
+          hosts:
+            orders.example.com:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  serviceName: orders-web
+                  servicePort: 8080
         deployments:
           worker:
             enabled: true
@@ -88,6 +99,41 @@ spec:
                 memory: 256Mi
               limits:
                 memory: 512Mi
+          web:
+            enabled: true
+            image:
+              repository: ghcr.io/example/orders-web
+              tag: v1.4.0
+            service:
+              ports:
+                http:
+                  targetPort: 8080
+                live:
+                  port: 9100
+                  targetPort: 9100
+            keda:
+              maxReplicas: 10
+              cooldownPeriod: 300
+              http:
+                enabled: true
+                scalingMetric:
+                  requestRate:
+                    targetValue: 50
+                    window: 1m
+                routes:
+                  live:
+                    paths: [/live]
+                    scalingMetric:
+                      concurrency:
+                        targetValue: 500
+            podDisruptionBudget:
+              maxUnavailable: 1
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                memory: 256Mi
         podDisruptionBudget:
           enabled: true
           minAvailable: 1
