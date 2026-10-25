@@ -21,6 +21,10 @@ configMaps:
   app-config:
     enabled: true
     mountPath: /etc/app
+    labels:
+      e2e/config: app
+    annotations:
+      e2e/owner: core-workloads
     data:
       GREETING: hello-from-configmap
       app.conf: |

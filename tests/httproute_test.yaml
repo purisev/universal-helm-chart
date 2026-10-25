@@ -211,8 +211,6 @@ tests:
               requestRedirect:
                 scheme: https
                 statusCode: 301
-          serviceName: my-svc
-          servicePort: 80
     asserts:
       - equal:
           path: spec.rules[0].filters[0].type
@@ -220,6 +218,189 @@ tests:
       - equal:
           path: spec.rules[0].filters[0].requestRedirect.scheme
           value: https
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  # --- rules: RequestRedirect takes no backend ---
+
+  - it: should render a redirect rule with an empty backendRefs list without backendRefs
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          backendRefs: []
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should treat a filter of type RequestRedirect as a redirect
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should treat a filter carrying requestRedirect as a redirect
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should keep the default backend on a rule whose filter is not a redirect
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: URLRewrite, urlRewrite: {hostname: example.com}}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0].name
+          value: test-release-universal-helm-chart
+
+  - it: should render only the redirect rule without backendRefs when rules mix
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+        - matches:
+            - path: {type: PathPrefix, value: /}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+      - equal:
+          path: spec.rules[1].backendRefs[0].name
+          value: test-release-universal-helm-chart
+
+  - it: should fail fast when a redirect rule sets serviceName
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorMessage: "httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule."
+
+  - it: should fail fast when a redirect rule sets servicePort
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          servicePort: 8080
+    asserts:
+      - failedTemplate:
+          errorPattern: 'httpRoute.rules\[0\]: a RequestRedirect filter cannot be combined'
+
+  - it: should fail fast when a workload redirect rule sets backendRefs
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          backendRefs:
+            - {name: other, port: 80}
+    asserts:
+      - failedTemplate:
+          errorPattern: 'deployments.web.httpRoute.rules\[0\]: a RequestRedirect filter cannot be combined'
+
+  - it: should render a workload redirect rule without backendRefs
+    set:
+      image.repository: nginx
+      image.tag: alpine
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.service.enabled: true
+      deployments.web.service.port: 80
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should name the plural-map rule when a redirect rule sets a backend
+    set:
+      httpRoutes.public.parentRefs:
+        - {name: my-gw}
+      httpRoutes.public.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          serviceName: my-svc
+    asserts:
+      - failedTemplate:
+          errorPattern: 'httpRoutes.public.rules\[0\]: a RequestRedirect filter cannot be combined'
+
+  - it: should render a plural-map redirect rule without backendRefs
+    set:
+      httpRoutes.public.parentRefs:
+        - {name: my-gw}
+      httpRoutes.public.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should render a keda.http redirect rule without the interceptor backend
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+    asserts:
+      - notExists:
+          path: spec.rules[0].backendRefs
+
+  - it: should report the redirect, not the interceptor port, for a keda.http redirect rule with servicePort
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - {name: my-gw}
+      deployments.web.httpRoute.rules:
+        - filters:
+            - {type: RequestRedirect, requestRedirect: {scheme: https}}
+          servicePort: 9000
+    asserts:
+      - failedTemplate:
+          errorPattern: 'deployments.web.httpRoute.rules\[0\]: a RequestRedirect filter cannot be combined'
 
   # --- Per-workload rules ---
 
@@ -1021,3 +1202,185 @@ tests:
       - equal:
           path: spec.rules[0].backendRefs[0].name
           value: legacy-api-svc
+
+  - it: should send a keda.http workload's defaulted rules to the interceptor
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: PathPrefix, value: /}}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - group: ""
+              kind: Service
+              name: keda-add-ons-http-interceptor-proxy
+              namespace: keda
+              port: 8080
+              weight: 1
+
+  - it: should follow the configured interceptor Service, namespace and port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon: {namespace: autoscaling, interceptorService: interceptor-80, port: 80}
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules: [{}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs[0]
+          value:
+            group: ""
+            kind: Service
+            name: interceptor-80
+            namespace: autoscaling
+            port: 80
+            weight: 1
+
+  - it: should leave keda.http rules with their own serviceName or backendRefs alone
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules:
+        - {serviceName: elsewhere, servicePort: 80}
+        - {backendRefs: [{name: other, port: 81}]}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: elsewhere, port: 80, weight: 1}
+      - equal:
+          path: spec.rules[1].backendRefs
+          value:
+            - {group: "", kind: Service, name: other, port: 81, weight: 1}
+
+  - it: should send a keda.http rule on a direct port to that port's own Service
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: PathPrefix, value: /events}}]
+          servicePort: 9000
+        - matches: [{path: {type: PathPrefix, value: /}}]
+        - {serviceName: elsewhere, servicePort: 9000}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web-events, port: 9000, weight: 1}
+      - equal:
+          path: spec.rules[1].backendRefs
+          value:
+            - {group: "", kind: Service, name: keda-add-ons-http-interceptor-proxy, namespace: keda, port: 8080, weight: 1}
+      - equal:
+          path: spec.rules[2].backendRefs
+          value:
+            - {group: "", kind: Service, name: elsewhere, port: 9000, weight: 1}
+
+  - it: should send a StatefulSet's keda.http rule on a direct port to that port's own Service
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, events: {port: 9000}}}
+      statefulSets.cache.keda.http.directPorts: [events]
+      statefulSets.cache.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-cache-events, port: 9000, weight: 1}
+
+  - it: should leave backendRefs of a keda.http rule on a direct port alone
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules:
+        - {servicePort: 9000, backendRefs: [{name: other, port: 81}]}
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: other, port: 81, weight: 1}
+
+  - it: should keep a direct port's rule on the workload Service when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.enabled: false
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web, port: 9000, weight: 1}
+
+  - it: should send a keda.http rule on a route's port to the interceptor on its own port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: PathPrefix, value: /stream}}]
+          servicePort: 9100
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: keda-add-ons-http-interceptor-proxy, namespace: keda, port: 8080, weight: 1}
+
+  - it: should keep a route's rule on the workload Service when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.enabled: false
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.httpRoute.rules: [{servicePort: 9100}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web, port: 9100, weight: 1}
+
+  - it: should still reject a redirect rule that sets a route's servicePort
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.httpRoute.rules:
+        - filters: [{type: RequestRedirect, requestRedirect: {statusCode: 301}}]
+          servicePort: 9100
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.httpRoute.rules[0]: a RequestRedirect filter cannot be combined with backendRefs, serviceName or servicePort; Gateway API rejects the rule. Remove the backend from this rule."
+
+  - it: should keep the workload Service as backend when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.enabled: false
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules: [{}]
+    asserts:
+      - equal:
+          path: spec.rules[0].backendRefs
+          value:
+            - {group: "", kind: Service, name: app-web, port: 80, weight: 1}

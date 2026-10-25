@@ -1,0 +1,40 @@
+# A second release that starts without keda.http. The service-type-switch
+# scenario upgrades it with keda.http on and back off, so the API server has
+# to turn the live ClusterIP Service into an ExternalName and back.
+fullnameOverride: e2e-sw
+
+integrations:
+  keda:
+    httpAddon:
+      interceptorService: keda-add-ons-http-interceptor-proxy-80
+      port: 80
+
+volumes:
+  nginx-cache:
+    emptyDir: {}
+  nginx-run:
+    emptyDir: {}
+  tmp:
+    emptyDir: {}
+
+volumeMounts:
+  app:
+    nginx-cache:
+      mountPath: /var/cache/nginx
+    nginx-run:
+      mountPath: /var/run
+    tmp:
+      mountPath: /tmp
+
+deployments:
+  app:
+    image:
+      repository: nginxinc/nginx-unprivileged
+      tag: "1.27-alpine"
+    service:
+      port: 80
+      targetPort: 8080
+    resources:
+      requests:
+        cpu: 20m
+        memory: 32Mi

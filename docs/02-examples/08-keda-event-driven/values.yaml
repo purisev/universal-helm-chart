@@ -1,4 +1,9 @@
-# 08-keda-event-driven — Kafka-lag-driven scaling on a Deployment, VPA orthogonal.
+# 08-keda-event-driven — Kafka-lag-driven scaling on a Deployment, VPA orthogonal,
+# and an HTTP frontend that scales to zero through the KEDA HTTP add-on.
+
+# Fixes the name prefix every resource carries, so the Ingress backend below can
+# name the web Service.
+fullnameOverride: orders
 
 integrations:
   monitoring:
@@ -11,6 +16,21 @@ integrations:
         enabled: true                 # auto metrics-only Service for service-less workloads
         port: 9090
         targetPort: 9090
+
+# The Ingress reaches the interceptor through the web Service, an ExternalName
+# under keda.http, so the controller has to accept ExternalName backends
+# (ingress-nginx does). Its host joins the web InterceptorRoutes, and /live
+# requests go to port 9100 by path.
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    orders.example.com:
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: orders-web     # <fullnameOverride>-<workload>
+          servicePort: 8080          # the interceptor port
 
 deployments:
 
@@ -87,6 +107,54 @@ deployments:
         memory: 256Mi
       limits:
         memory: 512Mi
+
+  # Scales on HTTP traffic through the KEDA HTTP add-on, down to zero when idle.
+  # The interceptor holds the first request while KEDA starts a pod.
+  web:
+    enabled: true
+    image:
+      repository: ghcr.io/example/orders-web
+      tag: v1.4.0
+      pullPolicy: IfNotPresent
+
+    service:
+      ports:
+        http:
+          targetPort: 8080            # port left unset: it is the interceptor port, 8080
+        live:
+          port: 9100                  # server-sent events, reached through the interceptor by path
+          targetPort: 9100
+
+    keda:
+      maxReplicas: 10                 # minReplicas defaults to 0 under keda.http
+      cooldownPeriod: 300
+      http:
+        enabled: true
+        scalingMetric:
+          requestRate:
+            targetValue: 50           # one replica per 50 requests a second
+            window: 1m
+        # /live goes to port 9100 under an InterceptorRoute of its own, which wakes
+        # the workload and scales on its own metric. An open stream counts as one
+        # request for as long as it lasts, so the target is sized for connections.
+        routes:
+          live:
+            paths: [/live]
+            scalingMetric:
+              concurrency:
+                targetValue: 500
+
+    # Replaces the root PDB: minAvailable 1 would block every drain of a node
+    # running the only pod.
+    podDisruptionBudget:
+      maxUnavailable: 1
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi
 
 # A modest PDB so KEDA's scale-down doesn't take everything at once.
 podDisruptionBudget:

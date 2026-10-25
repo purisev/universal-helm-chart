@@ -33,6 +33,7 @@ integrations:
       hpa: 21
       vpa: 21
       scaledObject: 21
+      interceptorRoute: 20
       podDisruptionBudget: 21
       serviceMonitor: 21
       podMonitor: 21
@@ -48,6 +49,7 @@ integrations:
 
       name: ""
       namespace: ""
+      labels: {}
       annotations: {}
 
 
@@ -73,6 +75,14 @@ integrations:
     secretStores: {}
 
     externalSecrets: {}
+
+  keda:
+    httpAddon:
+      namespace: keda
+      interceptorService: keda-add-ons-http-interceptor-proxy
+      port: 8080
+      scalerAddress: ""
+      clusterDomain: cluster.local
 
   monitoring:
     defaults:

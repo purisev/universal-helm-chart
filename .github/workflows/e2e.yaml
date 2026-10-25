@@ -33,6 +33,7 @@ jobs:
       secrets-config: ${{ steps.check.outputs.secrets-config }}
       observability: ${{ steps.check.outputs.observability }}
       network-policy: ${{ steps.check.outputs.network-policy }}
+      keda-http: ${{ steps.check.outputs.keda-http }}
       argocd: ${{ steps.check.outputs.argocd }}
       any: ${{ steps.check.outputs.any }}
     steps:
@@ -56,7 +57,7 @@ jobs:
           fi
 
           ANY=false
-          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy argocd; do
+          for job in core-workloads jobs autoscaling gateway-ingress secrets-config observability network-policy keda-http argocd; do
             if [[ "$FULL" == "true" ]] || jq -e --arg l "e2e:$job" 'index($l) != null' <<<"$LABELS_JSON" >/dev/null; then
               echo "$job=true" >> "$GITHUB_OUTPUT"
               ANY=true
@@ -795,6 +796,134 @@ jobs:
           kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
           echo "::endgroup::"
 
+  e2e-keda-http:
+    name: E2E / keda http
+    needs: [gate, lint, version-pins]
+    if: needs.gate.outputs.keda-http == 'true'
+    runs-on: ubuntu-latest
+    env:
+      NAMESPACE: e2e-keda-http
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: latest
+
+      # Calico rather than kindnet: the scenarios check that the chart's
+      # NetworkPolicy admits the interceptor, which needs a CNI that enforces it.
+      - name: Create kind cluster (no default CNI)
+        uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+        with:
+          config: test/e2e/kind/network-policy.yaml
+          cluster_name: e2e-keda-http
+
+      - name: Install Chainsaw
+        uses: kyverno/action-install-chainsaw@1223ef75bedeb59c4e7b5455463d4316e76dff01 # v0.2.15
+        with:
+          release: v0.2.15
+
+      - name: Install Calico
+        run: |
+          kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/calico.yaml
+          kubectl wait --timeout=3m -n kube-system pod -l k8s-app=calico-node --for=condition=Ready
+
+      - name: Install Gateway API CRDs
+        run: |
+          kubectl apply --server-side \
+            -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.1/standard-install.yaml
+
+      - name: Install agentgateway
+        run: |
+          helm upgrade -i --create-namespace \
+            --namespace agentgateway-system \
+            --version v1.4.1 agentgateway-crds oci://cr.agentgateway.dev/charts/agentgateway-crds
+          helm upgrade -i -n agentgateway-system agentgateway oci://cr.agentgateway.dev/charts/agentgateway \
+            --version v1.4.1 --wait --timeout 3m
+          kubectl wait --timeout=60s gatewayclass/agentgateway --for=condition=Accepted
+
+      - name: Install ingress-nginx
+        run: |
+          helm upgrade --install ingress-nginx ingress-nginx \
+            --repo https://kubernetes.github.io/ingress-nginx \
+            --namespace ingress-nginx --create-namespace \
+            --wait --timeout 3m
+
+      - name: Install KEDA and the HTTP add-on
+        run: |
+          helm repo add kedacore https://kedacore.github.io/charts
+          helm repo update
+          helm install keda kedacore/keda -n keda --create-namespace --wait --timeout 3m
+          helm install http-add-on kedacore/keda-add-ons-http -n keda \
+            --version 0.16.0 --wait --timeout 3m
+
+      - name: Create namespace and platform fixtures
+        run: |
+          kubectl create namespace "$NAMESPACE"
+          kubectl apply -f test/e2e/fixtures/keda-http-platform.yaml
+          kubectl apply -n "$NAMESPACE" -f test/e2e/fixtures/keda-http-gateway.yaml
+
+          # agentgateway provisions the Gateway's Service once it reconciles the object.
+          for i in $(seq 1 30); do
+            COUNT=$(kubectl get svc -n "$NAMESPACE" -l gateway.networking.k8s.io/gateway-name=e2e-gateway -o name | wc -l)
+            [ "$COUNT" -gt 0 ] && break
+            sleep 2
+          done
+
+      - name: Install chart
+        run: |
+          helm upgrade --install e2e . \
+            -n "$NAMESPACE" \
+            -f test/e2e/values/keda-http.yaml \
+            --wait --timeout 3m
+
+      - name: Run Chainsaw tests
+        run: chainsaw test test/e2e/chainsaw/keda-http --config test/e2e/chainsaw/keda-http-config.yaml
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "::group::InterceptorRoute / ScaledObject / HPA"
+          kubectl get interceptorroute,scaledobject,hpa -n "$NAMESPACE" -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::Services / EndpointSlices / NetworkPolicy"
+          kubectl get svc,endpointslices,networkpolicy -n "$NAMESPACE" -o wide || true
+          kubectl get svc -n keda -o wide || true
+          echo "::endgroup::"
+
+          echo "::group::Ingress / HTTPRoute / Gateway / ReferenceGrant"
+          kubectl get ingress,httproute,gateway -n "$NAMESPACE" -o yaml || true
+          kubectl get referencegrant -n keda -o yaml || true
+          echo "::endgroup::"
+
+          echo "::group::HTTP add-on logs"
+          kubectl logs -n keda -l app.kubernetes.io/component=interceptor --tail=200 || true
+          kubectl logs -n keda -l app.kubernetes.io/component=scaler --tail=200 || true
+          kubectl logs -n keda -l app.kubernetes.io/component=operator,app.kubernetes.io/name=http-add-on --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::KEDA operator logs"
+          kubectl logs -n keda -l app=keda-operator --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::ingress-nginx controller logs"
+          kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::agentgateway logs"
+          kubectl logs -n agentgateway-system -l app.kubernetes.io/name=agentgateway --tail=200 || true
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl get pods -A -o wide
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
   e2e-argocd:
     name: E2E / argocd
     needs: [gate, lint, version-pins]
@@ -928,8 +1057,22 @@ jobs:
           kubectl get imageupdater -n argocd -o yaml || true
           echo "::endgroup::"
 
+          echo "::group::ArgoCD pods"
+          kubectl get pods -n argocd -o wide || true
+          kubectl describe pods -n argocd || true
+          echo "::endgroup::"
+
+          echo "::group::ArgoCD events"
+          kubectl get events -n argocd --sort-by=.lastTimestamp || true
+          echo "::endgroup::"
+
+          # The Argo CD pod templates carry only app.kubernetes.io/name, so the
+          # components are named one by one.
           echo "::group::ArgoCD component logs"
-          kubectl logs -n argocd -l app.kubernetes.io/part-of=argocd --all-containers --prefix --tail=200 || true
+          for component in deployment/argocd-repo-server deployment/argocd-redis \
+            deployment/argocd-applicationset-controller statefulset/argocd-application-controller; do
+            kubectl logs -n argocd "$component" --all-containers --prefix --tail=200 || true
+          done
           echo "::endgroup::"
 
           echo "::group::argocd-image-updater logs"

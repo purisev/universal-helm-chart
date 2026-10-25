@@ -1,0 +1,30 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: victoriametrics-scrape-object-metadata
+spec:
+  steps:
+    - name: each workload's metrics labels and annotations land on its own scrape object
+      try:
+        - assert:
+            resource:
+              apiVersion: operator.victoriametrics.com/v1beta1
+              kind: VMServiceScrape
+              metadata:
+                name: e2e-api-metrics
+                labels:
+                  e2e/scrape: api
+                  app.kubernetes.io/instance: e2e-api
+                annotations:
+                  e2e/owner: observability
+        - assert:
+            resource:
+              apiVersion: operator.victoriametrics.com/v1beta1
+              kind: VMPodScrape
+              metadata:
+                name: e2e-api-pod-metrics
+                labels:
+                  e2e/scrape: api-pod
+                  app.kubernetes.io/instance: e2e-api-pod
+                annotations:
+                  e2e/owner: observability

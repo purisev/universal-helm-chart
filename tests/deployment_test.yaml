@@ -1976,3 +1976,46 @@ tests:
     asserts:
       - isNull:
           path: spec.template.spec.topologySpreadConstraints
+
+  - it: should not render replicas when a keda block is defined without an enabled flag
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.replicaCount: 3
+      deployments.web.keda.maxReplicas: 5
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: should not render replicas when an hpa block is defined without an enabled flag
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.replicaCount: 3
+      deployments.web.hpa.maxReplicas: 5
+    asserts:
+      - notExists:
+          path: spec.replicas
+
+  - it: should render replicas when keda and hpa are both disabled
+    set:
+      image.repository: nginx
+      image.tag: v1.0.0
+      deployments.web.replicaCount: 3
+      deployments.web.keda: {enabled: false, maxReplicas: 5}
+      deployments.web.hpa: {enabled: false, maxReplicas: 5}
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 3
+
+  - it: should keep the container port of a keda.http.directPorts entry
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000, targetPort: 9001}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].ports
+          content: {name: events, containerPort: 9001, protocol: TCP}

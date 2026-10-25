@@ -273,3 +273,177 @@ tests:
       - equal:
           path: spec.advanced.someFutureKedaField
           value: enabled
+
+  - it: should scale to zero by default under keda.http
+    values:
+      - fixtures/keda-http.yaml
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+
+  - it: should keep an explicit minReplicas under keda.http
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.minReplicas: 2
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 2
+
+  - it: should render the external-push trigger alone when no triggers are declared
+    values:
+      - fixtures/keda-http.yaml
+    asserts:
+      - equal:
+          path: spec.triggers
+          value:
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web
+
+  - it: should put the external-push trigger before the declared triggers
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.triggers:
+        - type: cpu
+          metricType: Utilization
+          metadata: {value: "60"}
+    asserts:
+      - equal:
+          path: spec.triggers
+          value:
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web
+            - type: cpu
+              metricType: Utilization
+              metadata: {value: "60"}
+
+  - it: should add a trigger per keda.http.routes entry between the workload's and the declared triggers
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.service.ports.feed: {port: 9200}
+      deployments.web.keda.http.routes:
+        stream: {paths: [/stream]}
+        feed: {paths: [/feed]}
+      deployments.web.keda.triggers:
+        - type: cpu
+          metricType: Utilization
+          metadata: {value: "60"}
+    asserts:
+      - equal:
+          path: spec.triggers
+          value:
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web-feed
+            - type: external-push
+              metadata:
+                scalerAddress: keda-add-ons-http-external-scaler.keda:9090
+                interceptorRoute: app-web-stream
+            - type: cpu
+              metricType: Utilization
+              metadata: {value: "60"}
+
+  - it: should add a keda.http.routes trigger for a StatefulSet
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, stream: {port: 9100}}}
+      statefulSets.cache.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - equal:
+          path: spec.triggers[1].metadata.interceptorRoute
+          value: app-cache-stream
+
+  - it: should derive the scaler address from httpAddon.namespace
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon.namespace: autoscaling
+    asserts:
+      - equal:
+          path: spec.triggers[0].metadata.scalerAddress
+          value: keda-add-ons-http-external-scaler.autoscaling:9090
+
+  - it: should take httpAddon.scalerAddress verbatim
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon.scalerAddress: scaler.platform.svc:9091
+    asserts:
+      - equal:
+          path: spec.triggers[0].metadata.scalerAddress
+          value: scaler.platform.svc:9091
+
+  - it: should add the trigger for a StatefulSet
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    asserts:
+      - equal:
+          path: spec.scaleTargetRef.kind
+          value: StatefulSet
+      - equal:
+          path: spec.minReplicaCount
+          value: 0
+      - equal:
+          path: spec.triggers[0].metadata.interceptorRoute
+          value: app-cache
+
+  - it: should leave the triggers and floor alone when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.enabled: false
+      deployments.web.keda.triggers:
+        - type: cpu
+          metricType: Utilization
+          metadata: {value: "60"}
+    asserts:
+      - equal:
+          path: spec.minReplicaCount
+          value: 1
+      - equal:
+          path: spec.triggers
+          value:
+            - type: cpu
+              metricType: Utilization
+              metadata: {value: "60"}
+
+  # --- keda.labels and keda.annotations ---
+
+  - it: should render the workload's keda labels and annotations on its ScaledObject
+    values:
+      - fixtures/keda-deployment.yaml
+    set:
+      deployments.worker.keda.labels.team: autoscaling
+      deployments.worker.keda.annotations.owner: autoscaling-team
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling
+      - equal:
+          path: metadata.annotations.owner
+          value: autoscaling-team
+
+  - it: should render keda labels on a StatefulSet's ScaledObject
+    values:
+      - fixtures/keda-statefulset.yaml
+    set:
+      statefulSets.cache.keda.labels.team: autoscaling
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling

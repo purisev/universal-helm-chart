@@ -78,16 +78,27 @@ is empty — caller decides whether to emit the labels: header.
 Params: $ctx (the dot)
 */}}
 {{- define "uhc.labels" -}}
-{{- $std := .Values.labels.standard | default dict -}}
+{{- include "uhc.labelsWithExtra" (dict "ctx" .) -}}
+{{- end }}
+
+{{/*
+uhc.labels plus per-resource labels. Precedence (last wins): commonLabels → extra →
+standard labels, so a resource's own labels override commonLabels but never the
+chart-managed app.kubernetes.io/* keys.
+Params: dict "ctx" $ctx ["extra" dict]
+*/}}
+{{- define "uhc.labelsWithExtra" -}}
+{{- $ctx := .ctx -}}
+{{- $std := $ctx.Values.labels.standard | default dict -}}
 {{- $stdLabels := dict -}}
 {{- if $std.enabled -}}
-  {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" (include "uhc.fullname" .) -}}{{- end -}}
-  {{- if $std.name -}}{{- $_ := set $stdLabels "app.kubernetes.io/name" (include "uhc.name" .) -}}{{- end -}}
-  {{- if $std.instance -}}{{- $_ := set $stdLabels "app.kubernetes.io/instance" .Release.Name -}}{{- end -}}
-  {{- if and $std.version .Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" (.Chart.AppVersion | toString) -}}{{- end -}}
-  {{- if $std.managedBy -}}{{- $_ := set $stdLabels "app.kubernetes.io/managed-by" .Release.Service -}}{{- end -}}
+  {{- if $std.partOf -}}{{- $_ := set $stdLabels "app.kubernetes.io/part-of" (include "uhc.fullname" $ctx) -}}{{- end -}}
+  {{- if $std.name -}}{{- $_ := set $stdLabels "app.kubernetes.io/name" (include "uhc.name" $ctx) -}}{{- end -}}
+  {{- if $std.instance -}}{{- $_ := set $stdLabels "app.kubernetes.io/instance" $ctx.Release.Name -}}{{- end -}}
+  {{- if and $std.version $ctx.Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" ($ctx.Chart.AppVersion | toString) -}}{{- end -}}
+  {{- if $std.managedBy -}}{{- $_ := set $stdLabels "app.kubernetes.io/managed-by" $ctx.Release.Service -}}{{- end -}}
 {{- end -}}
-{{- $merged := merge $stdLabels (.Values.commonLabels | default dict) -}}
+{{- $merged := merge $stdLabels (.extra | default dict) ($ctx.Values.commonLabels | default dict) -}}
 {{- if $merged -}}
 {{- toYaml $merged -}}
 {{- end -}}
@@ -99,9 +110,9 @@ HPA, ServiceMonitor, ConfigMap, Job, ESO resources). Always emits the minimal
 {name, instance} pair so spec.selector.matchLabels keeps matching the pod template — the
 labels.standard.{name,instance,enabled} flags do NOT affect this helper (changing them
 would silently break Deployment/StatefulSet/Job by orphaning the selector). Toggles for
-partOf, version, managedBy still apply, and commonLabels are merged with standard-wins
-precedence.
-Params: dict "ctx" $ctx "workloadName" $wlName ["keepSuffix" true]
+partOf, version, managedBy still apply. Precedence (last wins): commonLabels → extra →
+standard labels.
+Params: dict "ctx" $ctx "workloadName" $wlName ["keepSuffix" true] ["extra" dict]
 keepSuffix holds the {name, instance} pair on <workloadName> / <fullname>-<workloadName>
 whatever naming.omitWorkloadSuffix says. jobGroups pass it: the flag speaks about the one
 long-running workload in a release, and any number of job groups can sit beside it, so
@@ -131,7 +142,7 @@ collapsing their labels too would file their pods under the workload's own selec
   {{- if and $std.version $ctx.Chart.AppVersion -}}{{- $_ := set $stdLabels "app.kubernetes.io/version" ($ctx.Chart.AppVersion | toString) -}}{{- end -}}
   {{- if $std.managedBy -}}{{- $_ := set $stdLabels "app.kubernetes.io/managed-by" $ctx.Release.Service -}}{{- end -}}
 {{- end -}}
-{{- $merged := merge $stdLabels ($ctx.Values.commonLabels | default dict) -}}
+{{- $merged := merge $stdLabels (.extra | default dict) ($ctx.Values.commonLabels | default dict) -}}
 {{- toYaml $merged -}}
 {{- end }}
 

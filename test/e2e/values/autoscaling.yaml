@@ -49,6 +49,10 @@ deployments:
       minReplicas: 0
       maxReplicas: 3
       pollingInterval: 5
+      labels:
+        e2e/scaler: keda
+      annotations:
+        e2e/owner: autoscaling
       # start/end are cron expressions for a recurring daily window, not
       # timestamps, so they can't be hardcoded here to reliably cover
       # "right now" whenever CI happens to run. The workflow overrides both

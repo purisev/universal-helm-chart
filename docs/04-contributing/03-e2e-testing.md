@@ -31,6 +31,7 @@ They are skipped along with everything else when the gate enables no suite, so a
 | `e2e-secrets-config` | `e2e:secrets-config` | ESO SecretStore/ClusterSecretStore against a real single-replica Vault (Bank-Vaults operator), Stakater Reloader on ConfigMap, StatefulSet, and ExternalSecret changes |
 | `e2e-observability` | `e2e:observability` | ServiceMonitor/PodMonitor materialization and real scraping, Prometheus and VictoriaMetrics flavors |
 | `e2e-network-policy` | `e2e:network-policy` | NetworkPolicy ingress and egress enforcement (Calico; kind's default CNI doesn't enforce NetworkPolicy at all) |
+| `e2e-keda-http` | `e2e:keda-http` | KEDA HTTP add-on (`keda.http`): scale from zero on a request to the unchanged Service name, through an HTTPRoute and through an Ingress; scale back to zero; scale-out on request rate; NetworkPolicy admitting only the interceptor; metrics port on the origin Service; switching a live Service to ExternalName and back |
 | `e2e-argocd` | `e2e:argocd` | Argo CD Application sync/health, resync idempotency, Image Updater tag detection, PreSync hook ordering |
 
 Each job's cluster only carries the controllers that job's scenarios need — `e2e-secrets-config` doesn't install Gateway API CRDs, `e2e-gateway-ingress` doesn't install Vault, and so on.

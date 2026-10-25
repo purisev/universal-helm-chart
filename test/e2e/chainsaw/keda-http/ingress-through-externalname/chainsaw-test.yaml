@@ -1,0 +1,36 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: ingress-through-externalname
+spec:
+  steps:
+    - name: a request through ingress-nginx follows the ExternalName to the interceptor and wakes the Deployment
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-web 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true
+        - script:
+            timeout: 3m
+            content: |
+              set -e
+              kubectl exec prober -n "$NAMESPACE" -- \
+                wget -S -O- --timeout=150 --header="Host: ingress.keda-http.e2e.local" \
+                "http://ingress-nginx-controller.ingress-nginx.svc.cluster.local/" 2>&1
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+              "(contains(to_lower($stdout), 'x-keda-http-cold-start: true'))": true

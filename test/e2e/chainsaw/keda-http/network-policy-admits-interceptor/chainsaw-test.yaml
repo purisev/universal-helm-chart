@@ -1,0 +1,52 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: network-policy-admits-interceptor
+spec:
+  steps:
+    - name: the pods are running, so a refused request below comes from the policy rather than from no endpoints
+      try:
+        - apply:
+            file: ../_shared/prober-pod.yaml
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Pod
+              metadata:
+                name: prober
+              status:
+                phase: Running
+        - script:
+            timeout: 3m
+            content: |
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=150 "http://e2e-web/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true
+        - script:
+            timeout: 2m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" at-least e2e-web 1 110
+            check:
+              ($error): ~
+              (contains($stdout, 'result=at-least-1')): true
+    - name: the prober is blocked on the origin Service but served through the interceptor
+      try:
+        - script:
+            timeout: 60s
+            content: |
+              if kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=5 "http://e2e-web-origin/" >/dev/null 2>&1; then
+                echo "result=origin-reachable"
+              else
+                echo "result=origin-blocked"
+              fi
+            check:
+              ($error): ~
+              (contains($stdout, 'result=origin-blocked')): true
+        - script:
+            timeout: 60s
+            content: |
+              kubectl exec prober -n "$NAMESPACE" -- wget -q -O- --timeout=30 "http://e2e-web/"
+            check:
+              ($error): ~
+              (contains($stdout, 'Welcome to nginx')): true

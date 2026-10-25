@@ -1,0 +1,66 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: routes-ready
+spec:
+  steps:
+    - name: the add-on accepts the InterceptorRoute and KEDA the ScaledObject built on it
+      try:
+        - assert:
+            resource:
+              apiVersion: http.keda.sh/v1beta1
+              kind: InterceptorRoute
+              metadata:
+                name: e2e-web
+              spec:
+                target:
+                  service: e2e-web-origin
+                  portName: http
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"
+        - assert:
+            resource:
+              apiVersion: keda.sh/v1alpha1
+              kind: ScaledObject
+              metadata:
+                name: e2e-web
+              spec:
+                minReplicaCount: 0
+                (triggers[0]):
+                  type: external-push
+                  metadata:
+                    interceptorRoute: e2e-web
+              status:
+                (conditions[?type == 'Ready']):
+                  - status: "True"
+    - name: the client-facing Service resolves to the interceptor and the origin Service selects the pods
+      try:
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web
+              spec:
+                type: ExternalName
+                externalName: keda-add-ons-http-interceptor-proxy-80.keda.svc.cluster.local
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: e2e-web-origin
+              spec:
+                type: ClusterIP
+                selector:
+                  app.kubernetes.io/name: web
+    - name: with no traffic KEDA keeps the Deployment at zero
+      try:
+        - script:
+            timeout: 5m
+            content: |
+              bash "$GITHUB_WORKSPACE/test/e2e/scripts/keda-http-replicas.sh" zero e2e-web 280
+            check:
+              ($error): ~
+              (contains($stdout, 'result=zero')): true

@@ -135,6 +135,7 @@ jobs:
           # ghcr.io/example/* images tripping the "untrusted registry"
           # check). This makes severity actually apply.
           limit-severities-for-sarif: true
+          trivyignores: '.trivyignore.yaml'
 
       - name: Upload Trivy scan results to GitHub Security tab
         if: always()

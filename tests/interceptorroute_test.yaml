@@ -1,0 +1,969 @@
+suite: test interceptorroute
+templates:
+  - interceptorroute.yaml
+release:
+  name: test-release
+  namespace: test-ns
+
+tests:
+  - it: should not render when keda has no http block
+    values:
+      - fixtures/keda-deployment.yaml
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when keda.http.enabled is false
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render when keda.enabled is false
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should not render for a disabled workload
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should render when keda.http is defined without an enabled flag
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http:
+        hosts: [web.example.com]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should render an InterceptorRoute targeting the origin Service by port name
+    values:
+      - fixtures/keda-http.yaml
+    asserts:
+      - isKind:
+          of: InterceptorRoute
+      - equal:
+          path: apiVersion
+          value: http.keda.sh/v1beta1
+      - equal:
+          path: metadata.name
+          value: app-web
+      - equal:
+          path: spec.target
+          value:
+            service: app-web-origin
+            portName: http
+
+  - it: should answer to every in-cluster form of the Service name
+    values:
+      - fixtures/keda-http.yaml
+    asserts:
+      - equal:
+          path: spec.rules
+          value:
+            - hosts:
+                - app-web
+                - app-web.test-ns
+                - app-web.test-ns.svc
+                - app-web.test-ns.svc.cluster.local
+
+  - it: should use integrations.keda.httpAddon.clusterDomain for the fully qualified host
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon.clusterDomain: k8s.internal
+    asserts:
+      - contains:
+          path: spec.rules[0].hosts
+          content: app-web.test-ns.svc.k8s.internal
+
+  - it: should follow service.nameOverride in hosts and target
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.nameOverride: frontend
+    asserts:
+      - equal:
+          path: spec.target.service
+          value: frontend-origin
+      - equal:
+          path: spec.rules[0].hosts[0]
+          value: frontend
+
+  - it: should add root httpRoute.hostnames when the workload has an httpRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.hostnames: ["{{ .Release.Namespace }}.example.com", "api.example.com"]
+      deployments.web.httpRoute.rules: [{matches: [{path: {type: PathPrefix, value: /}}]}]
+    asserts:
+      - contains:
+          path: spec.rules[0].hosts
+          content: test-ns.example.com
+      - contains:
+          path: spec.rules[0].hosts
+          content: api.example.com
+
+  - it: should not add httpRoute.hostnames when the workload httpRoute is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs: [{name: gw}]
+      httpRoute.hostnames: [api.example.com]
+      deployments.web.httpRoute:
+        enabled: false
+        rules: [{matches: [{path: {type: PathPrefix, value: /}}]}]
+    asserts:
+      - notContains:
+          path: spec.rules[0].hosts
+          content: api.example.com
+
+  - it: should add the hosts of Ingress paths that target the Service
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        "{{ .Release.Namespace }}.example.com":
+          paths: [{path: /, serviceName: app-web, servicePort: 8080}]
+        other.example.com:
+          paths: [{path: /, serviceName: other, servicePort: 80}]
+      ingresses.public.hosts:
+        public.example.com:
+          paths: [{path: /, serviceName: app-web, servicePort: 8080}]
+    asserts:
+      - contains:
+          path: spec.rules[0].hosts
+          content: test-ns.example.com
+      - contains:
+          path: spec.rules[0].hosts
+          content: public.example.com
+      - notContains:
+          path: spec.rules[0].hosts
+          content: other.example.com
+
+  - it: should match an Ingress path that falls back to the release name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      naming.omitWorkloadSuffix: true
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /, servicePort: 8080}]
+    asserts:
+      - contains:
+          path: spec.rules[0].hosts
+          content: web.example.com
+
+  - it: should skip a disabled Ingress
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      ingresses.public:
+        enabled: false
+        hosts:
+          public.example.com:
+            paths: [{path: /, serviceName: app-web, servicePort: 80}]
+    asserts:
+      - notContains:
+          path: spec.rules[0].hosts
+          content: public.example.com
+
+  - it: should append keda.http.hosts through tpl and drop duplicates
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.hosts: ["{{ .Release.Namespace }}.example.com", app-web, extra.example.com]
+    asserts:
+      - equal:
+          path: spec.rules[0].hosts
+          value:
+            - app-web
+            - app-web.test-ns
+            - app-web.test-ns.svc
+            - app-web.test-ns.svc.cluster.local
+            - test-ns.example.com
+            - extra.example.com
+
+  - it: should default scalingMetric to a concurrency target of 100
+    values:
+      - fixtures/keda-http.yaml
+    asserts:
+      - equal:
+          path: spec.scalingMetric
+          value:
+            concurrency:
+              targetValue: 100
+      - notExists:
+          path: spec.coldStart
+      - notExists:
+          path: spec.timeouts
+
+  - it: should pass scalingMetric, coldStart and timeouts through
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.scalingMetric:
+        requestRate: {targetValue: 20, window: 30s}
+      deployments.web.keda.http.coldStart:
+        maxPendingRequests: 100
+        placeholder: {response: {statusCode: 503, body: warming up}}
+      deployments.web.keda.http.timeouts:
+        readiness: 30s
+    asserts:
+      - equal:
+          path: spec.scalingMetric
+          value:
+            requestRate: {targetValue: 20, window: 30s}
+      - equal:
+          path: spec.coldStart
+          value:
+            maxPendingRequests: 100
+            placeholder: {response: {statusCode: 503, body: warming up}}
+      - equal:
+          path: spec.timeouts
+          value:
+            readiness: 30s
+
+  - it: should carry the interceptorRoute sync wave
+    values:
+      - fixtures/keda-http.yaml
+    asserts:
+      - equal:
+          path: metadata.annotations["argocd.argoproj.io/sync-wave"]
+          value: "20"
+
+  - it: should render for a StatefulSet
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    asserts:
+      - equal:
+          path: metadata.name
+          value: app-cache
+      - equal:
+          path: spec.target.service
+          value: app-cache-origin
+
+  - it: should render when the cluster serves both KEDA and the add-on
+    values:
+      - fixtures/keda-http.yaml
+    capabilities:
+      apiVersions:
+        - keda.sh/v1alpha1
+        - http.keda.sh/v1beta1
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when the cluster serves KEDA without the add-on
+    values:
+      - fixtures/keda-http.yaml
+    capabilities:
+      apiVersions:
+        - keda.sh/v1alpha1
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http needs the KEDA HTTP add-on v0.14.0 or later, but the cluster serves keda.sh/v1alpha1 without http.keda.sh/v1beta1 (InterceptorRoute)."
+
+  - it: should fail when the workload has no Service
+    set:
+      fullnameOverride: app
+      image: {repository: nginx, tag: v1.0.0}
+      deployments.web.keda: {maxReplicas: 5, http: {enabled: true}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http puts the workload's Service behind the KEDA HTTP add-on interceptor, but the workload renders no Service. Declare service.ports.http, or service.port / service.targetPort."
+
+  - it: should fail when the workload Service is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.enabled: false
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http puts the workload's Service behind the KEDA HTTP add-on interceptor, but the workload renders no Service. Declare service.ports.http, or service.port / service.targetPort."
+
+  - it: should fail for a Service type other than ClusterIP
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.type: NodePort
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http needs a ClusterIP Service, but service.type is NodePort. The interceptor forwards to a ClusterIP Service only, and a NodePort Service would carry traffic past it. Remove service.type or set it to ClusterIP."
+
+  - it: should accept an explicit ClusterIP type
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.type: ClusterIP
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail for a headless Service
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.clusterIP: None
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http needs a Service with a cluster IP, but service.clusterIP is None. Remove service.clusterIP."
+
+  - it: should fail when service.ports has no http entry
+    set:
+      fullnameOverride: app
+      image: {repository: nginx, tag: v1.0.0}
+      deployments.web.keda: {maxReplicas: 5, http: {enabled: true}}
+      deployments.web.service.ports.web: {targetPort: 3000}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http sends the Service port named http through the interceptor, but service.ports has no http entry."
+
+  - it: should fail when service.ports carries ports besides http and metrics
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.grpc: {port: 9000}
+      deployments.web.service.ports.admin: {port: 8081}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http: service.ports.admin, service.ports.grpc would resolve to the interceptor, which listens on one port. List them in keda.http.directPorts to serve them past the interceptor from a Service of their own, or under keda.http.routes to reach them through the interceptor by path, or remove them."
+
+  - it: should accept a metrics port next to http
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.metrics: {port: 9090}
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should accept ports listed in keda.http.directPorts
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.service.ports.metrics: {port: 9090}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when service.ports carries a port that directPorts does not list
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.service.ports.admin: {port: 8081}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http: service.ports.admin would resolve to the interceptor, which listens on one port. List them in keda.http.directPorts to serve them past the interceptor from a Service of their own, or under keda.http.routes to reach them through the interceptor by path, or remove them."
+
+  - it: should fail when directPorts lists http
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.directPorts: [http]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists http, which stays on the workload Service: http goes through the interceptor and metrics is scraped from pod IPs. Remove it from directPorts."
+
+  - it: should fail when directPorts lists metrics
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.metrics: {port: 9090}
+      deployments.web.keda.http.directPorts: [metrics]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists metrics, which stays on the workload Service: http goes through the interceptor and metrics is scraped from pod IPs. Remove it from directPorts."
+
+  - it: should fail when directPorts lists a port service.ports does not declare
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists events, but service.ports has no events entry. Declare the port under service.ports or remove it from directPorts."
+
+  - it: should fail when directPorts is set on a single-port Service
+    set:
+      fullnameOverride: app
+      image: {repository: nginx, tag: v1.0.0}
+      deployments.web.service: {targetPort: 3000}
+      deployments.web.keda: {maxReplicas: 5, http: {directPorts: [events]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts lists events, but service.ports has no events entry. Declare the port under service.ports or remove it from directPorts."
+
+  - it: should fail when a direct port uses the interceptor port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 8080}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts: service.ports.events uses port 8080, the interceptor port, so a route or Ingress path on that port could mean either. Give it another port."
+
+  - it: should take a direct port's number from targetPort when port is unset
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {targetPort: 8080}
+      deployments.web.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.directPorts: service.ports.events uses port 8080, the interceptor port, so a route or Ingress path on that port could mean either. Give it another port."
+
+  - it: should fail when service.ports.http.port differs from the interceptor port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.http.port: 80
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http: service.ports.http.port is 80, but clients reach the interceptor on port 8080 (integrations.keda.httpAddon.port). Omit service.ports.http.port to take 8080, or make the two equal."
+
+  - it: should accept service.ports.http.port equal to the interceptor port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon.port: 80
+      deployments.web.service.ports.http.port: 80
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when the single-port service.port differs from the interceptor port
+    set:
+      fullnameOverride: app
+      image: {repository: nginx, tag: v1.0.0}
+      deployments.web.keda: {maxReplicas: 5, http: {enabled: true}}
+      deployments.web.service: {port: 80, targetPort: 3000}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http: service.port is 80, but clients reach the interceptor on port 8080 (integrations.keda.httpAddon.port). Omit service.port to take 8080, or make the two equal."
+
+  - it: should accept a single-port Service that sets only targetPort
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when the workload also has a grpcRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.grpcRoute.rules: [{}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http and deployments.web.grpcRoute cannot be combined: the interceptor serves the http port only. Disable grpcRoute on this workload."
+
+  - it: should fail when the workload also has a tlsRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.tlsRoute.rules: [{}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http and deployments.web.tlsRoute cannot be combined: the interceptor serves the http port only. Disable tlsRoute on this workload."
+
+  - it: should accept a disabled grpcRoute and tlsRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.grpcRoute: {enabled: false, rules: [{}]}
+      deployments.web.tlsRoute: {enabled: false, rules: [{}]}
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when a defaulted httpRoute rule sets another servicePort
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules: [{servicePort: 80}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.httpRoute.rules[0].servicePort is 80, but with keda.http the rule goes to the interceptor, which listens on port 8080. Remove servicePort or set it to 8080; the port of a service.ports entry listed in keda.http.directPorts goes to that entry's own Service, and one under keda.http.routes goes through the interceptor by path."
+
+  - it: should accept an httpRoute rule that names its own backend
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.httpRoute.rules:
+        - {serviceName: elsewhere, servicePort: 80}
+        - {backendRefs: [{name: elsewhere, port: 80}]}
+        - {servicePort: 8080}
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should accept an httpRoute rule on a direct port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      deployments.web.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when an Ingress path reaches a direct port through the Service name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /events, serviceName: app-web, servicePort: 9000}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingress.hosts.web.example.com.paths[0] sends traffic to Service \"app-web\" on port 9000, but deployments.web.keda.http serves that port from Service \"app-web-events\". Set serviceName to \"app-web-events\"."
+
+  - it: should fail when an ingresses entry reaches a direct port through the release name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      naming.omitWorkloadSuffix: true
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      ingresses.public.hosts:
+        public.example.com:
+          paths: [{path: /events, servicePort: 9000}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingresses.public.hosts.public.example.com.paths[0] sends traffic to Service \"app\" on port 9000, but deployments.web.keda.http serves that port from Service \"app-events\". Set serviceName to \"app-events\"."
+
+  - it: should accept a StatefulSet httpRoute rule on a direct port
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, events: {port: 9000}}}
+      statefulSets.cache.keda.http.directPorts: [events]
+      statefulSets.cache.httpRoute.rules: [{servicePort: 9000}]
+    asserts:
+      - hasDocuments:
+          count: 1
+
+  - it: should fail when a StatefulSet lists a port its Service does not declare
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.keda.http.directPorts: [events]
+    asserts:
+      - failedTemplate:
+          errorMessage: "statefulSets.cache.keda.http.directPorts lists events, but service.ports has no events entry. Declare the port under service.ports or remove it from directPorts."
+
+  - it: should leave an Ingress path to a direct port's own Service out of the hosts
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.events: {port: 9000}
+      deployments.web.keda.http.directPorts: [events]
+      ingress.enabled: true
+      ingress.hosts:
+        events.example.com:
+          paths: [{path: /, serviceName: app-web-events, servicePort: 9000}]
+    asserts:
+      - notContains:
+          path: spec.rules[0].hosts
+          content: events.example.com
+
+  - it: should fail when a direct port's Service name exceeds 63 characters
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.nameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      deployments.web.service.ports.notifications: {port: 9000}
+      deployments.web.keda.http.directPorts: [notifications]
+    asserts:
+      - failedTemplate:
+          errorPattern: "Service for keda.http.directPorts entry \"notifications\""
+
+  - it: should fail when an Ingress path reaches the Service on another port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /, serviceName: app-web}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingress.hosts.web.example.com.paths[0] sends traffic to Service \"app-web\" on port 80, but deployments.web.keda.http turns that Service into an ExternalName for the interceptor, which listens on port 8080. Set servicePort to 8080."
+
+  - it: should fail when an ingresses entry reaches the Service on another port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      ingresses.public.hosts:
+        public.example.com:
+          paths:
+            - {path: /, serviceName: other}
+            - {path: /app, serviceName: app-web, servicePort: 80}
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingresses.public.hosts.public.example.com.paths[1] sends traffic to Service \"app-web\" on port 80, but deployments.web.keda.http turns that Service into an ExternalName for the interceptor, which listens on port 8080. Set servicePort to 8080."
+
+  - it: should accept an Ingress path on the interceptor port with httpAddon.port 80
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      integrations.keda.httpAddon.port: 80
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /, serviceName: app-web}]
+    asserts:
+      - contains:
+          path: spec.rules[0].hosts
+          content: web.example.com
+
+  - it: should fail when the origin Service name exceeds 63 characters
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.nameOverride: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    asserts:
+      - failedTemplate:
+          errorPattern: "origin Service for workload \"web\""
+
+  # --- keda.labels and keda.annotations ---
+
+  - it: should render the workload's keda labels and annotations on its InterceptorRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.labels.team: autoscaling
+      deployments.web.keda.annotations.owner: autoscaling-team
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: autoscaling
+      - equal:
+          path: metadata.annotations.owner
+          value: autoscaling-team
+
+  # --- keda.http.routes ---
+
+  - it: should render an InterceptorRoute per keda.http.routes entry with the workload route's hosts
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100, targetPort: 3100}
+      deployments.web.keda.http.hosts: [web.example.com]
+      deployments.web.keda.http.routes:
+        stream: {paths: [/stream, /live/]}
+    asserts:
+      - hasDocuments:
+          count: 2
+      - notExists:
+          path: spec.rules[0].paths
+        documentIndex: 0
+      - equal:
+          path: metadata.name
+          value: app-web-stream
+        documentIndex: 1
+      - equal:
+          path: spec.target
+          value: {service: app-web-origin, portName: stream}
+        documentIndex: 1
+      - equal:
+          path: spec.rules
+          value:
+            - hosts: [app-web, app-web.test-ns, app-web.test-ns.svc, app-web.test-ns.svc.cluster.local, web.example.com]
+              paths: [{value: /stream}, {value: /live/}]
+        documentIndex: 1
+      - equal:
+          path: spec.scalingMetric
+          value: {concurrency: {targetValue: 100}}
+        documentIndex: 1
+
+  - it: should pass a route's scalingMetric, coldStart and timeouts through
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes:
+        stream:
+          paths: [/stream]
+          scalingMetric: {concurrency: {targetValue: 1000}}
+          coldStart: {fallback: {service: busy, port: 80}}
+          timeouts: {responseHeader: 0s}
+    asserts:
+      - equal:
+          path: spec.scalingMetric
+          value: {concurrency: {targetValue: 1000}}
+        documentIndex: 1
+      - equal:
+          path: spec.coldStart
+          value: {fallback: {service: busy, port: 80}}
+        documentIndex: 1
+      - equal:
+          path: spec.timeouts
+          value: {responseHeader: 0s}
+        documentIndex: 1
+
+  - it: should carry keda labels, annotations and the sync wave on a route's InterceptorRoute
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.keda.labels: {team: web}
+      deployments.web.keda.annotations: {example.com/owner: web}
+    asserts:
+      - equal:
+          path: metadata.labels.team
+          value: web
+        documentIndex: 1
+      - equal:
+          path: metadata.annotations
+          value:
+            argocd.argoproj.io/sync-wave: "20"
+            example.com/owner: web
+        documentIndex: 1
+
+  - it: should render a route's InterceptorRoute for a StatefulSet
+    values:
+      - fixtures/keda-http-statefulset.yaml
+    set:
+      statefulSets.cache.service: {ports: {http: {targetPort: 3000}, stream: {port: 9100}}}
+      statefulSets.cache.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - equal:
+          path: spec.target
+          value: {service: app-cache-origin, portName: stream}
+        documentIndex: 1
+
+  - it: should render no route when keda.http is disabled
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.enabled: false
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: should add an Ingress host on the interceptor port to every route
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /stream, serviceName: app-web, servicePort: 8080}]
+    asserts:
+      - contains:
+          path: spec.rules[0].hosts
+          content: web.example.com
+        documentIndex: 0
+      - contains:
+          path: spec.rules[0].hosts
+          content: web.example.com
+        documentIndex: 1
+
+  - it: should accept an httpRoute rule on a route's port whose paths lie under the route's paths
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream, /live]}}
+      deployments.web.httpRoute.rules:
+        - matches:
+            - path: {type: PathPrefix, value: /stream/v1}
+            - path: {type: Exact, value: /live}
+            - path: {value: /stream}
+          servicePort: 9100
+        - {serviceName: other, servicePort: 9100}
+    asserts:
+      - hasDocuments:
+          count: 2
+
+  - it: should fail when routes names http
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.routes: {http: {paths: [/x]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.routes.http: http is not a port to route by path. http is the workload route's own port and metrics is scraped from pod IPs. Remove the entry."
+
+  - it: should fail when routes names metrics
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.metrics: {port: 9090}
+      deployments.web.keda.http.routes: {metrics: {paths: [/x]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.routes.metrics: metrics is not a port to route by path. http is the workload route's own port and metrics is scraped from pod IPs. Remove the entry."
+
+  - it: should fail when a port is in both directPorts and routes
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.directPorts: [stream]
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http: stream is listed in both directPorts and routes. A port goes either past the interceptor or through it; keep one."
+
+  - it: should fail when routes names a port service.ports does not declare
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.routes.stream names a port service.ports does not declare. Declare service.ports.stream or remove the entry."
+
+  - it: should fail when routes is set on a single-port Service
+    set:
+      fullnameOverride: app
+      image: {repository: nginx, tag: v1.0.0}
+      deployments.web.service: {targetPort: 3000}
+      deployments.web.keda: {maxReplicas: 5, http: {routes: {stream: {paths: [/stream]}}}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.routes.stream names a port service.ports does not declare. Declare service.ports.stream or remove the entry."
+
+  - it: should fail when two routes list the same path, trailing slash aside
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.service.ports.feed: {port: 9200}
+      deployments.web.keda.http.routes:
+        stream: {paths: [/live]}
+        feed: {paths: [/live/]}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.routes: path /live is listed under both feed and stream, so the interceptor could send it to either port. List it once."
+
+  - it: should fail when a route's port is the interceptor port
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 8080}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.keda.http.routes: service.ports.stream uses port 8080, which the origin Service already gives the http port. Give it another port."
+
+  - it: should fail when an httpRoute rule on a route's port matches a path outside the route
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream, /live]}}
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: PathPrefix, value: /streamer}}]
+          servicePort: 9100
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.httpRoute.rules[0] sends port 9100 (service.ports.stream) through the interceptor, which picks that port by path, but its PathPrefix match \"/streamer\" is not under keda.http.routes.stream.paths (/stream, /live). Match only paths under them."
+
+  - it: should fail when an httpRoute rule on a route's port matches every path
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.httpRoute.rules:
+        - servicePort: 9100
+    asserts:
+      - failedTemplate:
+          errorMessage: "deployments.web.httpRoute.rules[0] sends port 9100 (service.ports.stream) through the interceptor, which picks that port by path, but its PathPrefix match \"/\" is not under keda.http.routes.stream.paths (/stream). Match only paths under them."
+
+  - it: should fail when an httpRoute rule on a route's port matches by header only
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.httpRoute.rules:
+        - matches: [{headers: [{name: x-stream, value: "1"}]}]
+          servicePort: 9100
+    asserts:
+      - failedTemplate:
+          errorPattern: "its PathPrefix match \"/\" is not under keda.http.routes.stream.paths"
+
+  - it: should fail when an httpRoute rule on a route's port matches by regular expression
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      httpRoute.parentRefs: [{name: gw}]
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web.httpRoute.rules:
+        - matches: [{path: {type: RegularExpression, value: /stream/.*}}]
+          servicePort: 9100
+    asserts:
+      - failedTemplate:
+          errorPattern: 'its RegularExpression match "/stream/\.\*" is not under keda.http.routes.stream.paths'
+
+  - it: should fail when an Ingress path reaches a route's port through the Service name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      ingress.enabled: true
+      ingress.hosts:
+        web.example.com:
+          paths: [{path: /stream, serviceName: app-web, servicePort: 9100}]
+    asserts:
+      - failedTemplate:
+          errorMessage: "ingress.hosts.web.example.com.paths[0] sends traffic to Service \"app-web\" on port 9100, but deployments.web.keda.http reaches service.ports.stream through the interceptor, which listens on port 8080 and picks the port by path. Set servicePort to 8080."
+
+  - it: should fail when a route lands on another workload's InterceptorRoute name
+    values:
+      - fixtures/keda-http.yaml
+    set:
+      deployments.web.service.ports.stream: {port: 9100}
+      deployments.web.keda.http.routes: {stream: {paths: [/stream]}}
+      deployments.web-stream.service.ports.http: {targetPort: 3000}
+      deployments.web-stream.keda: {maxReplicas: 2, http: {enabled: true}}
+    asserts:
+      - failedTemplate:
+          errorMessage: "InterceptorRoute name \"app-web-stream\" is claimed by both deployments.web.keda.http.routes.stream and deployments.web-stream.keda.http. Rename the workload or the service.ports entry."
