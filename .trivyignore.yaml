@@ -1,0 +1,8 @@
+# Read by the Trivy step in .github/workflows/ci.yaml, which scans the render of
+# values.yaml.example.
+misconfigurations:
+  - id: KSV-0108
+    statement: >-
+      The ExternalName is the keda.http Service, a DNS alias for the KEDA HTTP add-on
+      interceptor inside the cluster. values.yaml.example sets no externalIPs and no
+      other ExternalName.
