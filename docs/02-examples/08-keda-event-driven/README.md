@@ -2,7 +2,11 @@
 
 A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus VPA in `Initial` mode for right-sized memory requests on first pod start.
 
+Next to it, an HTTP frontend that scales 0 → 10 replicas on request rate through the [KEDA HTTP add-on](https://keda.sh/http-add-on/latest/), and wakes from zero on the first request.
+
 ## What this shows
+
+### `worker`: Kafka lag
 
 - `keda.enabled: true` on the worker, with a `kafka` trigger keyed on consumer-group lag.
 - `minReplicas: 1`, not `0` — this worker should never have a gap in consumption. Set `minReplicas: 0` instead when the workload can tolerate sitting idle (e.g. a `cron` trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.
@@ -13,6 +17,18 @@ A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus
 - `metrics.type: pod` + `integrations.monitoring.defaults.exposeService.enabled: true` → a metrics-only Service `<release>-worker-metrics` is auto-emitted, and a `PodMonitor` scrapes the worker pods directly.
 - The Deployment manifest will have **no `spec.replicas`** because an HPA-class scaler is on — so Helm `upgrade` doesn't bounce the count back to a static value on every sync.
 
+### `web`: HTTP traffic, down to zero
+
+- `keda.http.enabled: true` turns the ScaledObject into one driven by the add-on's interceptor, which counts requests, holds the first one while KEDA starts a pod, and forwards it once the pod is ready. `minReplicas` defaults to `0`.
+- The Service keeps its name, `orders-web`, and becomes an `ExternalName` for the interceptor. The pods are behind `orders-web-origin`, which also carries the metrics port the ServiceMonitor scrapes.
+- The `http` port is left unset, so it takes the interceptor port, `8080`. An ExternalName cannot remap ports, so callers and the Ingress use `8080`.
+- `scalingMetric.requestRate` adds one replica per 50 requests a second over a one-minute window.
+- `live` is a second port, for server-sent events. `keda.http.routes.live` gives it an `InterceptorRoute` of its own on `/live`: `http://orders-web:8080/live` reaches port `9100`, everything else reaches `http`. The route has its own trigger, so a stream request wakes the workload too. An open stream counts as one request for as long as it lasts, so its `concurrency` target is sized for connections.
+- The Ingress names `orders-web` on `8080`. Its host, `orders.example.com`, is added to both InterceptorRoutes.
+- `podDisruptionBudget.maxUnavailable: 1` replaces the root PDB for this workload: `minAvailable: 1` would block draining the node that runs its only pod.
+
+A port that should not go through the interceptor goes under `keda.http.directPorts` instead and gets a Service of its own; its traffic neither counts nor wakes the workload. The full set of fields, and the shapes the render rejects, are in the [values reference](../../03-reference/01-values.md#keda-http-add-on-kedahttp).
+
 ## Delta from `02-web-app-ingress`
 
 | Changed | What |
@@ -22,7 +38,8 @@ A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus
 | Added VPA | Orthogonal, recommends/sets memory requests on initial pod create. |
 | Service off | Worker has no listener; metrics-only Service auto-emitted instead. |
 | `metrics.type: pod` | PodMonitor instead of ServiceMonitor. |
-| Removed Ingress | No external traffic. |
+| Ingress on `web` | Backend is the ExternalName on the interceptor port. |
+| `web` on KEDA HTTP | Scales to zero; the interceptor wakes it on the first request. |
 
 ## Files
 
@@ -46,6 +63,8 @@ kubectl apply -f flux/
 ## Prerequisites
 
 - KEDA installed in the cluster (`keda.sh` CRDs).
+- KEDA HTTP add-on v0.14.0 or later in the `keda` namespace (`http.keda.sh/v1beta1` `InterceptorRoute`). Set `integrations.keda.httpAddon` if it runs elsewhere.
+- An Ingress controller that accepts `ExternalName` backends; ingress-nginx does.
 - VPA installed (`autoscaling.k8s.io` CRDs).
 - A Kafka cluster reachable at `kafka.kafka:9092` with topic `orders` and consumer group `orders-worker`. Adjust to your environment.
 - Prometheus Operator CRDs for the PodMonitor (or remove the `metrics:` block).
