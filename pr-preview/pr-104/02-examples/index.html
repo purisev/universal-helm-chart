@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-4f152a69.js";
+            window.path_to_searchindex_js = "../searchindex-6adf5a54.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-9fa66af8.js"></script>
@@ -212,7 +212,7 @@
 <tr><td>05</td><td><a href="05-cronjobs/"><code>05-cronjobs/</code></a></td><td><code>jobGroups</code> — Job (PreSync hook, tasks-mode) + CronJob (two scheduled jobs)</td></tr>
 <tr><td>06</td><td><a href="06-monitoring/"><code>06-monitoring/</code></a></td><td>ServiceMonitor + PodMonitor + annotations-mode + per-workload provider override (VM)</td></tr>
 <tr><td>07</td><td><a href="07-external-secrets/"><code>07-external-secrets/</code></a></td><td>ESO <code>SecretStore</code> (Vault) + <code>ExternalSecret</code> (<code>data</code> and <code>dataFrom</code>) + Reloader</td></tr>
-<tr><td>08</td><td><a href="08-keda-event-driven/"><code>08-keda-event-driven/</code></a></td><td>KEDA <code>ScaledObject</code> (Kafka lag trigger) + VPA Initial mode (orthogonal)</td></tr>
+<tr><td>08</td><td><a href="08-keda-event-driven/"><code>08-keda-event-driven/</code></a></td><td>KEDA <code>ScaledObject</code> (Kafka lag trigger) + VPA Initial mode (orthogonal); HTTP scale to zero through the KEDA HTTP add-on</td></tr>
 <tr><td>09</td><td><a href="09-multi-env-overrides/"><code>09-multi-env-overrides/</code></a></td><td>Base values + per-env overlays + Argo CD <code>ApplicationSet</code> + Flux <code>valuesFrom</code></td></tr>
 <tr><td>10</td><td><a href="10-init-containers/"><code>10-init-containers/</code></a></td><td>Per-workload <code>initContainers</code> map — wait-for-db + schema migration before the main container starts</td></tr>
 <tr><td>99</td><td><a href="99-kitchen-sink/"><code>99-kitchen-sink/</code></a></td><td>Everything-on showcase</td></tr>
@@ -229,6 +229,7 @@
 <li>Wiring up scrape targets → <code>06-monitoring</code>.</li>
 <li>Pulling secrets from Vault / AWS / GCP → <code>07-external-secrets</code>.</li>
 <li>Event-driven worker scaling → <code>08-keda-event-driven</code>.</li>
+<li>HTTP service that scales to zero → <code>08-keda-event-driven</code>.</li>
 <li>Same app in dev / staging / prod → <code>09-multi-env-overrides</code>.</li>
 <li>Init containers for wait-for-X / one-shot bootstrap before the main app → <code>10-init-containers</code>.</li>
 <li>All the bells and whistles → <code>99-kitchen-sink</code>.</li>

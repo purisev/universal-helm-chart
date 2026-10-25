@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-4f152a69.js";
+            window.path_to_searchindex_js = "searchindex-6adf5a54.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-9fa66af8.js"></script>
@@ -388,7 +388,7 @@
 <tr><td>05</td><td><a href="02-examples/05-cronjobs"><code>05-cronjobs/</code></a></td><td><code>jobGroups</code> — Job (PreSync hook, tasks-mode) + CronJob (two scheduled jobs)</td></tr>
 <tr><td>06</td><td><a href="02-examples/06-monitoring"><code>06-monitoring/</code></a></td><td>ServiceMonitor + PodMonitor + annotations-mode + per-workload provider override (VM)</td></tr>
 <tr><td>07</td><td><a href="02-examples/07-external-secrets"><code>07-external-secrets/</code></a></td><td>ESO <code>SecretStore</code> (Vault) + <code>ExternalSecret</code> (<code>data</code> and <code>dataFrom</code>) + Reloader</td></tr>
-<tr><td>08</td><td><a href="02-examples/08-keda-event-driven"><code>08-keda-event-driven/</code></a></td><td>KEDA <code>ScaledObject</code> (Kafka lag trigger) + VPA Initial mode (orthogonal)</td></tr>
+<tr><td>08</td><td><a href="02-examples/08-keda-event-driven"><code>08-keda-event-driven/</code></a></td><td>KEDA <code>ScaledObject</code> (Kafka lag trigger) + VPA Initial mode (orthogonal); HTTP scale to zero through the KEDA HTTP add-on</td></tr>
 <tr><td>09</td><td><a href="02-examples/09-multi-env-overrides"><code>09-multi-env-overrides/</code></a></td><td>Base values + per-env overlays + Argo CD <code>ApplicationSet</code> + Flux <code>valuesFrom</code></td></tr>
 <tr><td>10</td><td><a href="02-examples/10-init-containers"><code>10-init-containers/</code></a></td><td>Per-workload <code>initContainers</code> map — wait-for-db + schema migration before the main container starts</td></tr>
 <tr><td>99</td><td><a href="02-examples/99-kitchen-sink"><code>99-kitchen-sink/</code></a></td><td>Everything-on showcase</td></tr>
@@ -405,6 +405,7 @@
 <li>Wiring up scrape targets → <code>06-monitoring</code>.</li>
 <li>Pulling secrets from Vault / AWS / GCP → <code>07-external-secrets</code>.</li>
 <li>Event-driven worker scaling → <code>08-keda-event-driven</code>.</li>
+<li>HTTP service that scales to zero → <code>08-keda-event-driven</code>.</li>
 <li>Same app in dev / staging / prod → <code>09-multi-env-overrides</code>.</li>
 <li>Init containers for wait-for-X / one-shot bootstrap before the main app → <code>10-init-containers</code>.</li>
 <li>All the bells and whistles → <code>99-kitchen-sink</code>.</li>
@@ -820,7 +821,9 @@ kubectl apply -f flux/
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="08--keda-event-driven-autoscaling"><a class="header" href="#08--keda-event-driven-autoscaling">08 — KEDA event-driven autoscaling</a></h1>
 <p>A Kafka consumer that scales 1 → 30 replicas based on consumer-group lag, plus VPA in <code>Initial</code> mode for right-sized memory requests on first pod start.</p>
+<p>Next to it, an HTTP frontend that scales 0 → 10 replicas on request rate through the <a href="https://keda.sh/http-add-on/latest/">KEDA HTTP add-on</a>, and wakes from zero on the first request.</p>
 <h2 id="what-this-shows-7"><a class="header" href="#what-this-shows-7">What this shows</a></h2>
+<h3 id="worker-kafka-lag"><a class="header" href="#worker-kafka-lag"><code>worker</code>: Kafka lag</a></h3>
 <ul>
 <li><code>keda.enabled: true</code> on the worker, with a <code>kafka</code> trigger keyed on consumer-group lag.</li>
 <li><code>minReplicas: 1</code>, not <code>0</code> — this worker should never have a gap in consumption. Set <code>minReplicas: 0</code> instead when the workload can tolerate sitting idle (e.g. a <code>cron</code> trigger active only during a scheduled window); KEDA scales it down to zero once every trigger goes inactive, and back up once one fires again.</li>
@@ -831,6 +834,17 @@ kubectl apply -f flux/
 <li><code>metrics.type: pod</code> + <code>integrations.monitoring.defaults.exposeService.enabled: true</code> → a metrics-only Service <code>&lt;release&gt;-worker-metrics</code> is auto-emitted, and a <code>PodMonitor</code> scrapes the worker pods directly.</li>
 <li>The Deployment manifest will have <strong>no <code>spec.replicas</code></strong> because an HPA-class scaler is on — so Helm <code>upgrade</code> doesn’t bounce the count back to a static value on every sync.</li>
 </ul>
+<h3 id="web-http-traffic-down-to-zero"><a class="header" href="#web-http-traffic-down-to-zero"><code>web</code>: HTTP traffic, down to zero</a></h3>
+<ul>
+<li><code>keda.http.enabled: true</code> turns the ScaledObject into one driven by the add-on’s interceptor, which counts requests, holds the first one while KEDA starts a pod, and forwards it once the pod is ready. <code>minReplicas</code> defaults to <code>0</code>.</li>
+<li>The Service keeps its name, <code>orders-web</code>, and becomes an <code>ExternalName</code> for the interceptor. The pods are behind <code>orders-web-origin</code>, which also carries the metrics port the ServiceMonitor scrapes.</li>
+<li>The <code>http</code> port is left unset, so it takes the interceptor port, <code>8080</code>. An ExternalName cannot remap ports, so callers and the Ingress use <code>8080</code>.</li>
+<li><code>scalingMetric.requestRate</code> adds one replica per 50 requests a second over a one-minute window.</li>
+<li><code>live</code> is a second port, for server-sent events. <code>keda.http.routes.live</code> gives it an <code>InterceptorRoute</code> of its own on <code>/live</code>: <code>http://orders-web:8080/live</code> reaches port <code>9100</code>, everything else reaches <code>http</code>. The route has its own trigger, so a stream request wakes the workload too. An open stream counts as one request for as long as it lasts, so its <code>concurrency</code> target is sized for connections.</li>
+<li>The Ingress names <code>orders-web</code> on <code>8080</code>. Its host, <code>orders.example.com</code>, is added to both InterceptorRoutes.</li>
+<li><code>podDisruptionBudget.maxUnavailable: 1</code> replaces the root PDB for this workload: <code>minAvailable: 1</code> would block draining the node that runs its only pod.</li>
+</ul>
+<p>A port that should not go through the interceptor goes under <code>keda.http.directPorts</code> instead and gets a Service of its own; its traffic neither counts nor wakes the workload. The full set of fields, and the shapes the render rejects, are in the <a href="#keda-http-add-on-kedahttp">values reference</a>.</p>
 <h2 id="delta-from-02-web-app-ingress-4"><a class="header" href="#delta-from-02-web-app-ingress-4">Delta from <code>02-web-app-ingress</code></a></h2>
 <div class="table-wrapper">
 <table>
@@ -843,7 +857,8 @@ kubectl apply -f flux/
 <tr><td>Added VPA</td><td>Orthogonal, recommends/sets memory requests on initial pod create.</td></tr>
 <tr><td>Service off</td><td>Worker has no listener; metrics-only Service auto-emitted instead.</td></tr>
 <tr><td><code>metrics.type: pod</code></td><td>PodMonitor instead of ServiceMonitor.</td></tr>
-<tr><td>Removed Ingress</td><td>No external traffic.</td></tr>
+<tr><td>Ingress on <code>web</code></td><td>Backend is the ExternalName on the interceptor port.</td></tr>
+<tr><td><code>web</code> on KEDA HTTP</td><td>Scales to zero; the interceptor wakes it on the first request.</td></tr>
 </tbody>
 </table>
 </div>
@@ -871,6 +886,8 @@ kubectl apply -f flux/
 <h2 id="prerequisites-5"><a class="header" href="#prerequisites-5">Prerequisites</a></h2>
 <ul>
 <li>KEDA installed in the cluster (<code>keda.sh</code> CRDs).</li>
+<li>KEDA HTTP add-on v0.14.0 or later in the <code>keda</code> namespace (<code>http.keda.sh/v1beta1</code> <code>InterceptorRoute</code>). Set <code>integrations.keda.httpAddon</code> if it runs elsewhere.</li>
+<li>An Ingress controller that accepts <code>ExternalName</code> backends; ingress-nginx does.</li>
 <li>VPA installed (<code>autoscaling.k8s.io</code> CRDs).</li>
 <li>A Kafka cluster reachable at <code>kafka.kafka:9092</code> with topic <code>orders</code> and consumer group <code>orders-worker</code>. Adjust to your environment.</li>
 <li>Prometheus Operator CRDs for the PodMonitor (or remove the <code>metrics:</code> block).</li>
