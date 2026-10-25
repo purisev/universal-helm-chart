@@ -1,0 +1,22 @@
+# 01-minimal — one Deployment + Service.
+# Everything else (monitoring, ingress, autoscaling, RBAC, secrets) stays at chart defaults: off.
+
+deployments:
+  web:
+    enabled: true
+    replicaCount: 1
+    image:
+      repository: nginx
+      tag: "1.27"
+      pullPolicy: IfNotPresent
+    service:
+      enabled: true
+      type: ClusterIP
+      port: 80
+      targetPort: 80
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        memory: 128Mi

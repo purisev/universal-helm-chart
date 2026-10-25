@@ -1,0 +1,41 @@
+# 09-multi-env-overrides — staging overlay.
+# Apply on top of values-base.yaml: helm install -f values-base.yaml -f values-staging.yaml
+
+# Every env carries its own name prefix, so cross-references (the Ingress backend
+# below, dashboards, runbooks) name resources that exist without depending on how
+# the release was named.
+fullnameOverride: orders-staging
+
+commonLabels:
+  environment: staging
+
+integrations:
+  monitoring:
+    defaults:
+      enabled: true                  # production-shape monitoring on staging too
+
+ingress:
+  enabled: true
+  ingressClassName: nginx
+  hosts:
+    orders.staging.example.com:
+      paths:
+        - path: /
+          pathType: Prefix
+          serviceName: orders-staging-api
+          servicePort: 80
+
+deployments:
+  api:
+    replicaCount: 2
+    image:
+      tag: v1.4.2                    # immutable
+    env:
+      LOG_LEVEL:
+        value: info
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
